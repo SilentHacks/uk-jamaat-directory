@@ -30,12 +30,16 @@ async def create_published_dataset_version(session: AsyncSession) -> DatasetVers
     now = datetime.now(UTC)
     date_prefix = now.date().isoformat()
     existing = (
-        await session.execute(
-            select(DatasetVersion.version)
-            .where(DatasetVersion.version.like(f"{date_prefix}.%"))
-            .order_by(DatasetVersion.version.desc())
+        (
+            await session.execute(
+                select(DatasetVersion.version)
+                .where(DatasetVersion.version.like(f"{date_prefix}.%"))
+                .order_by(DatasetVersion.version.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     if existing:
         last = existing[0]

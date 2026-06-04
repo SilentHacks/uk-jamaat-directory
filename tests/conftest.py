@@ -87,15 +87,11 @@ async def _truncate_public_tables(connection) -> None:
             """
         )
     )
-    tables = [
-        row[0] for row in result if row[0] not in POSTGIS_SYSTEM_TABLES
-    ]
+    tables = [row[0] for row in result if row[0] not in POSTGIS_SYSTEM_TABLES]
     if not tables:
         return
     table_list = ", ".join(f'"{name}"' for name in tables)
-    await connection.execute(
-        text(f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE")
-    )
+    await connection.execute(text(f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE"))
 
 
 async def _bootstrap_schema(database_url: str) -> None:

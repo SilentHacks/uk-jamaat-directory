@@ -107,7 +107,10 @@ def test_ai_extraction_stays_pending_after_validation() -> None:
         extraction_kind=ExtractionKind.AI,
     )
     assert result.is_valid
-    assert status_after_validation(result, extraction_kind=ExtractionKind.AI) == CandidateStatus.PENDING
+    assert (
+        status_after_validation(result, extraction_kind=ExtractionKind.AI)
+        == CandidateStatus.PENDING
+    )
 
 
 def test_publish_gate_blocks_unknown_policy() -> None:
