@@ -15,26 +15,12 @@ from uk_jamaat_directory.models.core import (
     SourceHealth,
 )
 from uk_jamaat_directory.schedules.dataset import get_latest_published_version
+from uk_jamaat_directory.schedules.prayers import expected_prayers_for_date
 from uk_jamaat_directory.services.public_policy import public_source_filter
-
-DAILY_PRAYERS = (
-    Prayer.FAJR,
-    Prayer.DHUHR,
-    Prayer.ASR,
-    Prayer.MAGHRIB,
-    Prayer.ISHA,
-)
 
 
 def _today_london() -> date:
     return datetime.now(ZoneInfo("Europe/London")).date()
-
-
-def expected_prayers_for_date(on_date: date) -> set[Prayer]:
-    prayers = set(DAILY_PRAYERS)
-    if on_date.weekday() == 4:
-        prayers.add(Prayer.JUMUAH)
-    return prayers
 
 
 async def _published_occurrence_keys(
@@ -178,12 +164,16 @@ async def recompute_source_health(
 
 async def recompute_all_source_health(session: AsyncSession) -> int:
     source_ids = (
-        await session.execute(
-            select(MosqueSource.id)
-            .where(MosqueSource.mosque_id.is_not(None))
-            .where(public_source_filter())
+        (
+            await session.execute(
+                select(MosqueSource.id)
+                .where(MosqueSource.mosque_id.is_not(None))
+                .where(public_source_filter())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     count = 0
     for source_id in source_ids:
@@ -200,11 +190,15 @@ async def refresh_occurrence_freshness_for_source(
     if health is None:
         return 0
 
+    latest_version = await get_latest_published_version(session)
+    if latest_version is None:
+        return 0
+
     occ_status = classify_occurrence_freshness(health.freshness_status)
     stmt = (
         select(ScheduleOccurrence)
         .where(ScheduleOccurrence.source_id == source_id)
-        .where(ScheduleOccurrence.dataset_version_id.is_not(None))
+        .where(ScheduleOccurrence.dataset_version_id == latest_version.id)
     )
     occurrences = (await session.execute(stmt)).scalars().all()
     updated = 0

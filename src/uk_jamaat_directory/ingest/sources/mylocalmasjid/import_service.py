@@ -32,6 +32,7 @@ from uk_jamaat_directory.models.core import (
 from uk_jamaat_directory.schedules.candidates import upsert_schedule_candidate
 from uk_jamaat_directory.schedules.parse import parse_hhmm
 from uk_jamaat_directory.schedules.publication import validate_candidates
+from uk_jamaat_directory.schedules.types import ScheduleCandidateInput
 
 EXTRACTOR_VERSION = "mylocalmasjid-deterministic-v1"
 
@@ -62,6 +63,7 @@ async def import_mylocalmasjid_bundle(
     result = MyLocalMasjidImportResult()
     content_hash = hashlib.sha256(raw_payload).hexdigest()
     imported_at = datetime.now(UTC)
+    affected_source_ids: set[uuid.UUID] = set()
 
     for record in bundle.mosques:
         try:
@@ -109,9 +111,20 @@ async def import_mylocalmasjid_bundle(
         else:
             extraction_run = await _latest_extraction_run(session, source_id=source.id)
             if extraction_run is None:
-                await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
-                continue
+                extraction_run = ExtractionRun(
+                    id=uuid.uuid4(),
+                    artifact_id=artifact.id,
+                    source_id=source.id,
+                    kind=ExtractionKind.DETERMINISTIC,
+                    extractor_version=EXTRACTOR_VERSION,
+                    status="succeeded",
+                    finished_at=imported_at,
+                    metadata_={"mosque_external_id": record.external_id},
+                )
+                session.add(extraction_run)
+                await session.flush()
 
+        affected_source_ids.add(source.id)
         created, skipped = await _create_candidates(
             session,
             mosque=mosque,
@@ -124,8 +137,8 @@ async def import_mylocalmasjid_bundle(
 
         await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
 
-    if validate_after_import:
-        await validate_candidates(session, source_id=None)
+    if validate_after_import and affected_source_ids:
+        await validate_candidates(session, source_ids=affected_source_ids)
 
     return result
 
@@ -194,12 +207,19 @@ async def _create_candidates(
                 skipped += 1
                 continue
             start_time = parse_hhmm(row.start_time)
+            candidate_input = ScheduleCandidateInput(
+                date=row.date,
+                prayer=row.prayer,
+                session_number=row.session_number,
+                session_label=row.session_label,
+                timezone=row.timezone,
+            )
             updated, unchanged = await upsert_schedule_candidate(
                 session,
                 mosque=mosque,
                 source=source,
                 extraction_run_id=extraction_run_id,
-                row=row,
+                row=candidate_input,
                 jamaat_time=jamaat_time,
                 start_time=start_time,
             )

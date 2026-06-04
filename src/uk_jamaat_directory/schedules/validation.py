@@ -97,8 +97,7 @@ def validate_candidate(
                     severity=IssueSeverity.ERROR,
                     field="date",
                     message=(
-                        f"date {candidate.date} outside allowed window "
-                        f"{earliest} to {latest}"
+                        f"date {candidate.date} outside allowed window {earliest} to {latest}"
                     ),
                 )
             )
@@ -193,7 +192,7 @@ def _append_dst_warnings(
     local_dt = datetime.combine(on_date, at_time, tzinfo=tz)
     try:
         utc = local_dt.astimezone(ZoneInfo("UTC"))
-    except Exception:
+    except (OSError, ValueError):
         result.issues.append(
             ValidationIssue(
                 code="dst_gap_hour",

@@ -7,30 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import CandidateStatus
-from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import MyLocalMasjidScheduleRow
 from uk_jamaat_directory.models.core import Mosque, MosqueSource, ScheduleCandidate
-
-
-def _times_equal(left: time | None, right: time | None) -> bool:
-    return left == right
-
-
-def _candidate_unchanged(
-    existing: ScheduleCandidate,
-    *,
-    start_time: time | None,
-    jamaat_time: time,
-    session_label: str | None,
-    timezone: str,
-    extraction_run_id: uuid.UUID,
-) -> bool:
-    return (
-        _times_equal(existing.start_time, start_time)
-        and existing.jamaat_time == jamaat_time
-        and existing.session_label == session_label
-        and existing.timezone == timezone
-        and existing.extraction_run_id == extraction_run_id
-    )
+from uk_jamaat_directory.schedules.types import ScheduleCandidateInput
 
 
 async def upsert_schedule_candidate(
@@ -39,7 +17,7 @@ async def upsert_schedule_candidate(
     mosque: Mosque,
     source: MosqueSource,
     extraction_run_id: uuid.UUID,
-    row: MyLocalMasjidScheduleRow,
+    row: ScheduleCandidateInput,
     jamaat_time: time,
     start_time: time | None,
 ) -> tuple[bool, bool]:
@@ -68,13 +46,12 @@ async def upsert_schedule_candidate(
     }
 
     if existing is not None:
-        if _candidate_unchanged(
-            existing,
-            start_time=start_time,
-            jamaat_time=jamaat_time,
-            session_label=row.session_label,
-            timezone=row.timezone,
-            extraction_run_id=extraction_run_id,
+        if (
+            existing.start_time == start_time
+            and existing.jamaat_time == jamaat_time
+            and existing.session_label == row.session_label
+            and existing.timezone == row.timezone
+            and existing.extraction_run_id == extraction_run_id
         ):
             return False, True
 

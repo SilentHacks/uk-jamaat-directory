@@ -10,15 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uk_jamaat_directory.domain import CandidateStatus
 from uk_jamaat_directory.models.core import (
     ModerationAction,
-    Mosque,
-    MosqueSource,
     ScheduleCandidate,
 )
-from uk_jamaat_directory.schedules.validation import (
-    find_duplicate_candidate_ids,
-    resolve_extraction_kind,
-    validate_candidate,
-)
+from uk_jamaat_directory.schedules.moderation import approve_candidate_status
 
 
 @dataclass
@@ -96,31 +90,8 @@ async def approve_candidate(
         msg = f"candidate not found: {candidate_id}"
         raise ValueError(msg)
 
-    source = await session.get(MosqueSource, candidate.source_id)
-    mosque = (
-        await session.get(Mosque, candidate.mosque_id) if candidate.mosque_id else None
-    )
-    if source is None:
-        msg = "candidate source not found"
-        raise ValueError(msg)
-
-    dupes = await find_duplicate_candidate_ids(session, candidate)
-    extraction_kind = await resolve_extraction_kind(session, candidate)
-    validation = validate_candidate(
-        candidate,
-        mosque=mosque,
-        source=source,
-        duplicate_ids=dupes,
-        extraction_kind=extraction_kind,
-    )
-    candidate.validation_errors = validation.to_error_list()
-    if not validation.is_valid:
-        msg = "candidate has validation errors and cannot be approved"
-        raise ValueError(msg)
-
-    candidate.status = CandidateStatus.APPROVED
+    await approve_candidate_status(session, candidate)
     await _audit(session, actor=actor, action="approve_candidate", candidate_id=candidate_id)
-    await session.flush()
     return candidate
 
 

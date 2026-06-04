@@ -1,25 +1,26 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, time
 from enum import StrEnum
 
 from uk_jamaat_directory.domain import Prayer
 
 
-class IssueSeverity(StrEnum):
-    ERROR = "error"
-    WARNING = "warning"
-
-
 @dataclass(frozen=True)
-class ScheduleNaturalKey:
-    mosque_id: uuid.UUID
-    source_id: uuid.UUID
+class ScheduleCandidateInput:
     date: date
     prayer: Prayer
     session_number: int
+    session_label: str | None
+    timezone: str
+    start_time: time | None = None
+    jamaat_time: time | None = None
+
+
+class IssueSeverity(StrEnum):
+    ERROR = "error"
+    WARNING = "warning"
 
 
 @dataclass
@@ -74,8 +75,8 @@ class PublishResult:
     dataset_version: str | None = None
     published: int = 0
     skipped_policy: int = 0
-    skipped_not_approved: int = 0
     skipped_validation: int = 0
+    carried_forward: int = 0
     removed_occurrences: int = 0
     change_events: int = 0
     errors: list[str] = field(default_factory=list)
