@@ -126,7 +126,7 @@ export TEST_DATABASE_URL=postgresql+asyncpg://directory:directory@localhost:5432
 make test-postgres
 ```
 
-CI runs lint, `alembic upgrade head`, and the full test suite against a PostGIS service container on pushes to `main`.
+CI runs lint, `alembic upgrade head`, and the full test suite against a PostGIS service container on pushes to `master`.
 
 ## Project Layout
 

@@ -19,7 +19,7 @@
 - PostGIS schema: mosques, sources, artifacts, candidates, occurrences, dataset versions, changes, moderation, claims, corrections
 - Public read layer with `public_redistribution_allowed` source filtering
 - Generated contracts in `docs/api/`
-- GitHub Actions CI on `main`
+- GitHub Actions CI on `master`
 
 - MyLocalMasjid ingest adapter (`import-mlm`, `report-mlm` CLI; synthetic fixtures in `data/fixtures/mylocalmasjid/`)
 
