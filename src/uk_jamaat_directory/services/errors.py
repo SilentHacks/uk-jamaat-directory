@@ -7,3 +7,7 @@ class MosqueNotFoundError(LookupError):
 
 class DuplicateAliasError(ValueError):
     """Raised when an alias already exists for the mosque."""
+
+
+class SourceNotFoundError(LookupError):
+    """Raised when an admin operation targets a source that does not exist."""
