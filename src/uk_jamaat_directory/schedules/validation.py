@@ -4,12 +4,9 @@ import uuid
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from uk_jamaat_directory.config import Settings, get_settings
-from uk_jamaat_directory.domain import CandidateStatus, ExtractionKind, Prayer
-from uk_jamaat_directory.models.core import ExtractionRun, Mosque, MosqueSource, ScheduleCandidate
+from uk_jamaat_directory.domain import CandidateStatus, ExtractionKind, Prayer, SourceType
+from uk_jamaat_directory.models.core import Mosque, MosqueSource, ScheduleCandidate
 from uk_jamaat_directory.schedules.types import IssueSeverity, ValidationIssue, ValidationResult
 
 ACTIVE_CANDIDATE_STATUSES = (
@@ -216,46 +213,25 @@ def _append_dst_warnings(
     _ = utc
 
 
-async def find_duplicate_candidate_ids(
-    session: AsyncSession,
-    candidate: ScheduleCandidate,
-) -> set[uuid.UUID]:
-    if candidate.mosque_id is None:
-        return set()
-
-    stmt = (
-        select(ScheduleCandidate.id)
-        .where(ScheduleCandidate.mosque_id == candidate.mosque_id)
-        .where(ScheduleCandidate.source_id == candidate.source_id)
-        .where(ScheduleCandidate.date == candidate.date)
-        .where(ScheduleCandidate.prayer == candidate.prayer)
-        .where(ScheduleCandidate.session_number == candidate.session_number)
-        .where(ScheduleCandidate.status.in_(ACTIVE_CANDIDATE_STATUSES))
-        .where(ScheduleCandidate.id != candidate.id)
-    )
-    rows = (await session.execute(stmt)).scalars().all()
-    return set(rows)
-
-
-async def resolve_extraction_kind(
-    session: AsyncSession,
-    candidate: ScheduleCandidate,
-) -> ExtractionKind | None:
-    if candidate.extraction_run_id is None:
-        return None
-    run = await session.get(ExtractionRun, candidate.extraction_run_id)
-    if run is None:
-        return None
-    return run.kind
+def _requires_manual_approval(
+    source: MosqueSource | None,
+    extraction_kind: ExtractionKind | None,
+) -> bool:
+    if extraction_kind == ExtractionKind.AI:
+        return True
+    if source is not None and source.source_type == SourceType.COMMUNITY:
+        return True
+    return False
 
 
 def status_after_validation(
     result: ValidationResult,
     *,
     extraction_kind: ExtractionKind | None,
+    source: MosqueSource | None = None,
 ) -> CandidateStatus:
     if not result.is_valid:
         return CandidateStatus.REJECTED
-    if extraction_kind == ExtractionKind.AI:
+    if _requires_manual_approval(source, extraction_kind):
         return CandidateStatus.PENDING
     return CandidateStatus.APPROVED

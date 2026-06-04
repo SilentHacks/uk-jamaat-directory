@@ -12,7 +12,26 @@ from uk_jamaat_directory.models.core import (
     ModerationAction,
     ScheduleCandidate,
 )
-from uk_jamaat_directory.schedules.moderation import approve_candidate_status
+from uk_jamaat_directory.schedules.approval import approve_candidate_status
+from uk_jamaat_directory.schemas.admin import AdminCandidateSummary
+
+
+def candidate_to_summary(candidate: ScheduleCandidate) -> AdminCandidateSummary:
+    return AdminCandidateSummary(
+        candidate_id=candidate.id,
+        directory_mosque_id=candidate.mosque_id,
+        source_id=candidate.source_id,
+        date=candidate.date,
+        prayer=candidate.prayer.value,
+        start_time=candidate.start_time,
+        jamaat_time=candidate.jamaat_time,
+        session_number=candidate.session_number,
+        session_label=candidate.session_label,
+        timezone=candidate.timezone,
+        confidence=candidate.confidence.value,
+        status=candidate.status.value,
+        validation_errors=list(candidate.validation_errors or []),
+    )
 
 
 @dataclass

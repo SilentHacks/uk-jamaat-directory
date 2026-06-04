@@ -21,11 +21,14 @@ from uk_jamaat_directory.schedules.dataset import (
     create_published_dataset_version,
     get_latest_published_version,
 )
+from uk_jamaat_directory.schedules.evaluation import (
+    apply_validation_result,
+    evaluate_candidate_in_context,
+)
 from uk_jamaat_directory.schedules.freshness import (
     recompute_source_health,
     refresh_occurrence_freshness_for_source,
 )
-from uk_jamaat_directory.schedules.gates import can_publish_candidate
 from uk_jamaat_directory.schedules.keys import (
     OccurrenceKey,
     occurrence_key,
@@ -34,10 +37,6 @@ from uk_jamaat_directory.schedules.keys import (
 )
 from uk_jamaat_directory.schedules.prefetch import build_validation_batch_context
 from uk_jamaat_directory.schedules.types import PublishResult, ValidateBatchResult
-from uk_jamaat_directory.schedules.validation import (
-    status_after_validation,
-    validate_candidate,
-)
 from uk_jamaat_directory.services.public_policy import public_source_filter
 
 
@@ -139,24 +138,18 @@ async def validate_candidates(
         if source is None:
             result.skipped += 1
             continue
-        mosque = (
-            context.mosques.get(candidate.mosque_id) if candidate.mosque_id is not None else None
-        )
-        extraction_kind = context.extraction_kinds.get(candidate.id)
-        validation = validate_candidate(
+        evaluation = evaluate_candidate_in_context(
             candidate,
-            mosque=mosque,
-            source=source,
-            duplicate_ids=context.duplicate_ids.get(candidate.id),
-            extraction_kind=extraction_kind,
+            context,
+            mode="validate",
             settings=cfg,
         )
-        candidate.validation_errors = validation.to_error_list()
+        apply_validation_result(candidate, evaluation, update_status=update_status)
 
         if not update_status:
             continue
 
-        new_status = status_after_validation(validation, extraction_kind=extraction_kind)
+        new_status = evaluation.status
         if new_status == CandidateStatus.APPROVED:
             result.approved += 1
         elif new_status == CandidateStatus.REJECTED:
@@ -262,25 +255,18 @@ async def _select_publishable_candidates(
             result.skipped_validation += 1
             continue
 
-        extraction_kind = context.extraction_kinds.get(candidate.id)
-        allowed, reason = can_publish_candidate(
-            source, extraction_kind=extraction_kind, settings=settings
-        )
-        if not allowed:
-            result.skipped_policy += 1
-            if reason:
-                result.errors.append(f"{candidate.id}: {reason}")
-            continue
-
-        validation = validate_candidate(
+        evaluation = evaluate_candidate_in_context(
             candidate,
-            mosque=mosque,
-            source=source,
-            duplicate_ids=context.duplicate_ids.get(candidate.id),
-            extraction_kind=extraction_kind,
+            context,
+            mode="publish",
             settings=settings,
         )
-        if not validation.is_valid:
+        if not evaluation.policy_allowed:
+            result.skipped_policy += 1
+            if evaluation.policy_reason:
+                result.errors.append(f"{candidate.id}: {evaluation.policy_reason}")
+            continue
+        if not evaluation.validation.is_valid:
             result.skipped_validation += 1
             result.errors.append(f"{candidate.id}: validation failed at publish time")
             continue
