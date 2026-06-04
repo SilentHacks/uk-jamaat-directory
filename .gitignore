@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Test and tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.vps.example
+
+# Local runtime data
+.local/
+data/artifacts/
+data/exports/
+data/private/
+minio-data/
+postgres-data/
+redis-data/
+
+# Node/frontend, if added later
+node_modules/
+.next/
+out/
+
+# Editors and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
