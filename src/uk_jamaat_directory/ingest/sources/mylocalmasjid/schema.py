@@ -19,7 +19,7 @@ PRAYER_ALIASES: dict[str, Prayer] = {
     "jummah": Prayer.JUMUAH,
 }
 
-JAMAAT_TIME_ALIASES = frozenset({"jamaat_time", "jamaat", "jamat", "iqamah", "iqama"})
+JAMAAT_TIME_ALIASES = ("jamaat_time", "jamaat", "jamat", "iqamah", "iqama")
 
 
 class MyLocalMasjidScheduleRow(BaseModel):

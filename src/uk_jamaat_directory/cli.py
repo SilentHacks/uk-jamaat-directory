@@ -6,9 +6,11 @@ import json
 import sys
 from pathlib import Path
 
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
 from uk_jamaat_directory import __version__
 from uk_jamaat_directory.config import Environment, Settings, get_settings
-from uk_jamaat_directory.db.session import SessionLocal, create_engine
+from uk_jamaat_directory.db.session import create_engine
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
 from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
     build_coverage_report,
@@ -101,16 +103,20 @@ async def _run_import_mlm(args: argparse.Namespace, settings: Settings) -> int:
         )
         return 0
 
-    create_engine(settings)
-    async with SessionLocal() as session:
-        result = await import_mylocalmasjid_bundle(
-            session,
-            bundle,
-            raw_payload=raw_payload,
-            fetched_url=fetched_url,
-            publication_policy=policy,
-        )
-        await session.commit()
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            result = await import_mylocalmasjid_bundle(
+                session,
+                bundle,
+                raw_payload=raw_payload,
+                fetched_url=fetched_url,
+                publication_policy=policy,
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
 
     print(
         "Import complete: "
@@ -129,9 +135,13 @@ async def _run_import_mlm(args: argparse.Namespace, settings: Settings) -> int:
 
 
 async def _run_report_mlm(args: argparse.Namespace, settings: Settings) -> int:
-    create_engine(settings)
-    async with SessionLocal() as session:
-        report = await build_coverage_report(session)
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            report = await build_coverage_report(session)
+    finally:
+        await engine.dispose()
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))

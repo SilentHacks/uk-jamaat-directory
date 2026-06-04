@@ -34,6 +34,7 @@ from uk_jamaat_directory.models.core import (
     SourceArtifact,
     SourceHealth,
 )
+from uk_jamaat_directory.services.public_policy import is_public_source_policy
 
 DEFAULT_ATTRIBUTION = "MyLocalMasjid"
 EXTRACTOR_VERSION = "mylocalmasjid-deterministic-v1"
@@ -64,52 +65,53 @@ async def import_mylocalmasjid_bundle(
     imported_at = datetime.now(UTC)
 
     for record in bundle.mosques:
-        try:
-            mosque, source = await _upsert_mosque_and_source(
-                session,
-                record,
-                publication_policy=publication_policy,
-                imported_at=imported_at,
-            )
-            result.mosques_upserted += 1
-            result.sources_upserted += 1
+        mosque, source = await _upsert_mosque_and_source(
+            session,
+            record,
+            publication_policy=publication_policy,
+            imported_at=imported_at,
+        )
+        result.mosques_upserted += 1
+        result.sources_upserted += 1
 
-            artifact = await _record_artifact(
-                session,
-                source=source,
-                fetched_url=fetched_url,
-                content_hash=content_hash,
-                raw_payload=raw_payload,
-                object_key=store_artifact_object_key,
-            )
+        artifact, artifact_created = await _record_artifact(
+            session,
+            source=source,
+            fetched_url=fetched_url,
+            content_hash=content_hash,
+            raw_payload=raw_payload,
+            object_key=store_artifact_object_key,
+        )
+        if artifact_created:
             result.artifacts_created += 1
-
-            extraction_run = ExtractionRun(
-                id=uuid.uuid4(),
-                artifact_id=artifact.id,
-                source_id=source.id,
-                kind=ExtractionKind.DETERMINISTIC,
-                extractor_version=EXTRACTOR_VERSION,
-                status="succeeded",
-                finished_at=imported_at,
-                metadata_={"mosque_external_id": record.external_id},
-            )
-            session.add(extraction_run)
-            await session.flush()
-
-            created, skipped = await _create_candidates(
-                session,
-                mosque=mosque,
-                source=source,
-                extraction_run_id=extraction_run.id,
-                schedules=record.schedules,
-            )
-            result.candidates_created += created
-            result.candidates_skipped += skipped
-
+        else:
             await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"{record.external_id}: {exc}")
+            continue
+
+        extraction_run = ExtractionRun(
+            id=uuid.uuid4(),
+            artifact_id=artifact.id,
+            source_id=source.id,
+            kind=ExtractionKind.DETERMINISTIC,
+            extractor_version=EXTRACTOR_VERSION,
+            status="succeeded",
+            finished_at=imported_at,
+            metadata_={"mosque_external_id": record.external_id},
+        )
+        session.add(extraction_run)
+        await session.flush()
+
+        created, skipped = await _create_candidates(
+            session,
+            mosque=mosque,
+            source=source,
+            extraction_run_id=extraction_run.id,
+            schedules=record.schedules,
+        )
+        result.candidates_created += created
+        result.candidates_skipped += skipped
+
+        await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
 
     return result
 
@@ -126,7 +128,8 @@ async def _upsert_mosque_and_source(
 
     if source is not None and source.mosque_id is not None:
         mosque = await session.get_one(Mosque, source.mosque_id)
-        _apply_mosque_fields(mosque, record)
+        if is_public_source_policy(publication_policy):
+            _apply_mosque_fields(mosque, record)
     elif source is not None:
         mosque = _new_mosque(record)
         session.add(mosque)
@@ -214,7 +217,7 @@ async def _record_artifact(
     content_hash: str,
     raw_payload: bytes,
     object_key: str | None,
-) -> SourceArtifact:
+) -> tuple[SourceArtifact, bool]:
     existing = await session.scalar(
         select(SourceArtifact).where(
             SourceArtifact.source_id == source.id,
@@ -222,7 +225,7 @@ async def _record_artifact(
         )
     )
     if existing is not None:
-        return existing
+        return existing, False
 
     artifact = SourceArtifact(
         id=uuid.uuid4(),
@@ -237,7 +240,7 @@ async def _record_artifact(
     session.add(artifact)
     await session.flush()
     _ = raw_payload  # hash stored; object upload deferred to crawl phase
-    return artifact
+    return artifact, True
 
 
 async def _create_candidates(

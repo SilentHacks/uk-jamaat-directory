@@ -155,7 +155,7 @@ def _schedule_from_csv_row(row: dict[str, str | None]) -> dict[str, Any]:
         msg = "CSV schedule row requires date and prayer columns"
         raise ValueError(msg)
     jamaat_time = None
-    for column in ("jamaat_time", "jamaat", "jamat", "iqamah", "iqama"):
+    for column in JAMAAT_TIME_ALIASES:
         if row.get(column):
             jamaat_time = row[column]
             break
