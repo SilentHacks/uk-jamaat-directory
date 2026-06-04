@@ -445,6 +445,42 @@ class ChangeEvent(TimestampMixin, Base):
     )
 
 
+class IdentityMatchReview(TimestampMixin, Base):
+    __tablename__ = "identity_match_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    source_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("mosque_sources.id", ondelete="CASCADE"),
+        index=True,
+    )
+    proposed_mosque_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("mosques.id", ondelete="SET NULL"),
+        index=True,
+    )
+    score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    decision: Mapped[str] = mapped_column(String(40), nullable=False)
+    reasons: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    alternatives: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="pending")
+    reviewer: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ModerationAction(TimestampMixin, Base):
     __tablename__ = "moderation_actions"
 
