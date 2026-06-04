@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     community_submission_rate_limit: int = 10
     community_submission_rate_window_seconds: int = 60
 
+    schedule_date_past_days: int = 7
+    schedule_date_future_days: int = 400
+    freshness_stale_days: int = 30
+    publish_allow_ai: bool = False
+
     @field_validator("api_prefix")
     @classmethod
     def api_prefix_must_start_with_slash(cls, value: str) -> str:
