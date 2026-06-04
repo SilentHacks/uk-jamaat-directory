@@ -25,8 +25,8 @@ from uk_jamaat_directory.models.core import (
     ScheduleCandidate,
     ScheduleOccurrence,
 )
+from uk_jamaat_directory.schedules.dataset import PUBLISHED_DATASET_STATUS
 from uk_jamaat_directory.schedules.publication import publish_candidates, validate_candidates
-from uk_jamaat_directory.services.public_reads import PUBLISHED_DATASET_STATUS
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/mylocalmasjid"
 
@@ -163,11 +163,84 @@ async def test_republish_uses_latest_dataset_only(
     assert fajr_rows[0]["dataset_version"] == second.dataset_version
 
     versions = (
-        await db_session.execute(
-            select(DatasetVersion).where(DatasetVersion.status == PUBLISHED_DATASET_STATUS)
+        (
+            await db_session.execute(
+                select(DatasetVersion).where(DatasetVersion.status == PUBLISHED_DATASET_STATUS)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(versions) >= 2
+
+
+@pytest.mark.asyncio
+async def test_filtered_publish_carries_forward_other_mosques(
+    db_session: AsyncSession,
+    client_with_db: AsyncClient,
+) -> None:
+    path = FIXTURES / "sample_export.json"
+    bundle = parse_file(path)
+    await import_mylocalmasjid_bundle(
+        db_session,
+        bundle,
+        raw_payload=path.read_bytes(),
+        fetched_url=f"file://{path}",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        validate_after_import=True,
+    )
+    await db_session.commit()
+
+    for mosque in (await db_session.execute(select(Mosque))).scalars().all():
+        mosque.status = MosqueStatus.ACTIVE
+    await db_session.commit()
+
+    first = await publish_candidates(db_session)
+    await db_session.commit()
+    assert first.published >= 2
+
+    sources = (
+        (
+            await db_session.execute(
+                select(MosqueSource).where(MosqueSource.source_type == SourceType.MYLOCALMASJID)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(sources) >= 2
+    by_external = {source.external_id: source for source in sources}
+    central = by_external["mlm-synth-001"]
+    riverside = by_external["mlm-synth-002"]
+
+    await import_mylocalmasjid_bundle(
+        db_session,
+        bundle,
+        raw_payload=path.read_bytes(),
+        fetched_url=f"file://{path}",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        validate_after_import=True,
+    )
+    await db_session.commit()
+
+    scoped = await publish_candidates(db_session, mosque_id=riverside.mosque_id)
+    await db_session.commit()
+    assert scoped.published >= 1
+    assert scoped.carried_forward >= 1
+
+    central_times = await client_with_db.get(
+        f"/v1/mosques/{central.mosque_id}/times",
+        params={"from": "2026-06-05", "to": "2026-06-05"},
+    )
+    assert central_times.status_code == 200
+    assert len(central_times.json()["items"]) >= 1
+
+    riverside_times = await client_with_db.get(
+        f"/v1/mosques/{riverside.mosque_id}/times",
+        params={"from": "2026-06-05", "to": "2026-06-05"},
+    )
+    assert riverside_times.status_code == 200
+    assert len(riverside_times.json()["items"]) >= 1
 
 
 @pytest.mark.asyncio

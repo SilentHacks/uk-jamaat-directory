@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from uk_jamaat_directory import __version__
 from uk_jamaat_directory.config import Environment, Settings, get_settings
+from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.db.session import create_engine
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
 from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
@@ -289,21 +290,16 @@ def main() -> None:
 
 
 async def _run_validate_candidates(args: argparse.Namespace, settings: Settings) -> int:
-    engine = create_engine(settings)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with session_factory() as session:
-            result = await validate_candidates(
-                session,
-                source_id=args.source_id,
-                mosque_id=args.mosque_id,
-                date_from=args.date_from,
-                date_to=args.date_to,
-                update_status=not args.dry_run,
-            )
-            await session.commit()
-    finally:
-        await engine.dispose()
+    async with cli_db_session(settings) as session:
+        result = await validate_candidates(
+            session,
+            source_id=args.source_id,
+            mosque_id=args.mosque_id,
+            date_from=args.date_from,
+            date_to=args.date_to,
+            update_status=not args.dry_run,
+        )
+        await session.commit()
 
     print(
         f"Validated {result.examined} candidates: "
@@ -314,25 +310,21 @@ async def _run_validate_candidates(args: argparse.Namespace, settings: Settings)
 
 
 async def _run_publish_candidates(args: argparse.Namespace, settings: Settings) -> int:
-    engine = create_engine(settings)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with session_factory() as session:
-            result = await publish_candidates(
-                session,
-                source_id=args.source_id,
-                mosque_id=args.mosque_id,
-                date_from=args.date_from,
-                date_to=args.date_to,
-                settings=settings,
-            )
-            await session.commit()
-    finally:
-        await engine.dispose()
+    async with cli_db_session(settings) as session:
+        result = await publish_candidates(
+            session,
+            source_id=args.source_id,
+            mosque_id=args.mosque_id,
+            date_from=args.date_from,
+            date_to=args.date_to,
+            settings=settings,
+        )
+        await session.commit()
 
     print(
         f"Published {result.published} occurrences "
-        f"(dataset={result.dataset_version}, "
+        f"(carried_forward={result.carried_forward}, "
+        f"dataset={result.dataset_version}, "
         f"policy_skipped={result.skipped_policy}, "
         f"validation_skipped={result.skipped_validation}, "
         f"removed={result.removed_occurrences}, "
@@ -344,20 +336,15 @@ async def _run_publish_candidates(args: argparse.Namespace, settings: Settings) 
             print(f"  - {error}", file=sys.stderr)
         if len(result.errors) > 20:
             print(f"  ... and {len(result.errors) - 20} more", file=sys.stderr)
-    if result.skipped_policy and result.published == 0:
+    if result.published == 0 and result.carried_forward == 0:
         return 1
     return 0
 
 
 async def _run_recompute_freshness(settings: Settings) -> int:
-    engine = create_engine(settings)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with session_factory() as session:
-            count = await recompute_all_source_health(session)
-            await session.commit()
-    finally:
-        await engine.dispose()
+    async with cli_db_session(settings) as session:
+        count = await recompute_all_source_health(session)
+        await session.commit()
 
     print(f"Recomputed freshness for {count} public sources")
     return 0

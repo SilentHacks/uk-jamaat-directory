@@ -150,7 +150,7 @@ Imports create `schedule_candidates` only. To expose times on the public API, ru
 .venv/bin/uk-jamaat-directory recompute-freshness
 ```
 
-Filters for validate/publish: `--source-id`, `--mosque-id`, `--from`, `--to`. Use `validate-candidates --dry-run` to inspect without status updates.
+Filters for validate/publish: `--source-id`, `--mosque-id`, `--from`, `--to`. Use `validate-candidates --dry-run` to inspect without status updates. Filtered publish merges into the latest snapshot: occurrences outside the filter are carried forward from the previous published dataset; only rows in scope are replaced or removed.
 
 ## Development
 
