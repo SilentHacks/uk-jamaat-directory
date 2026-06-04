@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.config import get_settings
 from uk_jamaat_directory.domain import (
     CandidateStatus,
     ClaimStatus,
@@ -21,8 +22,6 @@ from uk_jamaat_directory.models.core import (
     ScheduleCandidate,
     SourceHealth,
 )
-
-STALE_AFTER_DAYS = 30
 
 
 @dataclass
@@ -42,8 +41,9 @@ class AdminCoverageReport:
 
 
 async def build_admin_coverage(session: AsyncSession) -> AdminCoverageReport:
+    settings = get_settings()
     now = datetime.now(UTC)
-    stale_cutoff = now - timedelta(days=STALE_AFTER_DAYS)
+    stale_cutoff = now - timedelta(days=settings.source_last_seen_stale_days)
 
     mosque_count = int(
         (await session.execute(select(func.count()).select_from(Mosque))).scalar_one()
@@ -60,16 +60,35 @@ async def build_admin_coverage(session: AsyncSession) -> AdminCoverageReport:
     )
 
     policy_counts: dict[str, int] = {}
+    for policy, count in (
+        await session.execute(
+            select(MosqueSource.publication_policy, func.count()).group_by(
+                MosqueSource.publication_policy
+            )
+        )
+    ).all():
+        policy_counts[policy.value] = count
+
     source_type_counts: dict[str, int] = {}
-    stale_source_count = 0
-    sources = (await session.scalars(select(MosqueSource))).all()
-    for source in sources:
-        policy = source.publication_policy.value
-        policy_counts[policy] = policy_counts.get(policy, 0) + 1
-        source_type = source.source_type.value
-        source_type_counts[source_type] = source_type_counts.get(source_type, 0) + 1
-        if source.last_seen_at is None or source.last_seen_at < stale_cutoff:
-            stale_source_count += 1
+    for source_type, count in (
+        await session.execute(
+            select(MosqueSource.source_type, func.count()).group_by(MosqueSource.source_type)
+        )
+    ).all():
+        source_type_counts[source_type.value] = count
+
+    stale_source_count = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(MosqueSource)
+                .where(
+                    (MosqueSource.last_seen_at.is_(None))
+                    | (MosqueSource.last_seen_at < stale_cutoff)
+                )
+            )
+        ).scalar_one()
+    )
 
     pending_candidates = 0
     approved_candidates = 0

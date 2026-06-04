@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.config import get_settings
 from uk_jamaat_directory.domain import CandidateStatus, CorrectionStatus, SourceType
 from uk_jamaat_directory.models.core import (
     Correction,
@@ -13,8 +14,6 @@ from uk_jamaat_directory.models.core import (
     MosqueSource,
     ScheduleCandidate,
 )
-
-STALE_AFTER_DAYS = 7
 
 
 @dataclass
@@ -46,9 +45,10 @@ class MyLocalMasjidCoverageReport:
 
 
 async def build_coverage_report(session: AsyncSession) -> MyLocalMasjidCoverageReport:
+    settings = get_settings()
     report = MyLocalMasjidCoverageReport()
     now = datetime.now(UTC)
-    stale_cutoff = now - timedelta(days=STALE_AFTER_DAYS)
+    stale_cutoff = now - timedelta(days=settings.mlm_report_stale_days)
     schedule_cutoff = date.today()
 
     sources = (

@@ -30,18 +30,18 @@ from uk_jamaat_directory.schemas.admin import (
     AdminSourceUpdate,
 )
 from uk_jamaat_directory.services import (
-    admin_candidates,
     admin_identity,
     admin_reporting,
     admin_sources,
+    schedule_moderation,
 )
-from uk_jamaat_directory.services.admin_candidates import candidate_to_summary
 from uk_jamaat_directory.services.admin_sources import source_to_summary
 from uk_jamaat_directory.services.errors import (
     DuplicateAliasError,
     MosqueNotFoundError,
     SourceNotFoundError,
 )
+from uk_jamaat_directory.services.schedule_moderation import candidate_to_summary
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_key)])
 
@@ -193,8 +193,17 @@ async def list_schedule_candidates(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> AdminCandidateListResponse:
-    parsed_status = CandidateStatus(status_filter) if status_filter else None
-    result = await admin_candidates.list_candidates(
+    parsed_status: CandidateStatus | None = None
+    if status_filter:
+        try:
+            parsed_status = CandidateStatus(status_filter)
+        except ValueError as exc:
+            allowed = ", ".join(status.value for status in CandidateStatus)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid status; allowed values: {allowed}",
+            ) from exc
+    result = await schedule_moderation.list_candidates(
         session,
         status=parsed_status,
         source_id=source_id,
@@ -218,7 +227,7 @@ async def approve_schedule_candidate(
     session: AsyncSession = Depends(get_db_session),
 ) -> AdminCandidateActionResponse:
     try:
-        candidate = await admin_candidates.approve_candidate(
+        candidate = await schedule_moderation.approve_candidate(
             session,
             candidate_id,
             actor="admin_api",
@@ -239,7 +248,7 @@ async def reject_schedule_candidate(
     session: AsyncSession = Depends(get_db_session),
 ) -> AdminCandidateActionResponse:
     try:
-        candidate = await admin_candidates.reject_candidate(
+        candidate = await schedule_moderation.reject_candidate(
             session,
             candidate_id,
             actor="admin_api",

@@ -110,3 +110,15 @@ async def test_admin_approve_rejects_unknown_policy_source(
         headers=ADMIN_HEADERS,
     )
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_admin_list_candidates_rejects_invalid_status(
+    admin_client_with_db: AsyncClient,
+) -> None:
+    response = await admin_client_with_db.get(
+        "/v1/admin/candidates",
+        headers=ADMIN_HEADERS,
+        params={"status": "not-a-status"},
+    )
+    assert response.status_code == 422

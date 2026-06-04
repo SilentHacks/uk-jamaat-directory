@@ -16,18 +16,12 @@ def source_to_summary(source: MosqueSource) -> AdminSourceSummary:
     return AdminSourceSummary(
         source_id=source.id,
         directory_mosque_id=source.mosque_id,
-        source_type=source.source_type.value
-        if hasattr(source.source_type, "value")
-        else str(source.source_type),
+        source_type=source.source_type.value,
         external_id=source.external_id,
         source_url=source.source_url,
         display_name=source.display_name,
-        publication_policy=source.publication_policy.value
-        if hasattr(source.publication_policy, "value")
-        else str(source.publication_policy),
-        confidence=source.confidence.value
-        if hasattr(source.confidence, "value")
-        else str(source.confidence),
+        publication_policy=source.publication_policy.value,
+        confidence=source.confidence.value,
         attribution=source.attribution,
         last_seen_at=source.last_seen_at,
     )

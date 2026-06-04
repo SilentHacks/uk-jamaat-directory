@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     schedule_date_past_days: int = 7
     schedule_date_future_days: int = 400
     freshness_stale_days: int = 30
+    source_last_seen_stale_days: int = 30
+    mlm_report_stale_days: int = 7
     publish_allow_ai: bool = False
 
     @field_validator("api_prefix")
