@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from uk_jamaat_directory.ingest.discovery.records import MatchDecision
+from uk_jamaat_directory.ingest.discovery.records import (
+    MatchDecision,
+    ResolvedDiscovery,
+    ResolveOutcome,
+)
 from uk_jamaat_directory.ingest.discovery.resolve import resolve_discovery_record
 from uk_jamaat_directory.ingest.sources.openstreetmap.adapter import osm_to_discovery_record
 from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBundle
@@ -27,23 +32,22 @@ async def import_openstreetmap_bundle(
     result = OsmImportResult()
     for place in bundle.places:
         try:
-            discovery = osm_to_discovery_record(place)
-            mosque, _source, match = await resolve_discovery_record(session, discovery)
-        except Exception as exc:  # noqa: BLE001
+            async with session.begin_nested():
+                discovery = osm_to_discovery_record(place)
+                resolved = await resolve_discovery_record(session, discovery)
+                _record_result(result, resolved)
+        except (ValueError, SQLAlchemyError) as exc:
             result.errors.append(f"{place.external_id}: {exc}")
             result.skipped += 1
-            continue
-
-        result.places_processed += 1
-        if match.decision == MatchDecision.NEEDS_REVIEW:
-            result.reviews_created += 1
-        elif match.decision == MatchDecision.AUTO_LINK and match.reasons != [
-            "existing_source_link"
-        ]:
-            result.mosques_linked += 1
-        if mosque is not None and match.decision == MatchDecision.CREATE_NEEDS_REVIEW:
-            result.mosques_created += 1
-        elif mosque is not None:
-            result.mosques_created += 1
 
     return result
+
+
+def _record_result(result: OsmImportResult, resolved: ResolvedDiscovery) -> None:
+    result.places_processed += 1
+    if resolved.match.decision == MatchDecision.NEEDS_REVIEW:
+        result.reviews_created += 1
+    elif resolved.outcome == ResolveOutcome.AUTO_LINK_MATCH:
+        result.mosques_linked += 1
+    if resolved.outcome == ResolveOutcome.CREATED_NEEDS_REVIEW:
+        result.mosques_created += 1

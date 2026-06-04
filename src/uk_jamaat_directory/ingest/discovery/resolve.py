@@ -3,20 +3,26 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from geoalchemy2 import WKTElement
-from geoalchemy2.shape import to_shape
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from uk_jamaat_directory.domain import MosqueStatus, SourceType
+from uk_jamaat_directory.geo.location import set_mosque_point
 from uk_jamaat_directory.ingest.discovery.matching import decide_match, score_mosque_candidate
 from uk_jamaat_directory.ingest.discovery.records import (
     DiscoveryMatch,
     DiscoveryRecord,
     MatchDecision,
+    ResolvedDiscovery,
+    ResolveOutcome,
+    ScoredMosqueCandidate,
 )
-from uk_jamaat_directory.ingest.normalize import normalize_mosque_name
+from uk_jamaat_directory.ingest.normalize import (
+    normalize_city,
+    normalize_mosque_name,
+    normalize_postcode,
+)
 from uk_jamaat_directory.models.core import (
     IdentityMatchReview,
     Mosque,
@@ -29,23 +35,24 @@ from uk_jamaat_directory.services.public_policy import is_public_source_policy
 async def resolve_discovery_record(
     session: AsyncSession,
     record: DiscoveryRecord,
-) -> tuple[Mosque | None, MosqueSource, DiscoveryMatch]:
+) -> ResolvedDiscovery:
     """Link a discovery record to an existing mosque or create a reviewable mosque."""
     source = await _get_source(session, record.source_type, record.external_id)
     if source is not None and source.mosque_id is not None:
         mosque = await session.get_one(Mosque, source.mosque_id)
         _update_source(source, record)
         if is_public_source_policy(record.publication_policy):
-            _apply_mosque_fields(mosque, record)
+            _apply_mosque_fields(mosque, record, only_empty=True)
         await session.flush()
-        return (
-            mosque,
-            source,
-            DiscoveryMatch(
+        return ResolvedDiscovery(
+            mosque=mosque,
+            source=source,
+            match=DiscoveryMatch(
                 decision=MatchDecision.AUTO_LINK,
                 mosque_id=mosque.id,
                 reasons=["existing_source_link"],
             ),
+            outcome=ResolveOutcome.EXISTING_SOURCE_LINK,
         )
 
     if source is not None:
@@ -54,21 +61,7 @@ async def resolve_discovery_record(
     candidates = await _score_candidates(session, record)
     match = decide_match(record, candidates)
 
-    if match.decision == MatchDecision.BLOCKED:
-        if source is None:
-            source = _new_source(record)
-            session.add(source)
-            await session.flush()
-        return None, source, match
-
-    mosque: Mosque | None = None
-    if match.decision == MatchDecision.AUTO_LINK and match.mosque_id is not None:
-        mosque = await session.get_one(Mosque, match.mosque_id)
-    elif match.decision == MatchDecision.CREATE_NEEDS_REVIEW:
-        mosque = _new_mosque(record)
-        session.add(mosque)
-        await session.flush()
-    elif match.decision == MatchDecision.NEEDS_REVIEW:
+    if match.decision == MatchDecision.NEEDS_REVIEW:
         if source is None:
             source = _new_source(record, mosque_id=None)
             session.add(source)
@@ -76,12 +69,28 @@ async def resolve_discovery_record(
         else:
             _update_source(source, record)
         await _create_match_review(session, record, match, source_id=source.id)
-        return None, source, match
+        return ResolvedDiscovery(
+            mosque=None,
+            source=source,
+            match=match,
+            outcome=ResolveOutcome.NEEDS_REVIEW,
+        )
 
-    if mosque is None:
+    mosque: Mosque | None = None
+    outcome: ResolveOutcome
+    if match.decision == MatchDecision.AUTO_LINK and match.mosque_id is not None:
+        mosque = await session.get_one(Mosque, match.mosque_id)
+        outcome = ResolveOutcome.AUTO_LINK_MATCH
+    elif match.decision == MatchDecision.CREATE_NEEDS_REVIEW:
         mosque = _new_mosque(record)
         session.add(mosque)
         await session.flush()
+        outcome = ResolveOutcome.CREATED_NEEDS_REVIEW
+    else:
+        mosque = _new_mosque(record)
+        session.add(mosque)
+        await session.flush()
+        outcome = ResolveOutcome.CREATED_NEEDS_REVIEW
 
     if source is None:
         source = _new_source(record, mosque_id=mosque.id)
@@ -91,43 +100,57 @@ async def resolve_discovery_record(
         _update_source(source, record)
 
     if is_public_source_policy(record.publication_policy):
-        _apply_mosque_fields(mosque, record)
+        _apply_mosque_fields(mosque, record, only_empty=outcome == ResolveOutcome.AUTO_LINK_MATCH)
 
     for alias in record.aliases:
         await _ensure_alias(session, mosque.id, alias, record.source_type)
 
     await session.flush()
-    return mosque, source, match
+    return ResolvedDiscovery(mosque=mosque, source=source, match=match, outcome=outcome)
 
 
 async def _score_candidates(
     session: AsyncSession,
     record: DiscoveryRecord,
-) -> list:
+) -> list[ScoredMosqueCandidate]:
     stmt = select(Mosque).options(selectinload(Mosque.aliases))
-    if record.postcode:
-        from uk_jamaat_directory.ingest.normalize import normalize_postcode
+    record_postcode = normalize_postcode(record.postcode)
+    if record_postcode:
+        compact = record_postcode.replace(" ", "")
+        stmt = stmt.where(
+            func.upper(func.replace(func.coalesce(Mosque.postcode, ""), " ", "")) == compact
+        )
+    elif record.city:
+        normalized_city = normalize_city(record.city)
+        if normalized_city:
+            stmt = stmt.where(func.lower(Mosque.city) == normalized_city)
+        else:
+            stmt = stmt.limit(500)
+    else:
+        stmt = stmt.limit(500)
 
-        normalized = normalize_postcode(record.postcode)
-        if normalized:
-            stmt = stmt.where(Mosque.postcode.is_not(None))
-    mosques = (await session.scalars(stmt.limit(500))).all()
+    mosques = (await session.scalars(stmt)).all()
 
-    scored = []
+    scored: list[ScoredMosqueCandidate] = []
     for mosque in mosques:
-        if record.postcode:
-            from uk_jamaat_directory.ingest.normalize import normalize_postcode
-
-            if normalize_postcode(mosque.postcode) != normalize_postcode(record.postcode):
-                if record.city and mosque.city:
-                    from uk_jamaat_directory.ingest.normalize import normalize_city
-
-                    if normalize_city(record.city) != normalize_city(mosque.city):
-                        continue
+        if not _is_plausible_candidate(record, mosque):
+            continue
         candidate = score_mosque_candidate(record, mosque, aliases=mosque.aliases)
         if candidate is not None:
             scored.append(candidate)
     return scored
+
+
+def _is_plausible_candidate(record: DiscoveryRecord, mosque: Mosque) -> bool:
+    record_postcode = normalize_postcode(record.postcode)
+    mosque_postcode = normalize_postcode(mosque.postcode)
+    if record_postcode and mosque_postcode:
+        return record_postcode == mosque_postcode
+    record_city = normalize_city(record.city)
+    mosque_city = normalize_city(mosque.city)
+    if record_city and mosque_city:
+        return record_city == mosque_city
+    return True
 
 
 async def _get_source(
@@ -183,29 +206,37 @@ def _new_mosque(record: DiscoveryRecord) -> Mosque:
         website_url=record.website_url,
         status=MosqueStatus.NEEDS_REVIEW,
     )
-    if record.latitude is not None and record.longitude is not None:
-        mosque.location = WKTElement(
-            f"POINT({record.longitude} {record.latitude})",
-            srid=4326,
-        )
+    set_mosque_point(mosque, record.latitude, record.longitude)
     return mosque
 
 
-def _apply_mosque_fields(mosque: Mosque, record: DiscoveryRecord) -> None:
-    mosque.name = record.name
-    mosque.normalized_name = normalize_mosque_name(record.name)
-    mosque.address_line1 = record.address_line1
-    mosque.address_line2 = record.address_line2
-    mosque.city = record.city
-    mosque.county = record.county
-    mosque.postcode = record.postcode
-    mosque.country = record.country
-    mosque.website_url = record.website_url
+def _apply_mosque_fields(
+    mosque: Mosque,
+    record: DiscoveryRecord,
+    *,
+    only_empty: bool = False,
+) -> None:
+    def set_field(field: str, value: object | None) -> None:
+        if value is None:
+            return
+        current = getattr(mosque, field)
+        if only_empty and current not in (None, ""):
+            return
+        setattr(mosque, field, value)
+
+    set_field("name", record.name)
+    if not only_empty or not mosque.normalized_name:
+        mosque.normalized_name = normalize_mosque_name(record.name)
+    set_field("address_line1", record.address_line1)
+    set_field("address_line2", record.address_line2)
+    set_field("city", record.city)
+    set_field("county", record.county)
+    set_field("postcode", record.postcode)
+    set_field("country", record.country)
+    set_field("website_url", record.website_url)
     if record.latitude is not None and record.longitude is not None:
-        mosque.location = WKTElement(
-            f"POINT({record.longitude} {record.latitude})",
-            srid=4326,
-        )
+        if not only_empty or mosque.location is None:
+            set_mosque_point(mosque, record.latitude, record.longitude)
 
 
 async def _ensure_alias(
@@ -261,13 +292,3 @@ async def _create_match_review(
         status="pending",
     )
     session.add(review)
-
-
-def mosque_coordinates(mosque: Mosque) -> tuple[float | None, float | None]:
-    if mosque.location is None:
-        return None, None
-    try:
-        shape = to_shape(mosque.location)
-        return shape.y, shape.x
-    except Exception:  # noqa: BLE001
-        return None, None

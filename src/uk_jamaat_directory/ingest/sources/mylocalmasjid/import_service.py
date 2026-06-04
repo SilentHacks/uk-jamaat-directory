@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import (
@@ -17,7 +18,7 @@ from uk_jamaat_directory.domain import (
     SourcePublicationPolicy,
     SourceType,
 )
-from uk_jamaat_directory.ingest.discovery.records import MatchDecision
+from uk_jamaat_directory.ingest.discovery.records import MatchDecision, ResolveOutcome
 from uk_jamaat_directory.ingest.discovery.resolve import resolve_discovery_record
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.discovery import mlm_record_to_discovery
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import (
@@ -65,21 +66,22 @@ async def import_mylocalmasjid_bundle(
 
     for record in bundle.mosques:
         try:
-            discovery = mlm_record_to_discovery(record, publication_policy=publication_policy)
-            mosque, source, match = await resolve_discovery_record(session, discovery)
-        except Exception as exc:  # noqa: BLE001
+            async with session.begin_nested():
+                discovery = mlm_record_to_discovery(record, publication_policy=publication_policy)
+                resolved = await resolve_discovery_record(session, discovery)
+        except (ValueError, SQLAlchemyError) as exc:
             result.errors.append(f"{record.external_id}: {exc}")
             continue
 
         result.sources_upserted += 1
-        if match.decision == MatchDecision.NEEDS_REVIEW:
+        if resolved.match.decision == MatchDecision.NEEDS_REVIEW:
             result.reviews_created += 1
-        elif match.decision == MatchDecision.AUTO_LINK and match.reasons != [
-            "existing_source_link"
-        ]:
+        elif resolved.outcome == ResolveOutcome.AUTO_LINK_MATCH:
             result.mosques_linked += 1
-        if mosque is not None:
+        if resolved.mosque is not None:
             result.mosques_upserted += 1
+            mosque = resolved.mosque
+            source = resolved.source
         else:
             continue
 

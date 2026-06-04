@@ -15,14 +15,11 @@ def test_parse_sample_osm_places() -> None:
     assert bundle.places[0].external_id == "node/900001"
 
 
-def test_rejects_non_muslim_place() -> None:
-    path_bad = FIXTURES / "_tmp_bad.json"
+def test_rejects_non_muslim_place(tmp_path: Path) -> None:
+    path_bad = tmp_path / "bad_place.json"
     path_bad.write_text(
         '{"places":[{"osm_type":"node","osm_id":1,"name":"St Example Church","religion":"christian"}]}',
         encoding="utf-8",
     )
-    try:
-        with pytest.raises(ValueError, match="not a Muslim place"):
-            parse_osm_file(path_bad)
-    finally:
-        path_bad.unlink(missing_ok=True)
+    with pytest.raises(ValueError, match="not a Muslim place"):
+        parse_osm_file(path_bad)

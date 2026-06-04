@@ -5,13 +5,20 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from uk_jamaat_directory.domain import Confidence, SourcePublicationPolicy, SourceType
+from uk_jamaat_directory.models.core import Mosque, MosqueSource
 
 
 class MatchDecision(StrEnum):
     AUTO_LINK = "auto_link"
     CREATE_NEEDS_REVIEW = "create_needs_review"
     NEEDS_REVIEW = "needs_review"
-    BLOCKED = "blocked"
+
+
+class ResolveOutcome(StrEnum):
+    EXISTING_SOURCE_LINK = "existing_source_link"
+    AUTO_LINK_MATCH = "auto_link_match"
+    CREATED_NEEDS_REVIEW = "created_needs_review"
+    NEEDS_REVIEW = "needs_review"
 
 
 @dataclass
@@ -54,6 +61,14 @@ class DiscoveryMatch:
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
     alternatives: list[ScoredMosqueCandidate] = field(default_factory=list)
+
+
+@dataclass
+class ResolvedDiscovery:
+    mosque: Mosque | None
+    source: MosqueSource
+    match: DiscoveryMatch
+    outcome: ResolveOutcome
 
 
 @dataclass

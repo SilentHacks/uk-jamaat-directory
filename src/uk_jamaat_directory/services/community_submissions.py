@@ -34,6 +34,6 @@ async def submit_community_mosque(
             "private_contact": True,
         },
     )
-    mosque, _source, _match = await resolve_discovery_record(session, record)
-    status = "needs_review" if mosque is not None else "pending_identity_review"
+    resolved = await resolve_discovery_record(session, record)
+    status = "needs_review" if resolved.mosque is not None else "pending_identity_review"
     return submission_id, status

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from uk_jamaat_directory.domain import Confidence, SourcePublicationPolicy, SourceType
+from uk_jamaat_directory.ingest.discovery.records import DiscoveryRecord
 from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBundle, OsmPlaceRecord
 
 MUSLIM_DENOMINATIONS = frozenset({"muslim", "sunni", "shia", "ahmadiyya"})
@@ -24,7 +26,7 @@ def parse_osm_file(path: Path) -> OsmImportBundle:
     raise ValueError(msg)
 
 
-def _place_from_dict(data: dict) -> OsmPlaceRecord:
+def _place_from_dict(data: dict[str, object]) -> OsmPlaceRecord:
     record = OsmPlaceRecord.model_validate(data)
     if not _is_muslim_place(record):
         msg = f"record {record.external_id} is not a Muslim place of worship"
@@ -43,10 +45,7 @@ def _is_muslim_place(record: OsmPlaceRecord) -> bool:
     return any(token in name_lower for token in ("masjid", "mosque", "islamic"))
 
 
-def osm_to_discovery_record(record: OsmPlaceRecord):
-    from uk_jamaat_directory.domain import Confidence, SourcePublicationPolicy, SourceType
-    from uk_jamaat_directory.ingest.discovery.records import DiscoveryRecord
-
+def osm_to_discovery_record(record: OsmPlaceRecord) -> DiscoveryRecord:
     return DiscoveryRecord(
         source_type=SourceType.OPENSTREETMAP,
         external_id=record.external_id,
