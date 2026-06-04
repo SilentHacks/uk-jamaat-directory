@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "MosqueSummaryPublic": {
+      "properties": {
+        "directory_mosque_id": {
+          "format": "uuid",
+          "title": "Directory Mosque Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "City"
+        },
+        "postcode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Postcode"
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Longitude"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "distance_metres": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distance Metres"
+        }
+      },
+      "required": [
+        "directory_mosque_id",
+        "name",
+        "status"
+      ],
+      "title": "MosqueSummaryPublic",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/MosqueSummaryPublic"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "count": {
+      "title": "Count",
+      "type": "integer"
+    },
+    "limit": {
+      "title": "Limit",
+      "type": "integer"
+    },
+    "offset": {
+      "title": "Offset",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "items",
+    "count",
+    "limit",
+    "offset"
+  ],
+  "title": "MosqueListResponse",
+  "type": "object"
+}

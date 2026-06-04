@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "PublicScheduleOccurrence": {
+      "properties": {
+        "directory_mosque_id": {
+          "format": "uuid",
+          "title": "Directory Mosque Id",
+          "type": "string"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "prayer": {
+          "title": "Prayer",
+          "type": "string"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "format": "time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Time"
+        },
+        "jamaat_time": {
+          "format": "time",
+          "title": "Jamaat Time",
+          "type": "string"
+        },
+        "session_number": {
+          "default": 1,
+          "title": "Session Number",
+          "type": "integer"
+        },
+        "session_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Label"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "type": "string"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "string"
+        },
+        "source_type": {
+          "title": "Source Type",
+          "type": "string"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "last_verified_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Verified At"
+        },
+        "freshness_status": {
+          "title": "Freshness Status",
+          "type": "string"
+        },
+        "dataset_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Version"
+        }
+      },
+      "required": [
+        "directory_mosque_id",
+        "date",
+        "prayer",
+        "jamaat_time",
+        "timezone",
+        "confidence",
+        "source_type",
+        "freshness_status"
+      ],
+      "title": "PublicScheduleOccurrence",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "directory_mosque_id": {
+      "format": "uuid",
+      "title": "Directory Mosque Id",
+      "type": "string"
+    },
+    "from_date": {
+      "format": "date",
+      "title": "From Date",
+      "type": "string"
+    },
+    "to_date": {
+      "format": "date",
+      "title": "To Date",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/PublicScheduleOccurrence"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "directory_mosque_id",
+    "from_date",
+    "to_date",
+    "items"
+  ],
+  "title": "TimesResponse",
+  "type": "object"
+}

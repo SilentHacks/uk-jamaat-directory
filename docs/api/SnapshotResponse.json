@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "SnapshotFormatInfo": {
+      "properties": {
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "checksum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checksum"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        }
+      },
+      "required": [
+        "format"
+      ],
+      "title": "SnapshotFormatInfo",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "published_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Published At"
+    },
+    "checksum": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checksum"
+    },
+    "attribution": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attribution",
+      "type": "array"
+    },
+    "formats": {
+      "items": {
+        "$ref": "#/$defs/SnapshotFormatInfo"
+      },
+      "title": "Formats",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "schema_version"
+  ],
+  "title": "SnapshotResponse",
+  "type": "object"
+}

@@ -34,6 +34,25 @@ API: http://localhost:8000
 
 OpenAPI docs are available at http://localhost:8000/docs in non-production environments.
 
+## Public API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/mosques` | List active mosques with pagination and optional city/postcode filters |
+| `GET` | `/v1/mosques/search` | Search mosques by name, postcode, or city |
+| `GET` | `/v1/mosques/{directory_mosque_id}` | Mosque detail with public source provenance |
+| `GET` | `/v1/mosques/{directory_mosque_id}/times` | Published jamaat occurrences for a date range |
+| `GET` | `/v1/times/nearby` | Nearby published jamaat occurrences for a point and date |
+| `GET` | `/v1/changes` | Append-only public change feed |
+| `GET` | `/v1/snapshots/latest` | Latest published dataset snapshot metadata |
+| `GET` | `/v1/snapshots/{version}` | Dataset snapshot metadata by version |
+
+Export contract artifacts:
+
+```bash
+make export-contracts
+```
+
 ## Docker Stack
 
 ```bash
@@ -50,6 +69,7 @@ make lint
 make format
 make test
 make test-postgres
+make export-contracts
 ```
 
 Use `make test` for fast unit tests. Use `make test-postgres` for tests that require PostGIS.

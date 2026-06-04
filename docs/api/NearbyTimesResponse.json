@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "NearbyTimeItem": {
+      "properties": {
+        "directory_mosque_id": {
+          "format": "uuid",
+          "title": "Directory Mosque Id",
+          "type": "string"
+        },
+        "mosque_name": {
+          "title": "Mosque Name",
+          "type": "string"
+        },
+        "distance_metres": {
+          "title": "Distance Metres",
+          "type": "number"
+        },
+        "occurrence": {
+          "$ref": "#/$defs/PublicScheduleOccurrence"
+        }
+      },
+      "required": [
+        "directory_mosque_id",
+        "mosque_name",
+        "distance_metres",
+        "occurrence"
+      ],
+      "title": "NearbyTimeItem",
+      "type": "object"
+    },
+    "PublicScheduleOccurrence": {
+      "properties": {
+        "directory_mosque_id": {
+          "format": "uuid",
+          "title": "Directory Mosque Id",
+          "type": "string"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "prayer": {
+          "title": "Prayer",
+          "type": "string"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "format": "time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Time"
+        },
+        "jamaat_time": {
+          "format": "time",
+          "title": "Jamaat Time",
+          "type": "string"
+        },
+        "session_number": {
+          "default": 1,
+          "title": "Session Number",
+          "type": "integer"
+        },
+        "session_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Label"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "type": "string"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "string"
+        },
+        "source_type": {
+          "title": "Source Type",
+          "type": "string"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "last_verified_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Verified At"
+        },
+        "freshness_status": {
+          "title": "Freshness Status",
+          "type": "string"
+        },
+        "dataset_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Version"
+        }
+      },
+      "required": [
+        "directory_mosque_id",
+        "date",
+        "prayer",
+        "jamaat_time",
+        "timezone",
+        "confidence",
+        "source_type",
+        "freshness_status"
+      ],
+      "title": "PublicScheduleOccurrence",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "date": {
+      "format": "date",
+      "title": "Date",
+      "type": "string"
+    },
+    "latitude": {
+      "title": "Latitude",
+      "type": "number"
+    },
+    "longitude": {
+      "title": "Longitude",
+      "type": "number"
+    },
+    "radius_m": {
+      "title": "Radius M",
+      "type": "number"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/NearbyTimeItem"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "date",
+    "latitude",
+    "longitude",
+    "radius_m",
+    "items"
+  ],
+  "title": "NearbyTimesResponse",
+  "type": "object"
+}

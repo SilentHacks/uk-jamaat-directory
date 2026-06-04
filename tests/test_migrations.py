@@ -10,12 +10,14 @@ from uk_jamaat_directory.config import get_settings
 
 
 @pytest.mark.asyncio
-async def test_initial_migration_creates_core_tables() -> None:
+async def test_initial_migration_creates_core_tables(db_engine) -> None:  # noqa: ARG001
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
 
-    settings = get_settings()
-    database_url = settings.test_database_url or settings.database_url
+    database_url = os.environ.get(
+        "TEST_DATABASE_URL",
+        os.environ.get("DATABASE_URL", get_settings().database_url),
+    )
     engine = create_async_engine(database_url)
 
     expected_tables = {

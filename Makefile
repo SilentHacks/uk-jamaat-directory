@@ -1,4 +1,4 @@
-.PHONY: install lint format test test-postgres migrate dev compose-up compose-down
+.PHONY: install lint format test test-postgres migrate dev compose-up compose-down export-contracts
 
 VENV := .venv
 BIN := $(VENV)/bin
@@ -35,3 +35,6 @@ compose-up:
 
 compose-down:
 	docker compose down
+
+export-contracts:
+	$(BIN)/uk-jamaat-directory export-contracts
