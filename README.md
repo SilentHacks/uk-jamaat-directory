@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–6 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import, discovery/canonicalization). Publication pipelines, crawlers, and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–7 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import, discovery/canonicalization, schedule validation and publication). Crawlers and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -134,6 +134,24 @@ Public community intake:
 
 - `POST /v1/contributions/mosques` — submit a missing mosque for moderation (202 Accepted)
 
+## Schedule validation and publication (Phase 7)
+
+Imports create `schedule_candidates` only. To expose times on the public API, run validation then publication explicitly (no auto-publish on import).
+
+```bash
+# Optional: validate during import
+.venv/bin/uk-jamaat-directory import-mlm \
+  --input data/fixtures/mylocalmasjid/sample_export.json \
+  --publication-policy public_redistribution_allowed \
+  --validate
+
+.venv/bin/uk-jamaat-directory validate-candidates
+.venv/bin/uk-jamaat-directory publish-candidates
+.venv/bin/uk-jamaat-directory recompute-freshness
+```
+
+Filters for validate/publish: `--source-id`, `--mosque-id`, `--from`, `--to`. Use `validate-candidates --dry-run` to inspect without status updates.
+
 ## Development
 
 ```bash
@@ -192,9 +210,10 @@ AGENTS.md                  Agent/developer conventions
 | 4 | Public read API and contract exports | Done |
 | 5 | MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI | Done |
 | 6 | Discovery sources, identity matching, admin/community intake | Done |
-| 7+ | Publication pipeline, crawlers, web UI | Planned |
+| 7 | Schedule validation, explicit publish CLI, freshness | Done |
+| 8+ | Admin candidate moderation API, crawlers, web UI | Planned |
 
-Imports create candidates only; public occurrences and bulk export files require the publication pipeline (Phase 7+). Snapshot endpoints return dataset metadata from `dataset_versions`; export files are not produced until a later phase.
+Bulk export files are not produced yet. Snapshot endpoints return dataset metadata from `dataset_versions`; NDJSON/CSV files come in a later phase.
 
 ## Data Publication Rules
 

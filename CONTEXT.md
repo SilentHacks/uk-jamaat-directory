@@ -47,7 +47,8 @@ As of the current codebase (Phases 0–4):
 - **Done:** service scaffold, PostGIS schema, public read API (`/v1/mosques`, `/v1/times/nearby`, `/v1/changes`, `/v1/snapshots`), source publication filtering on reads, OpenAPI/JSON Schema exports in `docs/api/`.
 - **Done (Phase 5):** MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI; imports create private artifacts, sources, and `schedule_candidates` regardless of publication policy.
 - **Done (Phase 6):** Shared discovery matching, OSM fixture import (`import-osm`), MLM link-before-create, admin mosque identity APIs, community mosque submissions, private Google discovery leads (admin-only).
-- **Not yet:** Candidate validation/publication workers, crawler, bulk NDJSON/CSV file generation, admin moderation UI, Celery-backed pipelines, live OSM Overpass/Google API fetchers.
+- **Done (Phase 7):** Deterministic schedule validation, explicit `validate-candidates` / `publish-candidates` CLI, dataset-versioned occurrences, change events on publish, freshness recompute, public reads filtered to latest published dataset.
+- **Not yet:** Admin candidate approve/reject HTTP (Phase 8), crawler, bulk NDJSON/CSV file generation, Celery-backed pipelines, live OSM Overpass/Google API fetchers.
 
 Snapshot API routes expose metadata from `dataset_versions` (version, checksum, manifest export URLs). They do not generate export files until a later phase implements snapshot publishing.
 
