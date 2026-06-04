@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     mylocalmasjid_publication_policy: str = "unknown"
     openai_api_key: str | None = None
 
+    community_submission_rate_limit: int = 10
+    community_submission_rate_window_seconds: int = 60
+
     @field_validator("api_prefix")
     @classmethod
     def api_prefix_must_start_with_slash(cls, value: str) -> str:

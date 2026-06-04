@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.rate_limit import limit_community_submissions
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.schemas.contributions import (
     CommunityMosqueSubmission,
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/contributions", tags=["contributions"])
     "/mosques",
     response_model=CommunityMosqueSubmissionResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(limit_community_submissions)],
 )
 async def submit_mosque(
     payload: CommunityMosqueSubmission,

@@ -11,7 +11,7 @@ class CommunityMosqueSubmission(BaseModel):
     website_url: str | None = None
     latitude: float | None = None
     longitude: float | None = None
-    message: str | None = None
+    message: str | None = Field(default=None, max_length=2000)
     submitter_name: str | None = None
     submitter_email: str | None = None
 
