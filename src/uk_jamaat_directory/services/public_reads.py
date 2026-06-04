@@ -17,6 +17,10 @@ from uk_jamaat_directory.models.core import (
     MosqueSource,
     ScheduleOccurrence,
 )
+from uk_jamaat_directory.schedules.dataset import (
+    PUBLISHED_DATASET_STATUS,
+    latest_published_version_id,
+)
 from uk_jamaat_directory.schemas.public import (
     ChangeFeedResponse,
     MosqueDetailPublic,
@@ -35,7 +39,10 @@ from uk_jamaat_directory.services.mappers import (
 )
 from uk_jamaat_directory.services.public_policy import public_source_filter
 
-PUBLISHED_DATASET_STATUS = "published"
+
+def _latest_dataset_filter(session: AsyncSession):
+    """Filter occurrences to the latest published dataset version only."""
+    return latest_published_version_id(session)
 
 
 def _active_mosque_filters(
@@ -148,6 +155,15 @@ async def get_mosque_times(
     if mosque is None:
         return None
 
+    latest_id = await _latest_dataset_filter(session)
+    if latest_id is None:
+        return TimesResponse(
+            directory_mosque_id=directory_mosque_id,
+            from_date=from_date,
+            to_date=to_date,
+            items=[],
+        )
+
     stmt = (
         select(ScheduleOccurrence, MosqueSource, DatasetVersion)
         .join(MosqueSource, ScheduleOccurrence.source_id == MosqueSource.id)
@@ -155,6 +171,7 @@ async def get_mosque_times(
         .where(ScheduleOccurrence.mosque_id == directory_mosque_id)
         .where(ScheduleOccurrence.date >= from_date)
         .where(ScheduleOccurrence.date <= to_date)
+        .where(ScheduleOccurrence.dataset_version_id == latest_id)
         .where(public_source_filter())
         .order_by(
             ScheduleOccurrence.date, ScheduleOccurrence.prayer, ScheduleOccurrence.session_number
@@ -196,6 +213,16 @@ async def get_nearby_times(
         )
 
     mosque_ids = [item.mosque.id for item in nearby]
+    latest_id = await _latest_dataset_filter(session)
+    if latest_id is None:
+        return NearbyTimesResponse(
+            date=on_date,
+            latitude=latitude,
+            longitude=longitude,
+            radius_m=radius_m,
+            items=[],
+        )
+
     stmt = (
         select(ScheduleOccurrence, MosqueSource, DatasetVersion, Mosque.name)
         .join(Mosque, ScheduleOccurrence.mosque_id == Mosque.id)
@@ -203,6 +230,7 @@ async def get_nearby_times(
         .outerjoin(DatasetVersion, ScheduleOccurrence.dataset_version_id == DatasetVersion.id)
         .where(ScheduleOccurrence.mosque_id.in_(mosque_ids))
         .where(ScheduleOccurrence.date == on_date)
+        .where(ScheduleOccurrence.dataset_version_id == latest_id)
         .where(public_source_filter())
     )
     rows = (await session.execute(stmt)).all()
