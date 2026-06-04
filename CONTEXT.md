@@ -44,7 +44,8 @@ MyLocalMasjid is the preferred primary source because it maintains broad UK mosq
 As of the current codebase (Phases 0–4):
 
 - **Done:** service scaffold, PostGIS schema, public read API (`/v1/mosques`, `/v1/times/nearby`, `/v1/changes`, `/v1/snapshots`), source publication filtering on reads, OpenAPI/JSON Schema exports in `docs/api/`.
-- **Not yet:** MyLocalMasjid or OSM ingestion, candidate validation/publication workers, crawler, bulk NDJSON/CSV file generation, contribution/write APIs, admin moderation UI, Celery-backed pipelines.
+- **Done (Phase 5):** MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI; imports create private artifacts, sources, and `schedule_candidates` regardless of publication policy.
+- **Not yet:** OSM/charity discovery imports, candidate validation/publication workers, crawler, bulk NDJSON/CSV file generation, contribution/write APIs, admin moderation UI, Celery-backed pipelines.
 
 Snapshot API routes expose metadata from `dataset_versions` (version, checksum, manifest export URLs). They do not generate export files until a later phase implements snapshot publishing.
 

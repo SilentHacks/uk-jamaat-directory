@@ -21,7 +21,9 @@
 - Generated contracts in `docs/api/`
 - GitHub Actions CI on `main`
 
-Not implemented yet: source adapters (MyLocalMasjid, OSM, crawlers), publication pipeline, bulk export files, contribution/write APIs beyond admin stub, Celery tasks, frontend.
+- MyLocalMasjid ingest adapter (`import-mlm`, `report-mlm` CLI; synthetic fixtures in `data/fixtures/mylocalmasjid/`)
+
+Not implemented yet: OSM/charity discovery imports, publication pipeline (candidates → occurrences), bulk export files, contribution/write APIs beyond admin stub, Celery tasks, crawlers, frontend.
 
 ## Architecture Rules
 

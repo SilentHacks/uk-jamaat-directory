@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–4 are in place (scaffolding, API shell, database schema, public read API). Ingestion, publication pipelines, and bulk export generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–5 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import adapter). Publication pipelines, crawlers, and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -87,6 +87,27 @@ make export-contracts
 
 See [docs/api/README.md](docs/api/README.md).
 
+## MyLocalMasjid import (Phase 5)
+
+Import synthetic or partner-provided exports into private sources, artifacts, and `schedule_candidates`. Default publication policy is `unknown` until redistribution is confirmed.
+
+```bash
+# Dry-run parse only
+.venv/bin/uk-jamaat-directory import-mlm \
+  --input data/fixtures/mylocalmasjid/sample_export.json \
+  --dry-run
+
+# Persist to local database (after migrate)
+.venv/bin/uk-jamaat-directory import-mlm \
+  --input data/fixtures/mylocalmasjid/sample_export.json \
+  --publication-policy unknown
+
+.venv/bin/uk-jamaat-directory report-mlm
+.venv/bin/uk-jamaat-directory report-mlm --json
+```
+
+Supported formats: JSON bundle (`.json`), NDJSON (`.ndjson`), flat CSV (`.csv`). Do not commit real MyLocalMasjid dumps; use `data/fixtures/mylocalmasjid/` for tests only.
+
 ## Development
 
 ```bash
@@ -129,9 +150,10 @@ AGENTS.md                  Agent/developer conventions
 | 2 | API shell (logging, errors, admin auth) | Done |
 | 3 | PostGIS schema (mosques, sources, occurrences, …) | Done |
 | 4 | Public read API and contract exports | Done |
-| 5+ | MyLocalMasjid ingestion, publication, crawlers, web UI | Planned |
+| 5 | MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI | Done |
+| 6+ | OSM discovery, publication pipeline, crawlers, web UI | Planned |
 
-The database schema supports ingestion and moderation, but there are no import workers or public bulk file generation yet. Snapshot endpoints return dataset metadata from `dataset_versions`; export files are not produced until a later phase.
+Imports create candidates only; public occurrences and bulk export files require the publication pipeline (Phase 7+). Snapshot endpoints return dataset metadata from `dataset_versions`; export files are not produced until a later phase.
 
 ## Data Publication Rules
 
