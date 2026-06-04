@@ -51,16 +51,15 @@ async def test_admin_create_and_merge_mosque(
         status=MosqueStatus.NEEDS_REVIEW,
     )
     db_session.add(duplicate)
-    db_session.add(
-        MosqueSource(
-            id=uuid.uuid4(),
-            mosque_id=duplicate.id,
-            source_type=SourceType.MANUAL,
-            external_id="dup-1",
-            publication_policy=SourcePublicationPolicy.UNKNOWN,
-            confidence=Confidence.COMMUNITY,
-        )
+    dup_source = MosqueSource(
+        id=uuid.uuid4(),
+        mosque_id=duplicate.id,
+        source_type=SourceType.MANUAL,
+        external_id="dup-1",
+        publication_policy=SourcePublicationPolicy.UNKNOWN,
+        confidence=Confidence.COMMUNITY,
     )
+    db_session.add(dup_source)
     db_session.add(
         MosqueAlias(
             id=uuid.uuid4(),
@@ -70,20 +69,12 @@ async def test_admin_create_and_merge_mosque(
             source_type=SourceType.MANUAL,
         )
     )
-    source_for_candidate = MosqueSource(
-        id=uuid.uuid4(),
-        mosque_id=duplicate.id,
-        source_type=SourceType.MANUAL,
-        external_id="dup-candidate-source",
-        publication_policy=SourcePublicationPolicy.UNKNOWN,
-        confidence=Confidence.COMMUNITY,
-    )
-    db_session.add(source_for_candidate)
+    await db_session.flush()
     db_session.add(
         ScheduleCandidate(
             id=uuid.uuid4(),
             mosque_id=duplicate.id,
-            source_id=source_for_candidate.id,
+            source_id=dup_source.id,
             date=date(2026, 6, 4),
             prayer=Prayer.DHUHR,
             jamaat_time=time(13, 15),

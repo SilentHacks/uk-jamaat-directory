@@ -4,8 +4,10 @@ from enum import StrEnum
 from functools import lru_cache
 from typing import Any
 
+from typing import Annotated
+
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Environment(StrEnum):
@@ -42,8 +44,10 @@ class Settings(BaseSettings):
     s3_access_key_id: str = "directory"
     s3_secret_access_key: str = "directory-secret"
 
-    allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
-    cors_origins: list[str] = Field(
+    allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1"]
+    )
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"]
     )
     trust_proxy_headers: bool = False

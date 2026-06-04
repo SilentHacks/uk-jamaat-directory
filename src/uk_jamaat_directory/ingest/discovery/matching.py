@@ -47,10 +47,10 @@ def score_mosque_candidate(
     if name_ratio >= STRONG_NAME_RATIO:
         score += 0.30
         signals += 1
-        reasons.append(f"name_ratio_{name_ratio}")
+        reasons.append(f"name_ratio_{int(round(name_ratio))}")
     elif name_ratio >= 85:
         score += 0.15
-        reasons.append(f"name_ratio_{name_ratio}")
+        reasons.append(f"name_ratio_{int(round(name_ratio))}")
 
     if aliases:
         for alias_row in aliases:
@@ -58,7 +58,7 @@ def score_mosque_candidate(
             if alias_ratio >= STRONG_NAME_RATIO:
                 score += 0.20
                 signals += 1
-                reasons.append(f"alias_ratio_{alias_ratio}")
+                reasons.append(f"alias_ratio_{int(round(alias_ratio))}")
                 break
 
     record_domain = normalize_domain(record.website_url)
