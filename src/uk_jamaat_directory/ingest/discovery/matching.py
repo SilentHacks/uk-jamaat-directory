@@ -109,12 +109,12 @@ def decide_match(
             alternatives=ranked[:3],
         )
 
-    strong_signals = sum(
-        1
-        for reason in best.reasons
-        if reason.startswith(("postcode_", "distance_", "name_ratio_", "domain_"))
-    )
-    if best.score >= AUTO_LINK_THRESHOLD and strong_signals >= 2:
+    strong_signals = _count_strong_signals(best.reasons)
+    if (
+        best.score >= AUTO_LINK_THRESHOLD
+        and strong_signals >= 2
+        and _has_identity_signal(best.reasons)
+    ):
         return DiscoveryMatch(
             decision=MatchDecision.AUTO_LINK,
             mosque_id=best.mosque_id,
@@ -135,6 +135,43 @@ def decide_match(
         score=best.score,
         reasons=["below_auto_link_threshold", *best.reasons],
     )
+
+
+def _fuzzy_ratio_from_reason(reason: str) -> int | None:
+    if reason.startswith("name_ratio_"):
+        suffix = reason.removeprefix("name_ratio_")
+    elif reason.startswith("alias_ratio_"):
+        suffix = reason.removeprefix("alias_ratio_")
+    else:
+        return None
+    try:
+        return int(suffix)
+    except ValueError:
+        return None
+
+
+def _count_strong_signals(reasons: list[str]) -> int:
+    count = 0
+    for reason in reasons:
+        if reason.startswith(("postcode_", "distance_")):
+            count += 1
+        elif reason.startswith("domain_"):
+            count += 1
+        else:
+            ratio = _fuzzy_ratio_from_reason(reason)
+            if ratio is not None and ratio >= STRONG_NAME_RATIO:
+                count += 1
+    return count
+
+
+def _has_identity_signal(reasons: list[str]) -> bool:
+    for reason in reasons:
+        if reason.startswith("domain_"):
+            return True
+        ratio = _fuzzy_ratio_from_reason(reason)
+        if ratio is not None and ratio >= STRONG_NAME_RATIO:
+            return True
+    return False
 
 
 def _distance_meters(
