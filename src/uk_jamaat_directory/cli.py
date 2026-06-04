@@ -4,6 +4,8 @@ import argparse
 import asyncio
 import json
 import sys
+import uuid
+from datetime import date
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -20,6 +22,11 @@ from uk_jamaat_directory.ingest.sources.mylocalmasjid.adapter import ImportForma
 from uk_jamaat_directory.ingest.sources.openstreetmap import (
     import_openstreetmap_bundle,
     parse_osm_file,
+)
+from uk_jamaat_directory.schedules import (
+    publish_candidates,
+    recompute_all_source_health,
+    validate_candidates,
 )
 from uk_jamaat_directory.services.export_contracts import export_json_schemas, export_openapi
 
@@ -73,6 +80,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Parse and validate the file without writing to the database",
     )
+    import_mlm.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run schedule validation after import (does not publish)",
+    )
 
     report_mlm = subparsers.add_parser(
         "report-mlm",
@@ -100,7 +112,51 @@ def build_parser() -> argparse.ArgumentParser:
         help="Parse and validate the file without writing to the database",
     )
 
+    _add_schedule_candidate_parsers(subparsers)
+
     return parser
+
+
+def _parse_optional_date(value: str | None) -> date | None:
+    if value is None:
+        return None
+    return date.fromisoformat(value)
+
+
+def _parse_optional_uuid(value: str | None) -> uuid.UUID | None:
+    if value is None:
+        return None
+    return uuid.UUID(value)
+
+
+def _add_schedule_candidate_parsers(subparsers: argparse._SubParsersAction) -> None:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--source-id", type=_parse_optional_uuid, default=None)
+    common.add_argument("--mosque-id", type=_parse_optional_uuid, default=None)
+    common.add_argument("--from", dest="date_from", type=_parse_optional_date, default=None)
+    common.add_argument("--to", dest="date_to", type=_parse_optional_date, default=None)
+
+    validate_cmd = subparsers.add_parser(
+        "validate-candidates",
+        parents=[common],
+        help="Validate pending schedule candidates and set approved/rejected status",
+    )
+    validate_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate without updating candidate status",
+    )
+
+    subparsers.add_parser(
+        "publish-candidates",
+        parents=[common],
+        help="Publish approved candidates to public schedule occurrences",
+    )
+
+    subparsers.add_parser(
+        "recompute-freshness",
+        help="Recompute source_health for all public-redistribution sources",
+    )
 
 
 def _resolve_mlm_policy(args: argparse.Namespace, settings: Settings):
@@ -133,6 +189,7 @@ async def _run_import_mlm(args: argparse.Namespace, settings: Settings) -> int:
                 raw_payload=raw_payload,
                 fetched_url=fetched_url,
                 publication_policy=policy,
+                validate_after_import=args.validate,
             )
             await session.commit()
     finally:
@@ -219,7 +276,91 @@ def main() -> None:
     if args.command == "import-osm":
         raise SystemExit(asyncio.run(_run_import_osm(args, settings)))
 
+    if args.command == "validate-candidates":
+        raise SystemExit(asyncio.run(_run_validate_candidates(args, settings)))
+
+    if args.command == "publish-candidates":
+        raise SystemExit(asyncio.run(_run_publish_candidates(args, settings)))
+
+    if args.command == "recompute-freshness":
+        raise SystemExit(asyncio.run(_run_recompute_freshness(settings)))
+
     parser.print_help()
+
+
+async def _run_validate_candidates(args: argparse.Namespace, settings: Settings) -> int:
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            result = await validate_candidates(
+                session,
+                source_id=args.source_id,
+                mosque_id=args.mosque_id,
+                date_from=args.date_from,
+                date_to=args.date_to,
+                update_status=not args.dry_run,
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    print(
+        f"Validated {result.examined} candidates: "
+        f"approved={result.approved}, rejected={result.rejected}, "
+        f"pending={result.pending}, skipped={result.skipped}"
+    )
+    return 0
+
+
+async def _run_publish_candidates(args: argparse.Namespace, settings: Settings) -> int:
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            result = await publish_candidates(
+                session,
+                source_id=args.source_id,
+                mosque_id=args.mosque_id,
+                date_from=args.date_from,
+                date_to=args.date_to,
+                settings=settings,
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    print(
+        f"Published {result.published} occurrences "
+        f"(dataset={result.dataset_version}, "
+        f"policy_skipped={result.skipped_policy}, "
+        f"validation_skipped={result.skipped_validation}, "
+        f"removed={result.removed_occurrences}, "
+        f"change_events={result.change_events})"
+    )
+    if result.errors:
+        print("Notes:", file=sys.stderr)
+        for error in result.errors[:20]:
+            print(f"  - {error}", file=sys.stderr)
+        if len(result.errors) > 20:
+            print(f"  ... and {len(result.errors) - 20} more", file=sys.stderr)
+    if result.skipped_policy and result.published == 0:
+        return 1
+    return 0
+
+
+async def _run_recompute_freshness(settings: Settings) -> int:
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            count = await recompute_all_source_health(session)
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    print(f"Recomputed freshness for {count} public sources")
+    return 0
 
 
 async def _run_import_osm(args: argparse.Namespace, settings: Settings) -> int:
