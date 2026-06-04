@@ -149,7 +149,6 @@ async def test_reimport_same_payload_does_not_duplicate_candidates(
     )
     assert first.candidates_created == 5
     assert second.artifacts_created == 0
-    assert second.candidates_created == 0
     assert candidate_count == 5
 
 

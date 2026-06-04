@@ -11,12 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import (
     ArtifactStatus,
-    CandidateStatus,
-    Confidence,
     ExtractionKind,
     FreshnessStatus,
     SourcePublicationPolicy,
-    SourceType,
 )
 from uk_jamaat_directory.ingest.discovery.records import MatchDecision, ResolveOutcome
 from uk_jamaat_directory.ingest.discovery.resolve import resolve_discovery_record
@@ -25,15 +22,16 @@ from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import (
     MyLocalMasjidImportBundle,
     MyLocalMasjidScheduleRow,
 )
-from uk_jamaat_directory.ingest.sources.mylocalmasjid.times import parse_hhmm
 from uk_jamaat_directory.models.core import (
     ExtractionRun,
     Mosque,
     MosqueSource,
-    ScheduleCandidate,
     SourceArtifact,
     SourceHealth,
 )
+from uk_jamaat_directory.schedules.candidates import upsert_schedule_candidate
+from uk_jamaat_directory.schedules.parse import parse_hhmm
+from uk_jamaat_directory.schedules.publication import validate_candidates
 
 EXTRACTOR_VERSION = "mylocalmasjid-deterministic-v1"
 
@@ -58,6 +56,7 @@ async def import_mylocalmasjid_bundle(
     fetched_url: str,
     publication_policy: SourcePublicationPolicy,
     store_artifact_object_key: str | None = None,
+    validate_after_import: bool = False,
 ) -> MyLocalMasjidImportResult:
     """Persist a parsed MyLocalMasjid bundle as private sources, artifacts, and candidates."""
     result = MyLocalMasjidImportResult()
@@ -95,22 +94,23 @@ async def import_mylocalmasjid_bundle(
         )
         if artifact_created:
             result.artifacts_created += 1
+            extraction_run = ExtractionRun(
+                id=uuid.uuid4(),
+                artifact_id=artifact.id,
+                source_id=source.id,
+                kind=ExtractionKind.DETERMINISTIC,
+                extractor_version=EXTRACTOR_VERSION,
+                status="succeeded",
+                finished_at=imported_at,
+                metadata_={"mosque_external_id": record.external_id},
+            )
+            session.add(extraction_run)
+            await session.flush()
         else:
-            await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
-            continue
-
-        extraction_run = ExtractionRun(
-            id=uuid.uuid4(),
-            artifact_id=artifact.id,
-            source_id=source.id,
-            kind=ExtractionKind.DETERMINISTIC,
-            extractor_version=EXTRACTOR_VERSION,
-            status="succeeded",
-            finished_at=imported_at,
-            metadata_={"mosque_external_id": record.external_id},
-        )
-        session.add(extraction_run)
-        await session.flush()
+            extraction_run = await _latest_extraction_run(session, source_id=source.id)
+            if extraction_run is None:
+                await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
+                continue
 
         created, skipped = await _create_candidates(
             session,
@@ -124,7 +124,23 @@ async def import_mylocalmasjid_bundle(
 
         await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
 
+    if validate_after_import:
+        await validate_candidates(session, source_id=None)
+
     return result
+
+
+async def _latest_extraction_run(
+    session: AsyncSession,
+    *,
+    source_id: uuid.UUID,
+) -> ExtractionRun | None:
+    return await session.scalar(
+        select(ExtractionRun)
+        .where(ExtractionRun.source_id == source_id)
+        .order_by(ExtractionRun.finished_at.desc().nullslast(), ExtractionRun.started_at.desc())
+        .limit(1)
+    )
 
 
 async def _record_artifact(
@@ -178,28 +194,19 @@ async def _create_candidates(
                 skipped += 1
                 continue
             start_time = parse_hhmm(row.start_time)
-            candidate = ScheduleCandidate(
-                id=uuid.uuid4(),
-                mosque_id=mosque.id,
-                source_id=source.id,
+            updated, unchanged = await upsert_schedule_candidate(
+                session,
+                mosque=mosque,
+                source=source,
                 extraction_run_id=extraction_run_id,
-                date=row.date,
-                prayer=row.prayer,
-                start_time=start_time,
+                row=row,
                 jamaat_time=jamaat_time,
-                session_number=row.session_number,
-                session_label=row.session_label,
-                timezone=row.timezone,
-                confidence=Confidence.PARTNER_IMPORT,
-                status=CandidateStatus.PENDING,
-                evidence={
-                    "source_type": SourceType.MYLOCALMASJID.value,
-                    "external_id": source.external_id,
-                    "linkback_url": source.metadata_.get("linkback_url"),
-                },
+                start_time=start_time,
             )
-            session.add(candidate)
-            created += 1
+            if unchanged:
+                skipped += 1
+            else:
+                created += 1
         except ValueError:
             skipped += 1
     await session.flush()
