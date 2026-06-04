@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from geoalchemy2 import WKTElement
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import (
@@ -12,9 +13,22 @@ from uk_jamaat_directory.domain import (
     MosqueStatus,
     SourceType,
 )
+from uk_jamaat_directory.geo.location import set_mosque_point
+from uk_jamaat_directory.ingest.discovery.resolve import _ensure_alias
 from uk_jamaat_directory.ingest.normalize import normalize_mosque_name
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
-from uk_jamaat_directory.models.core import ModerationAction, Mosque, MosqueAlias, MosqueSource
+from uk_jamaat_directory.models.core import (
+    Correction,
+    IdentityMatchReview,
+    ModerationAction,
+    Mosque,
+    MosqueAlias,
+    MosqueAttribute,
+    MosqueClaim,
+    MosqueSource,
+    ScheduleCandidate,
+    ScheduleOccurrence,
+)
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
     AdminMosqueCreate,
@@ -22,6 +36,14 @@ from uk_jamaat_directory.schemas.admin import (
     AdminMosqueUpdate,
     AdminSourceAttach,
 )
+from uk_jamaat_directory.services.errors import DuplicateAliasError, MosqueNotFoundError
+
+
+async def _require_mosque(session: AsyncSession, mosque_id: uuid.UUID) -> Mosque:
+    mosque = await session.get(Mosque, mosque_id)
+    if mosque is None:
+        raise MosqueNotFoundError(str(mosque_id))
+    return mosque
 
 
 async def create_mosque(
@@ -44,11 +66,7 @@ async def create_mosque(
         status=MosqueStatus(payload.status),
         public_notes=payload.public_notes,
     )
-    if payload.latitude is not None and payload.longitude is not None:
-        mosque.location = WKTElement(
-            f"POINT({payload.longitude} {payload.latitude})",
-            srid=4326,
-        )
+    set_mosque_point(mosque, payload.latitude, payload.longitude)
     session.add(mosque)
     await _audit(
         session,
@@ -68,7 +86,7 @@ async def update_mosque(
     *,
     actor: str,
 ) -> Mosque:
-    mosque = await session.get_one(Mosque, mosque_id)
+    mosque = await _require_mosque(session, mosque_id)
     if payload.name is not None:
         mosque.name = payload.name
         mosque.normalized_name = normalize_mosque_name(payload.name)
@@ -88,10 +106,7 @@ async def update_mosque(
     if payload.status is not None:
         mosque.status = MosqueStatus(payload.status)
     if payload.latitude is not None and payload.longitude is not None:
-        mosque.location = WKTElement(
-            f"POINT({payload.longitude} {payload.latitude})",
-            srid=4326,
-        )
+        set_mosque_point(mosque, payload.latitude, payload.longitude)
     await _audit(
         session,
         actor=actor,
@@ -110,6 +125,7 @@ async def attach_source(
     *,
     actor: str,
 ) -> MosqueSource:
+    await _require_mosque(session, mosque_id)
     source = MosqueSource(
         id=uuid.uuid4(),
         mosque_id=mosque_id,
@@ -142,6 +158,7 @@ async def add_alias(
     *,
     actor: str,
 ) -> MosqueAlias:
+    await _require_mosque(session, mosque_id)
     alias = MosqueAlias(
         id=uuid.uuid4(),
         mosque_id=mosque_id,
@@ -150,6 +167,10 @@ async def add_alias(
         source_type=SourceType.MANUAL,
     )
     session.add(alias)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise DuplicateAliasError("alias already exists for this mosque") from exc
     await _audit(
         session,
         actor=actor,
@@ -169,17 +190,79 @@ async def merge_mosques(
     *,
     actor: str,
 ) -> Mosque:
-    canonical = await session.get_one(Mosque, canonical_mosque_id)
-    duplicate = await session.get_one(Mosque, payload.duplicate_mosque_id)
+    canonical = await _require_mosque(session, canonical_mosque_id)
+    duplicate = await _require_mosque(session, payload.duplicate_mosque_id)
     if duplicate.id == canonical.id:
         msg = "cannot merge a mosque into itself"
         raise ValueError(msg)
 
-    sources = (
+    for source in (
         await session.scalars(select(MosqueSource).where(MosqueSource.mosque_id == duplicate.id))
-    ).all()
-    for source in sources:
+    ).all():
         source.mosque_id = canonical.id
+
+    for alias in (
+        await session.scalars(select(MosqueAlias).where(MosqueAlias.mosque_id == duplicate.id))
+    ).all():
+        conflict = await session.scalar(
+            select(MosqueAlias).where(
+                MosqueAlias.mosque_id == canonical.id,
+                MosqueAlias.normalized_alias == alias.normalized_alias,
+            )
+        )
+        if conflict is not None:
+            await session.delete(alias)
+        else:
+            alias.mosque_id = canonical.id
+
+    for candidate in (
+        await session.scalars(
+            select(ScheduleCandidate).where(ScheduleCandidate.mosque_id == duplicate.id)
+        )
+    ).all():
+        candidate.mosque_id = canonical.id
+
+    for occurrence in (
+        await session.scalars(
+            select(ScheduleOccurrence).where(ScheduleOccurrence.mosque_id == duplicate.id)
+        )
+    ).all():
+        occurrence.mosque_id = canonical.id
+
+    for claim in (
+        await session.scalars(select(MosqueClaim).where(MosqueClaim.mosque_id == duplicate.id))
+    ).all():
+        claim.mosque_id = canonical.id
+
+    await session.execute(
+        update(Correction)
+        .where(Correction.mosque_id == duplicate.id)
+        .values(mosque_id=canonical.id)
+    )
+    await session.execute(
+        update(IdentityMatchReview)
+        .where(IdentityMatchReview.proposed_mosque_id == duplicate.id)
+        .values(proposed_mosque_id=canonical.id)
+    )
+
+    dup_attr = await session.get(MosqueAttribute, duplicate.id)
+    if dup_attr is not None:
+        canonical_attr = await session.get(MosqueAttribute, canonical.id)
+        if canonical_attr is None:
+            session.add(
+                MosqueAttribute(
+                    mosque_id=canonical.id,
+                    facilities=dup_attr.facilities,
+                    madhab=dup_attr.madhab,
+                    affiliation=dup_attr.affiliation,
+                    women_space=dup_attr.women_space,
+                    parking=dup_attr.parking,
+                    accessibility=dup_attr.accessibility,
+                )
+            )
+        await session.delete(dup_attr)
+
+    await _ensure_alias(session, canonical.id, duplicate.name, SourceType.MANUAL)
 
     duplicate.status = MosqueStatus.DUPLICATE
     await _audit(
@@ -204,21 +287,20 @@ async def record_discovery_lead(
     actor: str,
 ) -> uuid.UUID:
     lead_id = uuid.uuid4()
-    action = ModerationAction(
-        id=uuid.uuid4(),
+    await _audit(
+        session,
         actor=actor,
         action="google_discovery_lead",
         entity_type="discovery_lead",
         entity_id=lead_id,
         reason=notes,
-        metadata_={
+        metadata={
             "query": query,
             "location_hint": location_hint,
             "provider": "google",
             "policy": "admin_only_private",
         },
     )
-    session.add(action)
     await session.flush()
     return lead_id
 
@@ -231,7 +313,7 @@ async def _audit(
     entity_type: str,
     entity_id: uuid.UUID,
     reason: str | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     session.add(
         ModerationAction(

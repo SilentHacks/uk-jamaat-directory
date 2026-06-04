@@ -40,8 +40,8 @@ class AdminSourceAttach(BaseModel):
     external_id: str = Field(min_length=1, max_length=255)
     source_url: str | None = None
     display_name: str | None = None
-    publication_policy: str = "public_redistribution_allowed"
-    confidence: str = "verified"
+    publication_policy: str = "unknown"
+    confidence: str = "community"
     attribution: str | None = None
 
 

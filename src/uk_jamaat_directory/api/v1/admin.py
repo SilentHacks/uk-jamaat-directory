@@ -19,12 +19,23 @@ from uk_jamaat_directory.schemas.admin import (
     AdminSourceAttach,
 )
 from uk_jamaat_directory.services import admin_identity
+from uk_jamaat_directory.services.errors import DuplicateAliasError, MosqueNotFoundError
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_key)])
 
 
 class AdminHealthResponse(BaseModel):
     status: str
+
+
+def _admin_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, MosqueNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, DuplicateAliasError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    raise exc
 
 
 @router.get("/health", response_model=AdminHealthResponse)
@@ -52,7 +63,10 @@ async def update_mosque(
     payload: AdminMosqueUpdate,
     session: AsyncSession = Depends(get_db_session),
 ) -> AdminMosqueResponse:
-    mosque = await admin_identity.update_mosque(session, mosque_id, payload, actor="admin_api")
+    try:
+        mosque = await admin_identity.update_mosque(session, mosque_id, payload, actor="admin_api")
+    except (MosqueNotFoundError, ValueError) as exc:
+        raise _admin_http_error(exc) from exc
     await session.commit()
     return AdminMosqueResponse(
         directory_mosque_id=mosque.id,
@@ -70,12 +84,15 @@ async def attach_source(
     payload: AdminSourceAttach,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
-    source = await admin_identity.attach_source(
-        session,
-        mosque_id,
-        payload,
-        actor="admin_api",
-    )
+    try:
+        source = await admin_identity.attach_source(
+            session,
+            mosque_id,
+            payload,
+            actor="admin_api",
+        )
+    except MosqueNotFoundError as exc:
+        raise _admin_http_error(exc) from exc
     await session.commit()
     return {"source_id": str(source.id)}
 
@@ -89,7 +106,10 @@ async def add_alias(
     payload: AdminAliasCreate,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
-    alias = await admin_identity.add_alias(session, mosque_id, payload, actor="admin_api")
+    try:
+        alias = await admin_identity.add_alias(session, mosque_id, payload, actor="admin_api")
+    except (MosqueNotFoundError, DuplicateAliasError) as exc:
+        raise _admin_http_error(exc) from exc
     await session.commit()
     return {"alias_id": str(alias.id)}
 
@@ -107,8 +127,8 @@ async def merge_mosques(
             payload,
             actor="admin_api",
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except (MosqueNotFoundError, ValueError) as exc:
+        raise _admin_http_error(exc) from exc
     await session.commit()
     return AdminMosqueResponse(
         directory_mosque_id=mosque.id,
