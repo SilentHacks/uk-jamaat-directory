@@ -7,6 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from uk_jamaat_directory import models  # noqa: F401
 from uk_jamaat_directory.config import get_settings
 from uk_jamaat_directory.db.base import Base
 

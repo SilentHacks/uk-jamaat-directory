@@ -1,1 +1,33 @@
-"""SQLAlchemy models are registered here as schema phases are implemented."""
+from uk_jamaat_directory.models.core import (
+    ChangeEvent,
+    Correction,
+    DatasetVersion,
+    ExtractionRun,
+    ModerationAction,
+    Mosque,
+    MosqueAlias,
+    MosqueAttribute,
+    MosqueClaim,
+    MosqueSource,
+    ScheduleCandidate,
+    ScheduleOccurrence,
+    SourceArtifact,
+    SourceHealth,
+)
+
+__all__ = [
+    "ChangeEvent",
+    "Correction",
+    "DatasetVersion",
+    "ExtractionRun",
+    "ModerationAction",
+    "Mosque",
+    "MosqueAlias",
+    "MosqueAttribute",
+    "MosqueClaim",
+    "MosqueSource",
+    "ScheduleCandidate",
+    "ScheduleOccurrence",
+    "SourceArtifact",
+    "SourceHealth",
+]
