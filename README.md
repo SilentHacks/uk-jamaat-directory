@@ -2,25 +2,28 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Fresh implementation. Phase 0/1 scaffolding is in progress; the authoritative product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–4 are in place (scaffolding, API shell, database schema, public read API). Ingestion, publication pipelines, and bulk export generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+
+**Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
 ## Purpose
 
 The Directory maintains mosque identities, source provenance, freshness status, schedule candidates, published jamaat occurrences, public read APIs, and bulk exports. It is designed to be useful to Sirat and other clients without depending on Sirat-specific journey-planning behavior.
 
-The service owns public mosque and timetable truth. Sirat and other consumers should sync from the Directory through snapshots or change feeds, not call it live during journey planning.
+Sirat and other consumers should sync from the Directory through snapshots or change feeds, not call it live during journey planning.
 
 ## Stack
 
-- Python 3.12
-- FastAPI, Pydantic v2
+- Python 3.12, FastAPI, Pydantic v2
 - PostgreSQL 16 + PostGIS, SQLAlchemy async, Alembic
-- Redis and Celery for background work
-- S3-compatible object storage, with MinIO locally
-- Docker Compose for reproducible local services and VPS deployment
-- Local `.venv` workflow for fast day-to-day development
+- Redis and Celery (wired; background jobs not implemented yet)
+- S3-compatible object storage (MinIO locally)
+- Docker Compose for local services and VPS-style deployment
+- Local `.venv` for fast API and test work
 
 ## Quick Start
+
+### Local API (recommended for development)
 
 ```bash
 cp .env.example .env
@@ -30,49 +33,105 @@ make migrate
 make dev
 ```
 
-API: http://localhost:8000
+- API: http://localhost:8000
+- OpenAPI UI: http://localhost:8000/docs (non-production)
+- MinIO console: http://localhost:9001
 
-OpenAPI docs are available at http://localhost:8000/docs in non-production environments.
+If host port `5432` is already in use, run only the Directory Postgres container on another port or stop the conflicting service before `docker compose up`.
 
-## Public API
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/v1/mosques` | List active mosques with pagination and optional city/postcode filters |
-| `GET` | `/v1/mosques/search` | Search mosques by name, postcode, or city |
-| `GET` | `/v1/mosques/{directory_mosque_id}` | Mosque detail with public source provenance |
-| `GET` | `/v1/mosques/{directory_mosque_id}/times` | Published jamaat occurrences for a date range |
-| `GET` | `/v1/times/nearby` | Nearby published jamaat occurrences for a point and date |
-| `GET` | `/v1/changes` | Append-only public change feed |
-| `GET` | `/v1/snapshots/latest` | Latest published dataset snapshot metadata |
-| `GET` | `/v1/snapshots/{version}` | Dataset snapshot metadata by version |
-
-Export contract artifacts:
-
-```bash
-make export-contracts
-```
-
-## Docker Stack
+### Full Docker stack
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-The local compose stack runs the API, PostGIS, Redis, MinIO, a Celery worker, and Celery Beat.
+Runs the API (with reload), PostGIS, Redis, MinIO, Celery worker, and Celery Beat.
+
+Apply migrations from the host or inside the API container:
+
+```bash
+make migrate
+```
+
+## Public API (`/v1`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness and service metadata |
+| `GET` | `/health/ready` | Readiness (Postgres connectivity) |
+| `GET` | `/mosques` | List active mosques (`limit`, `offset`, `city`, `postcode`) |
+| `GET` | `/mosques/search` | Search by `q`, `postcode`, and/or `city` (`limit`) |
+| `GET` | `/mosques/{directory_mosque_id}` | Mosque detail with public source provenance |
+| `GET` | `/mosques/{directory_mosque_id}/times` | Published occurrences (`from`, `to` dates) |
+| `GET` | `/times/nearby` | Nearby published occurrences (`lat`, `lng`, `radius_m`, `date`) |
+| `GET` | `/changes` | Change feed (`since` event id, `limit`) |
+| `GET` | `/snapshots/latest` | Latest published snapshot metadata (`format=ndjson\|csv`) |
+| `GET` | `/snapshots/{version}` | Snapshot metadata by version |
+
+Public responses include provenance, confidence, and freshness where applicable. Rows from sources without `public_redistribution_allowed` are excluded from timetable endpoints.
+
+Operational admin route (requires `X-Admin-Key` when `ADMIN_API_KEY` is set):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin/health` | Admin-authenticated health check |
+
+Full request/response shapes: [docs/api/openapi.json](docs/api/openapi.json) or `/docs` when running locally.
+
+Regenerate exported contracts after API changes:
+
+```bash
+make export-contracts
+```
+
+See [docs/api/README.md](docs/api/README.md).
 
 ## Development
 
 ```bash
 make lint
 make format
-make test
-make test-postgres
+make test              # unit tests; skips PostGIS integration tests
+make test-postgres     # requires PostGIS (see below)
 make export-contracts
 ```
 
-Use `make test` for fast unit tests. Use `make test-postgres` for tests that require PostGIS.
+**PostGIS integration tests** need a running database:
+
+```bash
+export UK_JAMAAT_TEST_POSTGRES=1
+export TEST_DATABASE_URL=postgresql+asyncpg://directory:directory@localhost:5432/directory_test
+make test-postgres
+```
+
+CI runs lint, `alembic upgrade head`, and the full test suite against a PostGIS service container on pushes to `main`.
+
+## Project Layout
+
+```text
+src/uk_jamaat_directory/   Application code (API, models, services, geo)
+alembic/                   Database migrations
+tests/                     Unit and PostGIS integration tests
+docs/adr/                  Architecture decision records
+docs/api/                  Generated OpenAPI and JSON Schema exports
+PLAN.md                    Product and rollout plan
+CONTEXT.md                 Domain language and invariants
+AGENTS.md                  Agent/developer conventions
+```
+
+## Implementation Progress
+
+| Phase | Scope | Status |
+|-------|--------|--------|
+| 0 | Repo baseline, ADRs, hygiene | Done |
+| 1 | Python/Docker scaffold, CI | Done |
+| 2 | API shell (logging, errors, admin auth) | Done |
+| 3 | PostGIS schema (mosques, sources, occurrences, …) | Done |
+| 4 | Public read API and contract exports | Done |
+| 5+ | MyLocalMasjid ingestion, publication, crawlers, web UI | Planned |
+
+The database schema supports ingestion and moderation, but there are no import workers or public bulk file generation yet. Snapshot endpoints return dataset metadata from `dataset_versions`; export files are not produced until a later phase.
 
 ## Data Publication Rules
 
@@ -80,15 +139,13 @@ MyLocalMasjid is the intended primary source path, subject to explicit redistrib
 
 Raw fetched artifacts, extraction runs, claim contact details, private admin notes, and restricted partner metadata are operational data and are not public export fields.
 
-## GitHub Publishing
+## Documentation
 
-This repo is private initially. Before pushing:
-
-1. Create a private GitHub repository.
-2. Add the remote with `git remote add origin <repo-url>`.
-3. Push with `git push -u origin main`.
-4. Enable branch protection after CI passes reliably.
-5. Add repository secrets only when production deployment needs them.
+- [PLAN.md](PLAN.md) — full product architecture and rollout
+- [CONTEXT.md](CONTEXT.md) — domain terms and publication invariants
+- [AGENTS.md](AGENTS.md) — commands and conventions for contributors/agents
+- [docs/adr/](docs/adr/) — architecture decisions
+- [docs/api/](docs/api/) — generated public API contracts
 
 ## License
 

@@ -4,12 +4,24 @@
 
 - Install local environment: `make install`
 - Run API locally: `make dev`
-- Run all local services: `docker compose up --build`
+- Run dependency services only: `docker compose up postgres redis minio -d`
+- Run full stack: `docker compose up --build` or `make compose-up`
 - Apply migrations: `make migrate`
 - Lint: `make lint`
 - Format: `make format`
 - Unit tests: `make test`
-- PostGIS tests: `make test-postgres`
+- PostGIS tests: `UK_JAMAAT_TEST_POSTGRES=1 make test-postgres`
+- Export OpenAPI/JSON schemas: `make export-contracts`
+
+## Current Scope (implemented)
+
+- FastAPI service under `/v1` with health, public read routes, and admin health
+- PostGIS schema: mosques, sources, artifacts, candidates, occurrences, dataset versions, changes, moderation, claims, corrections
+- Public read layer with `public_redistribution_allowed` source filtering
+- Generated contracts in `docs/api/`
+- GitHub Actions CI on `main`
+
+Not implemented yet: source adapters (MyLocalMasjid, OSM, crawlers), publication pipeline, bulk export files, contribution/write APIs beyond admin stub, Celery tasks, frontend.
 
 ## Architecture Rules
 
@@ -19,6 +31,7 @@
 - Use typed settings from `uk_jamaat_directory.config`.
 - Use SQLAlchemy async models and Alembic migrations for schema changes.
 - Keep raw source artifacts and private operational data out of public schemas and exports.
+- Map ORM rows to explicit public Pydantic models in `schemas/public.py`; do not return database models from public routes.
 
 ## Data Safety Rules
 
@@ -30,10 +43,11 @@
 ## Testing Expectations
 
 - Add unit tests for normalization, validation, source policy gates, and freshness logic.
-- Add integration tests for database-backed APIs and migrations.
+- Add integration tests for database-backed APIs and migrations (`tests/conftest.py` + `UK_JAMAAT_TEST_POSTGRES=1`).
 - Add fixture tests for source adapters before importing real data.
 - Add regression tests for DST, Ramadan schedules, multiple Jumuah sessions, and invalid jamaat ordering as those features land.
+- Regenerate `docs/api/` when public response shapes change (`make export-contracts`).
 
 ## Commit Guidance
 
-Keep commits reviewable. Prefer one commit for repository baseline/setup changes and separate commits for behavior or schema changes.
+Keep commits reviewable. Prefer separate commits for schema changes, API behavior, and generated contract updates.
