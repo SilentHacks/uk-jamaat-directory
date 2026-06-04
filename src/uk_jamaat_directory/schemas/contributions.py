@@ -61,3 +61,5 @@ class ContributionAcceptedResponse(BaseModel):
     submission_id: str
     status: str
     message: str
+    rows_accepted: int | None = None
+    rows_rejected: int | None = None

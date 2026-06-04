@@ -4,6 +4,18 @@ from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
 
+PRAYER_ALIASES: dict[str, Prayer] = {
+    "fajr": Prayer.FAJR,
+    "dhuhr": Prayer.DHUHR,
+    "zuhr": Prayer.DHUHR,
+    "asr": Prayer.ASR,
+    "maghrib": Prayer.MAGHRIB,
+    "isha": Prayer.ISHA,
+    "jumuah": Prayer.JUMUAH,
+    "jumah": Prayer.JUMUAH,
+    "jummah": Prayer.JUMUAH,
+}
+
 DAILY_PRAYERS = (
     Prayer.FAJR,
     Prayer.DHUHR,

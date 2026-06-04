@@ -136,14 +136,14 @@ async def submit_schedule(
     session: AsyncSession = Depends(get_db_session),
 ) -> ContributionAcceptedResponse:
     try:
-        submission_id, created = await contribution_intake.submit_schedule(
+        submission_id, accepted, rejected = await contribution_intake.submit_schedule(
             session,
             directory_mosque_id,
             payload,
         )
     except MosqueNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    if created == 0:
+    if accepted == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No valid schedule rows were provided",
@@ -153,6 +153,8 @@ async def submit_schedule(
         submission_id=str(submission_id),
         status="pending",
         message="Schedule submission received and queued for moderation.",
+        rows_accepted=accepted,
+        rows_rejected=rejected,
     )
 
 

@@ -107,6 +107,57 @@ async def test_mosque_schedule_submission_creates_pending_candidates(
     )
     assert pending is not None
     assert pending.status.value == "pending"
+    payload = response.json()
+    assert payload["rows_accepted"] == 1
+    assert payload["rows_rejected"] == 0
+
+
+@pytest.mark.asyncio
+async def test_community_schedule_stays_pending_after_validate(
+    db_session: AsyncSession,
+) -> None:
+    from datetime import date
+
+    from fixtures import seed_public_mosque_bundle
+
+    from uk_jamaat_directory.domain import SourceType
+    from uk_jamaat_directory.models.core import MosqueSource, ScheduleCandidate
+    from uk_jamaat_directory.schedules.publication import validate_candidates
+    from uk_jamaat_directory.schemas.contributions import (
+        MosqueScheduleSubmission,
+        ScheduleSubmissionRow,
+    )
+    from uk_jamaat_directory.services.contribution_intake import submit_schedule
+
+    bundle = await seed_public_mosque_bundle(db_session)
+    mosque_id = bundle["mosque"].id
+    _submission_id, accepted, _rejected = await submit_schedule(
+        db_session,
+        mosque_id,
+        MosqueScheduleSubmission(
+            schedules=[
+                ScheduleSubmissionRow(
+                    date=date(2026, 6, 9),
+                    prayer="fajr",
+                    jamaat_time="04:15",
+                )
+            ]
+        ),
+    )
+    assert accepted == 1
+    await db_session.commit()
+
+    candidate = await db_session.scalar(
+        select(ScheduleCandidate)
+        .join(MosqueSource, ScheduleCandidate.source_id == MosqueSource.id)
+        .where(ScheduleCandidate.mosque_id == mosque_id)
+        .where(MosqueSource.source_type == SourceType.COMMUNITY)
+    )
+    assert candidate is not None
+
+    await validate_candidates(db_session)
+    await db_session.refresh(candidate)
+    assert candidate.status.value == "pending"
 
 
 @pytest.mark.asyncio

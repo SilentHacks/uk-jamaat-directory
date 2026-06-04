@@ -16,10 +16,11 @@ async def upsert_schedule_candidate(
     *,
     mosque: Mosque,
     source: MosqueSource,
-    extraction_run_id: uuid.UUID,
+    extraction_run_id: uuid.UUID | None = None,
     row: ScheduleCandidateInput,
     jamaat_time: time,
     start_time: time | None,
+    evidence_extra: dict | None = None,
 ) -> tuple[bool, bool]:
     """Return (created_or_updated, skipped_unchanged)."""
     stmt = (
@@ -44,6 +45,8 @@ async def upsert_schedule_candidate(
         "external_id": source.external_id,
         "linkback_url": source.metadata_.get("linkback_url"),
     }
+    if evidence_extra:
+        evidence.update(evidence_extra)
 
     if existing is not None:
         if (

@@ -6,21 +6,19 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import (
-    CandidateStatus,
     Confidence,
     CorrectionStatus,
     SourcePublicationPolicy,
     SourceType,
 )
-from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import MyLocalMasjidScheduleRow
 from uk_jamaat_directory.models.core import (
     Correction,
     Mosque,
     MosqueClaim,
     MosqueSource,
-    ScheduleCandidate,
 )
-from uk_jamaat_directory.schedules.parse import parse_hhmm
+from uk_jamaat_directory.schedules.candidates import upsert_schedule_candidate
+from uk_jamaat_directory.schedules.parse import parse_schedule_row
 from uk_jamaat_directory.schemas.contributions import (
     MosqueClaimSubmission,
     MosqueCorrectionSubmission,
@@ -64,8 +62,8 @@ async def submit_schedule(
     session: AsyncSession,
     mosque_id: uuid.UUID,
     payload: MosqueScheduleSubmission,
-) -> tuple[uuid.UUID, int]:
-    await _require_mosque(session, mosque_id)
+) -> tuple[uuid.UUID, int, int]:
+    mosque = await _require_mosque(session, mosque_id)
     submission_id = uuid.uuid4()
     source = MosqueSource(
         id=uuid.uuid4(),
@@ -86,46 +84,41 @@ async def submit_schedule(
     session.add(source)
     await session.flush()
 
-    created = 0
+    accepted = 0
+    rejected = 0
+    evidence_extra = {
+        "source_type": SourceType.COMMUNITY.value,
+        "submission_id": str(submission_id),
+    }
     for row in payload.schedules:
-        parsed = MyLocalMasjidScheduleRow.model_validate(
-            {
-                "date": row.date,
-                "prayer": row.prayer,
-                "start_time": row.start_time,
-                "jamaat_time": row.jamaat_time,
-                "session_number": row.session_number,
-                "session_label": row.session_label,
-                "timezone": payload.timezone,
-            }
-        )
-        jamaat_time = parse_hhmm(parsed.jamaat_time)
-        if jamaat_time is None:
+        try:
+            candidate_input, jamaat_time, start_time = parse_schedule_row(
+                on_date=row.date,
+                prayer=row.prayer,
+                start_time=row.start_time,
+                jamaat_time=row.jamaat_time,
+                session_number=row.session_number,
+                session_label=row.session_label,
+                timezone=payload.timezone,
+            )
+        except ValueError:
+            rejected += 1
             continue
-        start_time = parse_hhmm(parsed.start_time)
-        candidate = ScheduleCandidate(
-            id=uuid.uuid4(),
-            mosque_id=mosque_id,
-            source_id=source.id,
-            date=parsed.date,
-            prayer=parsed.prayer,
-            start_time=start_time,
+
+        await upsert_schedule_candidate(
+            session,
+            mosque=mosque,
+            source=source,
+            extraction_run_id=None,
+            row=candidate_input,
             jamaat_time=jamaat_time,
-            session_number=parsed.session_number,
-            session_label=parsed.session_label,
-            timezone=parsed.timezone,
-            confidence=Confidence.COMMUNITY,
-            status=CandidateStatus.PENDING,
-            evidence={
-                "source_type": SourceType.COMMUNITY.value,
-                "submission_id": str(submission_id),
-            },
+            start_time=start_time,
+            evidence_extra=evidence_extra,
         )
-        session.add(candidate)
-        created += 1
+        accepted += 1
 
     await session.flush()
-    return submission_id, created
+    return submission_id, accepted, rejected
 
 
 async def submit_claim(
