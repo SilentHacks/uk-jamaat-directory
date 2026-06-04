@@ -10,7 +10,7 @@
 - Lint: `make lint`
 - Format: `make format`
 - Unit tests: `make test` (~0.3s; skips PostGIS integration tests)
-- PostGIS tests: see **PostGIS integration tests** below (do not run without preflight)
+- PostGIS tests: `make test-postgres` (runs preflight first) — see **PostGIS integration tests** below
 - Export OpenAPI/JSON schemas: `make export-contracts`
 
 ## Current Scope (implemented)
@@ -49,85 +49,71 @@ Not implemented yet: publication pipeline (candidates → occurrences), bulk exp
 
 **Default for most changes:** run `make test` only. It completes in under a second and is enough for adapter, policy, and API-layer work that does not touch DB fixtures.
 
-**Do not run `UK_JAMAAT_TEST_POSTGRES=1 make test-postgres` without preflight.** A misconfigured database causes a multi-minute hang that looks like tests are stuck.
+**Prefer `make test-postgres`** (not raw `pytest` with `UK_JAMAAT_TEST_POSTGRES=1`) so preflight runs and URLs default to port **54324**.
 
-### Why a bad run takes ~6 minutes
+### Local Postgres port
 
-Integration tests use the function-scoped `db_engine` fixture in `tests/conftest.py`. Before each of the 11 PostGIS tests, `_wait_for_database()` retries connection up to **30 times** with a **1 second sleep** between failures (~32s per test). When the database is unreachable or credentials are wrong, every integration test pays that cost independently:
+Directory compose publishes PostGIS on host port **54324** → container `5432`. Defaults are aligned in `docker-compose.yml`, `.env.example`, `config.py`, `tests/conftest.py`, and `Makefile` (`POSTGRES_HOST_PORT`).
 
-- 1 failing integration test ≈ **33 seconds** (observed)
-- 11 failing integration tests ≈ **355 seconds / ~6 minutes** (observed 2026-06-04)
+This avoids the common case where another project's Postgres already owns **5432** or **5433**.
 
-Pytest produces no useful output during each 30s wait, so the run appears hung.
+### Speed (what changed)
 
-### Common failure on shared dev machines
+Integration tests use a **session-scoped** `db_engine` fixture: one schema drop/create, one `alembic upgrade head` per pytest run. Each test gets a clean database via **TRUNCATE** (not a full remigration).
 
-1. **Port 5432 already taken** by another project's Postgres container. `docker compose up postgres -d` may start, but with an **empty host port mapping** if `:5432` is unavailable. Tests still connect to `localhost:5432` and hit the wrong server.
-2. **Wrong database name:** compose creates database `directory`; tests default to `directory_test` (must be created manually).
-3. **URL mismatches:** `tests/conftest.py` and `README.md` default to port **5432**; `.env.example` uses port **5433** for `TEST_DATABASE_URL`.
+Typical healthy run: **~15–40s** for the full PostGIS suite, depending on machine and cold vs warm Postgres.
 
-Observed error when pointing at the wrong server: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "directory"`.
+**Ways to go faster**
 
-### Preflight checklist (run before `make test-postgres`)
+- Use `make test` unless the change touches DB-backed routes, migrations, or ingest persistence.
+- Keep `docker compose up postgres -d` running between runs.
+- Do not point `TEST_DATABASE_URL` at the wrong host/port (wastes time on connection retries).
+- Tune startup wait only when needed: `UK_JAMAAT_TEST_DB_WAIT_ATTEMPTS=5 UK_JAMAAT_TEST_DB_WAIT_SECONDS=0.2`.
+- Skip schema rebuild when iterating: `UK_JAMAAT_TEST_REBUILD=0 make test-postgres` (reuses existing migrated schema; still truncates per test).
+
+### When a bad run still hangs
+
+If Postgres is unreachable, `_wait_for_database()` retries up to **10 times** with **0.5s** sleep (~5s total at session start). Older function-scoped remigration multiplied that per test; session scope limits the pain to one startup wait.
+
+**Do not run integration tests without preflight** when the database has never been started on this machine.
+
+### Preflight
 
 ```bash
-# 0. Compose services reference .env — create it if missing
+make test-postgres-preflight
+# or the full suite (preflight + pytest):
+make test-postgres
+```
+
+Manual checklist if compose fails:
+
+```bash
 test -f .env || cp .env.example .env
 
-# 1. See what owns host port 5432
-docker ps --format '{{.Names}} {{.Ports}}' | grep 5432 || true
-ss -ltnp | grep ':5432' || true
-
-# 2. Start this project's Postgres and confirm it is healthy AND published on the host
 docker compose up postgres -d
 docker compose ps postgres
 docker inspect "$(docker compose ps -q postgres)" --format '{{json .NetworkSettings.Ports}}'
-# Expected: {"5432/tcp":[{"HostIp":"0.0.0.0","HostPort":"5432"}]}
-# If Ports is {} — another container owns 5432; fix the conflict before running tests.
+# Expected host mapping includes "HostPort":"54324"
 
-# 3. Create the test database (compose only creates `directory`)
 docker compose exec -T postgres psql -U directory -d directory \
   -c "SELECT 1 FROM pg_database WHERE datname = 'directory_test'" \
   | grep -q 1 || \
 docker compose exec -T postgres psql -U directory -d directory \
   -c "CREATE DATABASE directory_test;"
 
-# 4. Quick connectivity probe (~1s). Must succeed before running the full suite.
-.venv/bin/python - <<'PY'
-import asyncio, os
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
-
-url = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://directory:directory@localhost:5432/directory_test",
-)
-async def main() -> None:
-    engine = create_async_engine(url)
-    async with engine.connect() as conn:
-        await conn.execute(text("SELECT 1"))
-    await engine.dispose()
-    print("postgres ok:", url)
-
-asyncio.run(main())
-PY
-
-# 5. Full suite (typically ~5–15s when DB is correct)
-UK_JAMAAT_TEST_POSTGRES=1 \
-  TEST_DATABASE_URL=postgresql+asyncpg://directory:directory@localhost:5432/directory_test \
-  make test-postgres
+POSTGRES_HOST_PORT=54324 make test-postgres-preflight
 ```
 
-If step 4 fails, **stop** — do not run step 5. Fix port conflicts or credentials first.
+If the probe fails, **stop** — do not run pytest hoping it will recover.
 
 ### Agent timeouts
 
-When blocking on PostGIS tests, allow at least **2 minutes** for a healthy run. If there is no pytest output progress for **>45 seconds**, treat it as a database misconfiguration (not a slow test) and run the preflight checklist instead of waiting the full ~6 minutes.
+When blocking on PostGIS tests, allow at least **90 seconds** for a healthy run. If there is no pytest output progress for **>45 seconds** after preflight succeeded, investigate DB locks or a stuck container — not normal slowness.
 
 ## Testing Expectations
 
 - Add unit tests for normalization, validation, source policy gates, and freshness logic.
-- Add integration tests for database-backed APIs and migrations (`tests/conftest.py` + `UK_JAMAAT_TEST_POSTGRES=1`).
+- Add integration tests for database-backed APIs and migrations (`tests/conftest.py` + `make test-postgres`).
 - Add fixture tests for source adapters before importing real data.
 - Add regression tests for DST, Ramadan schedules, multiple Jumuah sessions, and invalid jamaat ordering as those features land.
 - Regenerate `docs/api/` when public response shapes change (`make export-contracts`).

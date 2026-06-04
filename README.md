@@ -37,7 +37,7 @@ make dev
 - OpenAPI UI: http://localhost:8000/docs (non-production)
 - MinIO console: http://localhost:9001
 
-If host port `5432` is already in use, run only the Directory Postgres container on another port or stop the conflicting service before `docker compose up`.
+PostGIS is published on host port **54324** by default (not 5432) so it is less likely to collide with other local Postgres containers. Inside Docker networks the service still listens on `5432`.
 
 ### Full Docker stack
 
@@ -139,18 +139,32 @@ Public community intake:
 ```bash
 make lint
 make format
-make test              # unit tests; skips PostGIS integration tests
-make test-postgres     # requires PostGIS (see below)
+make test                    # unit tests only (~0.4s); skips PostGIS integration tests
+make test-postgres-preflight # start Postgres, create directory_test, connectivity probe
+make test-postgres           # preflight + full suite (needs PostGIS on localhost:54324)
 make export-contracts
 ```
 
-**PostGIS integration tests** need a running database:
+**PostGIS integration tests** use `localhost:54324` by default (see `docker-compose.yml`). The suite migrates the schema once per run and truncates tables between tests (not a full schema rebuild each time).
 
 ```bash
-export UK_JAMAAT_TEST_POSTGRES=1
-export TEST_DATABASE_URL=postgresql+asyncpg://directory:directory@localhost:5432/directory_test
 make test-postgres
 ```
+
+Optional overrides:
+
+```bash
+export POSTGRES_HOST_PORT=54324
+export TEST_DATABASE_URL=postgresql+asyncpg://directory:directory@localhost:54324/directory_test
+make test-postgres
+```
+
+**Speed tips**
+
+- Prefer `make test` during normal development; run `make test-postgres` before merge or when touching DB/migrations.
+- Keep `docker compose up postgres -d` running between test runs to avoid container startup cost.
+- `make test-postgres` runs preflight automatically; if the probe fails, fix port/URL issues before waiting on pytest.
+- After changing `.env.example`, align `DATABASE_URL` / `TEST_DATABASE_URL` in your local `.env` to port `54324`.
 
 CI runs lint, `alembic upgrade head`, and the full test suite against a PostGIS service container on pushes to `master`.
 

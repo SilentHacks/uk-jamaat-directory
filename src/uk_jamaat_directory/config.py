@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
-from typing import Any
-
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -31,7 +29,9 @@ class Settings(BaseSettings):
     docs_enabled: bool = True
     admin_api_key: str | None = None
 
-    database_url: str = "postgresql+asyncpg://directory:directory@localhost:5432/directory"
+    database_url: str = (
+        "postgresql+asyncpg://directory:directory@localhost:54324/directory"
+    )
     test_database_url: str | None = None
 
     redis_url: str = "redis://localhost:6379/0"
