@@ -5,7 +5,6 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from geoalchemy2 import WKTElement
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,14 +14,14 @@ from uk_jamaat_directory.domain import (
     Confidence,
     ExtractionKind,
     FreshnessStatus,
-    MosqueStatus,
     SourcePublicationPolicy,
     SourceType,
 )
-from uk_jamaat_directory.ingest.normalize import normalize_mosque_name
+from uk_jamaat_directory.ingest.discovery.records import MatchDecision
+from uk_jamaat_directory.ingest.discovery.resolve import resolve_discovery_record
+from uk_jamaat_directory.ingest.sources.mylocalmasjid.discovery import mlm_record_to_discovery
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import (
     MyLocalMasjidImportBundle,
-    MyLocalMasjidMosqueRecord,
     MyLocalMasjidScheduleRow,
 )
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.times import parse_hhmm
@@ -34,9 +33,7 @@ from uk_jamaat_directory.models.core import (
     SourceArtifact,
     SourceHealth,
 )
-from uk_jamaat_directory.services.public_policy import is_public_source_policy
 
-DEFAULT_ATTRIBUTION = "MyLocalMasjid"
 EXTRACTOR_VERSION = "mylocalmasjid-deterministic-v1"
 
 
@@ -44,6 +41,8 @@ EXTRACTOR_VERSION = "mylocalmasjid-deterministic-v1"
 class MyLocalMasjidImportResult:
     mosques_upserted: int = 0
     sources_upserted: int = 0
+    mosques_linked: int = 0
+    reviews_created: int = 0
     artifacts_created: int = 0
     candidates_created: int = 0
     candidates_skipped: int = 0
@@ -65,14 +64,24 @@ async def import_mylocalmasjid_bundle(
     imported_at = datetime.now(UTC)
 
     for record in bundle.mosques:
-        mosque, source = await _upsert_mosque_and_source(
-            session,
-            record,
-            publication_policy=publication_policy,
-            imported_at=imported_at,
-        )
-        result.mosques_upserted += 1
+        try:
+            discovery = mlm_record_to_discovery(record, publication_policy=publication_policy)
+            mosque, source, match = await resolve_discovery_record(session, discovery)
+        except Exception as exc:  # noqa: BLE001
+            result.errors.append(f"{record.external_id}: {exc}")
+            continue
+
         result.sources_upserted += 1
+        if match.decision == MatchDecision.NEEDS_REVIEW:
+            result.reviews_created += 1
+        elif match.decision == MatchDecision.AUTO_LINK and match.reasons != [
+            "existing_source_link"
+        ]:
+            result.mosques_linked += 1
+        if mosque is not None:
+            result.mosques_upserted += 1
+        else:
+            continue
 
         artifact, artifact_created = await _record_artifact(
             session,
@@ -114,99 +123,6 @@ async def import_mylocalmasjid_bundle(
         await _upsert_source_health(session, source_id=source.id, imported_at=imported_at)
 
     return result
-
-
-async def _upsert_mosque_and_source(
-    session: AsyncSession,
-    record: MyLocalMasjidMosqueRecord,
-    *,
-    publication_policy: SourcePublicationPolicy,
-    imported_at: datetime,
-) -> tuple[Mosque, MosqueSource]:
-    source = await _get_source(session, record.external_id)
-    mosque: Mosque
-
-    if source is not None and source.mosque_id is not None:
-        mosque = await session.get_one(Mosque, source.mosque_id)
-        if is_public_source_policy(publication_policy):
-            _apply_mosque_fields(mosque, record)
-    elif source is not None:
-        mosque = _new_mosque(record)
-        session.add(mosque)
-        await session.flush()
-        source.mosque_id = mosque.id
-    else:
-        mosque = _new_mosque(record)
-        session.add(mosque)
-        await session.flush()
-        source = MosqueSource(
-            id=uuid.uuid4(),
-            mosque_id=mosque.id,
-            source_type=SourceType.MYLOCALMASJID,
-            external_id=record.external_id,
-        )
-        session.add(source)
-
-    source.source_url = record.source_url
-    source.display_name = record.name
-    source.publication_policy = publication_policy
-    source.confidence = Confidence.PARTNER_IMPORT
-    source.attribution = record.attribution or DEFAULT_ATTRIBUTION
-    source.last_seen_at = imported_at
-    source.metadata_ = {
-        "linkback_url": record.linkback_url,
-        "profile_url": record.profile_url,
-        "import_format_version": "1",
-    }
-    await session.flush()
-    return mosque, source
-
-
-async def _get_source(session: AsyncSession, external_id: str) -> MosqueSource | None:
-    stmt = select(MosqueSource).where(
-        MosqueSource.source_type == SourceType.MYLOCALMASJID,
-        MosqueSource.external_id == external_id,
-    )
-    return await session.scalar(stmt)
-
-
-def _new_mosque(record: MyLocalMasjidMosqueRecord) -> Mosque:
-    mosque = Mosque(
-        id=uuid.uuid4(),
-        name=record.name,
-        normalized_name=normalize_mosque_name(record.name),
-        address_line1=record.address_line1,
-        address_line2=record.address_line2,
-        city=record.city,
-        county=record.county,
-        postcode=record.postcode,
-        country=record.country,
-        website_url=record.website_url,
-        status=MosqueStatus.NEEDS_REVIEW,
-    )
-    _apply_location(mosque, record)
-    return mosque
-
-
-def _apply_mosque_fields(mosque: Mosque, record: MyLocalMasjidMosqueRecord) -> None:
-    mosque.name = record.name
-    mosque.normalized_name = normalize_mosque_name(record.name)
-    mosque.address_line1 = record.address_line1
-    mosque.address_line2 = record.address_line2
-    mosque.city = record.city
-    mosque.county = record.county
-    mosque.postcode = record.postcode
-    mosque.country = record.country
-    mosque.website_url = record.website_url
-    _apply_location(mosque, record)
-
-
-def _apply_location(mosque: Mosque, record: MyLocalMasjidMosqueRecord) -> None:
-    if record.latitude is not None and record.longitude is not None:
-        mosque.location = WKTElement(
-            f"POINT({record.longitude} {record.latitude})",
-            srid=4326,
-        )
 
 
 async def _record_artifact(

@@ -1,0 +1,29 @@
+{
+  "format_version": "1",
+  "exported_at": "2026-06-04T10:00:00+00:00",
+  "attribution": "© OpenStreetMap contributors (ODbL 1.0) — synthetic fixture",
+  "places": [
+    {
+      "osm_type": "node",
+      "osm_id": 900001,
+      "name": "Synthetic OSM Central Masjid",
+      "city": "London",
+      "postcode": "E2 1AA",
+      "latitude": 51.5308,
+      "longitude": -0.0714,
+      "religion": "muslim",
+      "denomination": "sunni",
+      "source_url": "https://example.org/osm/node/900001"
+    },
+    {
+      "osm_type": "node",
+      "osm_id": 900002,
+      "name": "Synthetic OSM Riverside Mosque",
+      "city": "Manchester",
+      "postcode": "M1 1AE",
+      "latitude": 53.4808,
+      "longitude": -2.2426,
+      "religion": "muslim"
+    }
+  ]
+}
