@@ -1,0 +1,64 @@
+{
+  "format_version": "1",
+  "exported_at": "2026-06-01T12:00:00+00:00",
+  "source_label": "mylocalmasjid-synthetic",
+  "mosques": [
+    {
+      "external_id": "mlm-synth-001",
+      "name": "Synthetic Central Masjid",
+      "address_line1": "1 Test Road",
+      "city": "London",
+      "postcode": "E2 1AA",
+      "latitude": 51.5308,
+      "longitude": -0.0714,
+      "profile_url": "https://example.org/mosques/synth-001",
+      "linkback_url": "https://example.org/mosques/synth-001/timetable",
+      "attribution": "MyLocalMasjid (synthetic fixture)",
+      "schedules": [
+        {
+          "date": "2026-06-05",
+          "prayer": "fajr",
+          "start_time": "04:15",
+          "jamaat_time": "04:30"
+        },
+        {
+          "date": "2026-06-05",
+          "prayer": "dhuhr",
+          "start_time": "13:05",
+          "iqamah": "13:20"
+        },
+        {
+          "date": "2026-06-06",
+          "prayer": "jumuah",
+          "jamaat_time": "13:00",
+          "session_number": 1,
+          "session_label": "First Jumuah"
+        },
+        {
+          "date": "2026-06-06",
+          "prayer": "jumuah",
+          "jamaat_time": "14:00",
+          "session_number": 2,
+          "session_label": "Second Jumuah"
+        }
+      ]
+    },
+    {
+      "external_id": "mlm-synth-002",
+      "name": "Synthetic Riverside Masjid",
+      "city": "Manchester",
+      "postcode": "M1 1AE",
+      "latitude": 53.4808,
+      "longitude": -2.2426,
+      "profile_url": "https://example.org/mosques/synth-002",
+      "schedules": [
+        {
+          "date": "2026-06-05",
+          "prayer": "maghrib",
+          "start_time": "21:10",
+          "jamat": "21:18"
+        }
+      ]
+    }
+  ]
+}
