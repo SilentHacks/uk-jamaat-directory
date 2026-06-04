@@ -54,6 +54,8 @@ async def http_exception_handler(
         code = "unauthorized"
     elif exc.status_code == status.HTTP_403_FORBIDDEN:
         code = "forbidden"
+    elif exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+        code = "validation_error"
     elif exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
         code = "service_unavailable"
 
