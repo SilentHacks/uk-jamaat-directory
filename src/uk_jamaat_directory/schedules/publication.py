@@ -290,7 +290,7 @@ async def _select_publishable_candidates(
     return publishable
 
 
-async def _carry_forward_out_of_scope(
+async def _carry_forward_previous_occurrences(
     session: AsyncSession,
     *,
     full_previous: dict[OccurrenceKey, ScheduleOccurrence],
@@ -303,15 +303,25 @@ async def _carry_forward_out_of_scope(
     date_to: date | None,
     result: PublishResult,
     touched_sources: set[uuid.UUID],
+    in_replace_scope: bool | None = None,
 ) -> None:
+    """Copy prior occurrences not yet in final_keys.
+
+    in_replace_scope=None carries all unreplaced rows (unused today).
+    False carries out-of-scope rows before a partial publish batch.
+    True carries in-scope rows that were not rewritten by the batch.
+    """
     for key, previous in full_previous.items():
-        if _occurrence_in_replace_scope(
+        if key in final_keys:
+            continue
+        scoped = _occurrence_in_replace_scope(
             previous,
             source_id=source_id,
             mosque_id=mosque_id,
             date_from=date_from,
             date_to=date_to,
-        ):
+        )
+        if in_replace_scope is not None and scoped != in_replace_scope:
             continue
         session.add(
             _copy_carried_occurrence(
@@ -360,6 +370,7 @@ async def _publish_batch_rows(
     result: PublishResult,
     touched_sources: set[uuid.UUID],
 ) -> None:
+    pending_change_events: list[ChangeEvent] = []
     for item in publishable:
         candidate = item.candidate
         source = item.source
@@ -418,10 +429,9 @@ async def _publish_batch_rows(
             )
 
         session.add(occurrence)
-        await session.flush()
 
         if not unchanged:
-            session.add(
+            pending_change_events.append(
                 ChangeEvent(
                     event_type=ChangeEventType.OCCURRENCE_PUBLISHED,
                     mosque_id=mosque.id,
@@ -434,10 +444,14 @@ async def _publish_batch_rows(
                     },
                 )
             )
-            result.change_events += 1
         result.published += 1
         candidate.status = CandidateStatus.SUPERSEDED
         touched_sources.add(source.id)
+
+    await session.flush()
+    for event in pending_change_events:
+        session.add(event)
+        result.change_events += 1
 
 
 async def publish_candidates(
@@ -490,7 +504,7 @@ async def publish_candidates(
     )
 
     if partial_publish:
-        await _carry_forward_out_of_scope(
+        await _carry_forward_previous_occurrences(
             session,
             full_previous=full_previous,
             dataset_version=dataset_version,
@@ -502,6 +516,7 @@ async def publish_candidates(
             date_to=date_to,
             result=result,
             touched_sources=touched_sources,
+            in_replace_scope=False,
         )
 
     await _publish_batch_rows(
@@ -514,6 +529,21 @@ async def publish_candidates(
         result=result,
         touched_sources=touched_sources,
     )
+    if partial_publish:
+        await _carry_forward_previous_occurrences(
+            session,
+            full_previous=full_previous,
+            dataset_version=dataset_version,
+            final_keys=final_keys,
+            now=now,
+            source_id=source_id,
+            mosque_id=mosque_id,
+            date_from=date_from,
+            date_to=date_to,
+            result=result,
+            touched_sources=touched_sources,
+            in_replace_scope=True,
+        )
     await _emit_removals(
         session,
         full_previous=full_previous,

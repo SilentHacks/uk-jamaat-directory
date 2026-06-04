@@ -244,6 +244,69 @@ async def test_filtered_publish_carries_forward_other_mosques(
 
 
 @pytest.mark.asyncio
+async def test_filtered_publish_preserves_in_scope_dates_for_same_mosque(
+    db_session: AsyncSession,
+    client_with_db: AsyncClient,
+) -> None:
+    path = FIXTURES / "sample_export.json"
+    bundle = parse_file(path)
+    await import_mylocalmasjid_bundle(
+        db_session,
+        bundle,
+        raw_payload=path.read_bytes(),
+        fetched_url=f"file://{path}",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        validate_after_import=True,
+    )
+    await db_session.commit()
+
+    for mosque in (await db_session.execute(select(Mosque))).scalars().all():
+        mosque.status = MosqueStatus.ACTIVE
+    await db_session.commit()
+
+    first = await publish_candidates(db_session)
+    await db_session.commit()
+    assert first.published >= 2
+
+    source = await db_session.scalar(
+        select(MosqueSource).where(MosqueSource.external_id == "mlm-synth-001").limit(1)
+    )
+    assert source is not None
+    mosque_id = source.mosque_id
+
+    full_times = await client_with_db.get(
+        f"/v1/mosques/{mosque_id}/times",
+        params={"from": "2026-06-05", "to": "2026-06-05"},
+    )
+    assert full_times.status_code == 200
+    prayers_before = {item["prayer"] for item in full_times.json()["items"]}
+    assert len(prayers_before) >= 2
+
+    await import_mylocalmasjid_bundle(
+        db_session,
+        bundle,
+        raw_payload=path.read_bytes(),
+        fetched_url=f"file://{path}",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        validate_after_import=True,
+    )
+    await db_session.commit()
+
+    scoped = await publish_candidates(db_session, mosque_id=mosque_id)
+    await db_session.commit()
+    assert scoped.published >= 1
+    assert scoped.carried_forward >= 1
+
+    after = await client_with_db.get(
+        f"/v1/mosques/{mosque_id}/times",
+        params={"from": "2026-06-05", "to": "2026-06-05"},
+    )
+    assert after.status_code == 200
+    prayers_after = {item["prayer"] for item in after.json()["items"]}
+    assert prayers_before.issubset(prayers_after)
+
+
+@pytest.mark.asyncio
 async def test_ai_candidate_not_auto_approved(db_session: AsyncSession) -> None:
     path = FIXTURES / "sample_export.json"
     bundle = parse_file(path)
