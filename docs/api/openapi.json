@@ -2996,6 +2996,28 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "rows_accepted": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Accepted"
+          },
+          "rows_rejected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Rejected"
           }
         },
         "type": "object",
