@@ -6,9 +6,17 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.rate_limit import limit_community_submissions
 from uk_jamaat_directory.db.session import get_db_session
+from uk_jamaat_directory.schemas.contributions import (
+    ContributionAcceptedResponse,
+    MosqueClaimSubmission,
+    MosqueCorrectionSubmission,
+    MosqueScheduleSubmission,
+)
 from uk_jamaat_directory.schemas.public import MosqueDetailPublic, MosqueListResponse, TimesResponse
-from uk_jamaat_directory.services import public_reads
+from uk_jamaat_directory.services import contribution_intake, public_reads
+from uk_jamaat_directory.services.errors import MosqueNotFoundError
 
 router = APIRouter(prefix="/mosques", tags=["mosques"])
 
@@ -87,3 +95,89 @@ async def get_mosque_times(
     if times is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mosque not found")
     return times
+
+
+@router.post(
+    "/{directory_mosque_id}/corrections",
+    response_model=ContributionAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(limit_community_submissions)],
+)
+async def submit_correction(
+    directory_mosque_id: uuid.UUID,
+    payload: MosqueCorrectionSubmission,
+    session: AsyncSession = Depends(get_db_session),
+) -> ContributionAcceptedResponse:
+    try:
+        correction_id = await contribution_intake.submit_correction(
+            session,
+            directory_mosque_id,
+            payload,
+        )
+    except MosqueNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return ContributionAcceptedResponse(
+        submission_id=str(correction_id),
+        status="pending",
+        message="Correction received and queued for moderation.",
+    )
+
+
+@router.post(
+    "/{directory_mosque_id}/schedule-submissions",
+    response_model=ContributionAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(limit_community_submissions)],
+)
+async def submit_schedule(
+    directory_mosque_id: uuid.UUID,
+    payload: MosqueScheduleSubmission,
+    session: AsyncSession = Depends(get_db_session),
+) -> ContributionAcceptedResponse:
+    try:
+        submission_id, created = await contribution_intake.submit_schedule(
+            session,
+            directory_mosque_id,
+            payload,
+        )
+    except MosqueNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if created == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No valid schedule rows were provided",
+        )
+    await session.commit()
+    return ContributionAcceptedResponse(
+        submission_id=str(submission_id),
+        status="pending",
+        message="Schedule submission received and queued for moderation.",
+    )
+
+
+@router.post(
+    "/{directory_mosque_id}/claims",
+    response_model=ContributionAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(limit_community_submissions)],
+)
+async def submit_claim(
+    directory_mosque_id: uuid.UUID,
+    payload: MosqueClaimSubmission,
+    session: AsyncSession = Depends(get_db_session),
+) -> ContributionAcceptedResponse:
+    try:
+        claim_id = await contribution_intake.submit_claim(
+            session,
+            directory_mosque_id,
+            payload,
+        )
+    except MosqueNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return ContributionAcceptedResponse(
+        submission_id=str(claim_id),
+        status="pending",
+        message="Claim received and queued for verification.",
+    )
