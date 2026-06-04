@@ -17,6 +17,10 @@ from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
     import_mylocalmasjid_bundle,
 )
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.adapter import ImportFormat, parse_file
+from uk_jamaat_directory.ingest.sources.openstreetmap import (
+    import_openstreetmap_bundle,
+    parse_osm_file,
+)
 from uk_jamaat_directory.services.export_contracts import export_json_schemas, export_openapi
 
 
@@ -80,6 +84,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON instead of a human summary",
     )
 
+    import_osm = subparsers.add_parser(
+        "import-osm",
+        help="Import OSM GB Muslim places of worship from a JSON fixture/export",
+    )
+    import_osm.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="Path to OSM places JSON (synthetic fixtures for local testing)",
+    )
+    import_osm.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and validate the file without writing to the database",
+    )
+
     return parser
 
 
@@ -121,6 +141,8 @@ async def _run_import_mlm(args: argparse.Namespace, settings: Settings) -> int:
     print(
         "Import complete: "
         f"{result.mosques_upserted} mosques, "
+        f"{result.mosques_linked} linked, "
+        f"{result.reviews_created} reviews, "
         f"{result.sources_upserted} sources, "
         f"{result.artifacts_created} artifacts, "
         f"{result.candidates_created} candidates "
@@ -150,8 +172,7 @@ async def _run_report_mlm(args: argparse.Namespace, settings: Settings) -> int:
     print(f"MyLocalMasjid coverage report ({report.generated_at.isoformat()})")
     print(f"  Sources: {report.source_count} ({report.linked_mosque_count} linked to mosques)")
     print(
-        f"  Candidates: pending={report.pending_candidates}, "
-        f"approved={report.approved_candidates}"
+        f"  Candidates: pending={report.pending_candidates}, approved={report.approved_candidates}"
     )
     print(f"  Publication policies: {report.policy_counts or '(none)'}")
     print(f"  Stale sources (>{STALE_LABEL}): {len(report.stale_sources)}")
@@ -184,10 +205,7 @@ def main() -> None:
     settings = get_settings()
 
     if args.command == "import-mlm":
-        if (
-            settings.environment == Environment.PRODUCTION
-            and not settings.mylocalmasjid_enabled
-        ):
+        if settings.environment == Environment.PRODUCTION and not settings.mylocalmasjid_enabled:
             print(
                 "MyLocalMasjid import is disabled (mylocalmasjid_enabled=false).",
                 file=sys.stderr,
@@ -198,4 +216,37 @@ def main() -> None:
     if args.command == "report-mlm":
         raise SystemExit(asyncio.run(_run_report_mlm(args, settings)))
 
+    if args.command == "import-osm":
+        raise SystemExit(asyncio.run(_run_import_osm(args, settings)))
+
     parser.print_help()
+
+
+async def _run_import_osm(args: argparse.Namespace, settings: Settings) -> int:
+    bundle = parse_osm_file(args.input)
+    if args.dry_run:
+        print(f"Dry run OK: {len(bundle.places)} OSM places")
+        return 0
+
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            result = await import_openstreetmap_bundle(session, bundle)
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    print(
+        "OSM import complete: "
+        f"{result.places_processed} places, "
+        f"{result.mosques_created} mosques created, "
+        f"{result.mosques_linked} linked, "
+        f"{result.reviews_created} reviews"
+    )
+    if result.errors:
+        print("Errors:", file=sys.stderr)
+        for error in result.errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+    return 0

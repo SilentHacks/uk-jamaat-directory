@@ -10,7 +10,8 @@ Sirat is a private journey-planning consumer. Sirat should sync Directory data i
 
 - **Directory**: this public data service.
 - **Directory Mosque ID**: stable public ID assigned by the Directory.
-- **Source**: an external origin such as MyLocalMasjid, OSM, charity register, mosque website, standard feed, community submission, or partner feed.
+- **Source**: an external origin such as MyLocalMasjid, OSM, mosque website, standard feed, community submission, manual/admin entry, or partner feed.
+- **Discovery Lead**: private admin-only hint (for example from Google search) used to find a missing mosque. Not public provenance.
 - **Source Artifact**: raw fetched evidence such as HTML, PDF, image, JSON, or CSV. Artifacts are private operational data.
 - **Schedule Candidate**: extracted or imported proposed timing pending validation and publication.
 - **Published Occurrence**: public normalized row for one mosque, one date, one prayer, and one jamaat session.
@@ -45,7 +46,8 @@ As of the current codebase (Phases 0–4):
 
 - **Done:** service scaffold, PostGIS schema, public read API (`/v1/mosques`, `/v1/times/nearby`, `/v1/changes`, `/v1/snapshots`), source publication filtering on reads, OpenAPI/JSON Schema exports in `docs/api/`.
 - **Done (Phase 5):** MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI; imports create private artifacts, sources, and `schedule_candidates` regardless of publication policy.
-- **Not yet:** OSM/charity discovery imports, candidate validation/publication workers, crawler, bulk NDJSON/CSV file generation, contribution/write APIs, admin moderation UI, Celery-backed pipelines.
+- **Done (Phase 6):** Shared discovery matching, OSM fixture import (`import-osm`), MLM link-before-create, admin mosque identity APIs, community mosque submissions, private Google discovery leads (admin-only).
+- **Not yet:** Candidate validation/publication workers, crawler, bulk NDJSON/CSV file generation, admin moderation UI, Celery-backed pipelines, live OSM Overpass/Google API fetchers.
 
 Snapshot API routes expose metadata from `dataset_versions` (version, checksum, manifest export URLs). They do not generate export files until a later phase implements snapshot publishing.
 

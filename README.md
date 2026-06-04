@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–5 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import adapter). Publication pipelines, crawlers, and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–6 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import, discovery/canonicalization). Publication pipelines, crawlers, and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -108,6 +108,32 @@ Import synthetic or partner-provided exports into private sources, artifacts, an
 
 Supported formats: JSON bundle (`.json`), NDJSON (`.ndjson`), flat CSV (`.csv`). Do not commit real MyLocalMasjid dumps; use `data/fixtures/mylocalmasjid/` for tests only.
 
+## Discovery import (Phase 6)
+
+Import OSM GB Muslim places of worship from synthetic fixtures and link sources to existing mosques before creating duplicates:
+
+```bash
+.venv/bin/uk-jamaat-directory import-osm \
+  --input data/fixtures/openstreetmap/sample_places.json
+
+# Import MLM after OSM so matching can link to existing mosques
+.venv/bin/uk-jamaat-directory import-mlm \
+  --input data/fixtures/mylocalmasjid/sample_export.json
+```
+
+Admin identity APIs (require `ADMIN_API_KEY`):
+
+- `POST /v1/admin/mosques` — create mosque
+- `PATCH /v1/admin/mosques/{id}` — update mosque
+- `POST /v1/admin/mosques/{id}/sources` — attach source
+- `POST /v1/admin/mosques/{id}/aliases` — add alias
+- `POST /v1/admin/mosques/{id}/merge` — merge duplicate into canonical mosque
+- `POST /v1/admin/discovery-leads` — record private Google/admin discovery lead (not public data)
+
+Public community intake:
+
+- `POST /v1/contributions/mosques` — submit a missing mosque for moderation (202 Accepted)
+
 ## Development
 
 ```bash
@@ -151,7 +177,8 @@ AGENTS.md                  Agent/developer conventions
 | 3 | PostGIS schema (mosques, sources, occurrences, …) | Done |
 | 4 | Public read API and contract exports | Done |
 | 5 | MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI | Done |
-| 6+ | OSM discovery, publication pipeline, crawlers, web UI | Planned |
+| 6 | Discovery sources, identity matching, admin/community intake | Done |
+| 7+ | Publication pipeline, crawlers, web UI | Planned |
 
 Imports create candidates only; public occurrences and bulk export files require the publication pipeline (Phase 7+). Snapshot endpoints return dataset metadata from `dataset_versions`; export files are not produced until a later phase.
 

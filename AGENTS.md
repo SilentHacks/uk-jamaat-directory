@@ -22,8 +22,11 @@
 - GitHub Actions CI on `master`
 
 - MyLocalMasjid ingest adapter (`import-mlm`, `report-mlm` CLI; synthetic fixtures in `data/fixtures/mylocalmasjid/`)
+- Phase 6 discovery: shared identity matching, `import-osm`, admin mosque CRUD/merge, `POST /v1/contributions/mosques`, admin-only `POST /v1/admin/discovery-leads` (Google leads — never public)
 
-Not implemented yet: OSM/charity discovery imports, publication pipeline (candidates → occurrences), bulk export files, contribution/write APIs beyond admin stub, Celery tasks, crawlers, frontend.
+Phase 6 scope excludes charity register import and public Google-derived facts. Do not add charity or Google as redistributable `mosque_sources` without an explicit ADR change.
+
+Not implemented yet: publication pipeline (candidates → occurrences), bulk export files, Celery tasks, crawlers, frontend.
 
 ## Architecture Rules
 

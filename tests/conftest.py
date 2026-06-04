@@ -87,6 +87,24 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
+async def admin_client_with_db(
+    test_settings: Settings,
+    db_session: AsyncSession,
+) -> AsyncGenerator[AsyncClient, None]:
+    test_settings.admin_api_key = "test-admin-key"
+    app = create_app(test_settings)
+
+    async def _override() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db_session] = _override
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
 async def client_with_db(
     test_settings: Settings,
     db_session: AsyncSession,
