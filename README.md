@@ -130,9 +130,24 @@ Admin identity APIs (require `ADMIN_API_KEY`):
 - `POST /v1/admin/mosques/{id}/merge` — merge duplicate into canonical mosque
 - `POST /v1/admin/discovery-leads` — record private Google/admin discovery lead (not public data)
 
+## Admin moderation and reporting (Phase 8)
+
+All admin routes require `X-Admin-Key`.
+
+- `GET /v1/admin/candidates` — list schedule candidates (filter by status, source, mosque, date)
+- `POST /v1/admin/candidates/{id}/approve` — approve a candidate for publication
+- `POST /v1/admin/candidates/{id}/reject` — reject a candidate
+- `GET /v1/admin/sources` — list sources
+- `PATCH /v1/admin/sources/{id}` — update publication policy and source metadata
+- `GET /v1/admin/coverage` — operational coverage summary
+- `GET /v1/admin/source-health` — freshness and import health by source
+
 Public community intake:
 
 - `POST /v1/contributions/mosques` — submit a missing mosque for moderation (202 Accepted)
+- `POST /v1/mosques/{id}/corrections` — report incorrect published data (202 Accepted)
+- `POST /v1/mosques/{id}/schedule-submissions` — propose timetable rows as pending candidates
+- `POST /v1/mosques/{id}/claims` — mosque ownership verification request (private contact details)
 
 ## Schedule validation and publication (Phase 7)
 
@@ -211,7 +226,8 @@ AGENTS.md                  Agent/developer conventions
 | 5 | MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI | Done |
 | 6 | Discovery sources, identity matching, admin/community intake | Done |
 | 7 | Schedule validation, explicit publish CLI, freshness | Done |
-| 8+ | Admin candidate moderation API, crawlers, web UI | Planned |
+| 8 | Admin moderation/reporting APIs, mosque contribution intake | Done |
+| 9+ | Crawlers, bulk exports, web UI | Planned |
 
 Bulk export files are not produced yet. Snapshot endpoints return dataset metadata from `dataset_versions`; NDJSON/CSV files come in a later phase.
 

@@ -27,8 +27,9 @@
 Phase 6 scope excludes charity register import and public Google-derived facts. Do not add charity or Google as redistributable `mosque_sources` without an explicit ADR change.
 
 - Phase 7 schedules: `validate-candidates`, `publish-candidates`, `recompute-freshness` CLI; explicit publish only (see ADR 0006)
+- Phase 8 admin: candidate approve/reject/list, source list/patch, coverage, source-health; public corrections, schedule submissions, and claims on `/v1/mosques/{id}/…`
 
-Not implemented yet: admin candidate moderation HTTP, bulk export files, Celery tasks, crawlers, frontend.
+Not implemented yet: bulk export files, Celery tasks, crawlers, frontend.
 
 ## Architecture Rules
 
