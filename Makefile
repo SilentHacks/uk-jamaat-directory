@@ -1,4 +1,4 @@
-.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down export-contracts export-osm compose-vps-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
+.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down export-contracts export-osm export-mib compose-vps-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
 
 VENV := .venv
 BIN := $(VENV)/bin
@@ -78,4 +78,7 @@ export-contracts:
 	$(BIN)/uk-jamaat-directory export-contracts
 
 export-osm:
-	$(BIN)/uk-jamaat-directory export-osm --output data/exports/osm_gb_muslim.json
+	$(BIN)/uk-jamaat-directory export-osm --output data/exports/osm_uk_ie_muslim.json
+
+export-mib:
+	$(BIN)/uk-jamaat-directory export-mib --output data/exports/mib_uk_ie_mosques.json

@@ -54,6 +54,8 @@ class Settings(BaseSettings):
 
     mylocalmasjid_enabled: bool = False
     mylocalmasjid_publication_policy: str = "unknown"
+    muslimsinbritain_enabled: bool = False
+    muslimsinbritain_publication_policy: str = "unknown"
     openai_api_key: str | None = None
 
     community_submission_rate_limit: int = 10
@@ -64,6 +66,7 @@ class Settings(BaseSettings):
     freshness_stale_days: int = 30
     source_last_seen_stale_days: int = 30
     mlm_report_stale_days: int = 7
+    mib_report_stale_days: int = 30
     publish_allow_ai: bool = False
 
     crawl_enabled: bool = False

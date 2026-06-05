@@ -21,8 +21,18 @@ from uk_jamaat_directory.ingest.extract.runner import run_extraction
 from uk_jamaat_directory.ingest.extract.standard_feed import extract_standard_feed
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
+from uk_jamaat_directory.ingest.sources.muslimsinbritain import (
+    build_coverage_report as build_mib_coverage_report,
+)
+from uk_jamaat_directory.ingest.sources.muslimsinbritain import (
+    export_mib_bundle,
+    import_muslimsinbritain_bundle,
+    parse_mib_file,
+)
 from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
-    build_coverage_report,
+    build_coverage_report as build_mlm_coverage_report,
+)
+from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
     import_mylocalmasjid_bundle,
 )
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.adapter import ImportFormat, parse_file
@@ -106,9 +116,65 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON instead of a human summary",
     )
 
+    export_mib = subparsers.add_parser(
+        "export-mib",
+        help="Fetch the MuslimsInBritain UK and Ireland directory and write import-mib JSON",
+    )
+    export_mib.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="Path for the normalized MibImportBundle JSON file",
+    )
+    export_mib.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch and validate without writing the output file",
+    )
+    export_mib.add_argument(
+        "--enrich-details",
+        action="store_true",
+        help="Reserved for slower per-entry detail enrichment when needed",
+    )
+
+    import_mib = subparsers.add_parser(
+        "import-mib",
+        help="Import a MuslimsInBritain UK and Ireland JSON/CSV export into mosque sources",
+    )
+    import_mib.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="Path to MiB export file (synthetic fixtures for local testing)",
+    )
+    import_mib.add_argument(
+        "--publication-policy",
+        default=None,
+        help=(
+            "Source publication policy for imported rows "
+            "(public_redistribution_allowed, private_use_only, unknown, blocked). "
+            "Defaults to MUSLIMSINBRITAIN_PUBLICATION_POLICY or 'unknown'."
+        ),
+    )
+    import_mib.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and validate the file without writing to the database",
+    )
+
+    report_mib = subparsers.add_parser(
+        "report-mib",
+        help="Summarize MuslimsInBritain source coverage, linkage, and review backlog",
+    )
+    report_mib.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of a human summary",
+    )
+
     import_osm = subparsers.add_parser(
         "import-osm",
-        help="Import OSM GB Muslim places of worship from a JSON fixture/export",
+        help="Import OSM UK and Ireland Muslim places of worship from a JSON fixture/export",
     )
     import_osm.add_argument(
         "--input",
@@ -124,7 +190,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_osm = subparsers.add_parser(
         "export-osm",
-        help="Fetch GB Muslim places of worship from Overpass and write import-osm JSON",
+        help=(
+            "Fetch UK and Ireland Muslim places of worship from Overpass "
+            "and write import-osm JSON"
+        ),
     )
     export_osm.add_argument(
         "--output",
@@ -256,6 +325,11 @@ def _resolve_mlm_policy(args: argparse.Namespace, settings: Settings):
     return parse_publication_policy(raw)
 
 
+def _resolve_mib_policy(args: argparse.Namespace, settings: Settings):
+    raw = args.publication_policy or settings.muslimsinbritain_publication_policy
+    return parse_publication_policy(raw)
+
+
 async def _run_import_mlm(args: argparse.Namespace, settings: Settings) -> int:
     format_hint = ImportFormat(args.format) if args.format else None
     bundle = parse_file(args.input, format_hint=format_hint)
@@ -310,7 +384,7 @@ async def _run_report_mlm(args: argparse.Namespace, settings: Settings) -> int:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with session_factory() as session:
-            report = await build_coverage_report(session)
+            report = await build_mlm_coverage_report(session)
     finally:
         await engine.dispose()
 
@@ -332,6 +406,91 @@ async def _run_report_mlm(args: argparse.Namespace, settings: Settings) -> int:
             print(f"    ... and {len(report.stale_sources) - 10} more")
     print(f"  Missing recent schedules: {len(report.sources_missing_recent_schedules)}")
     print(f"  Open corrections (MLM-linked mosques): {report.open_corrections}")
+    return 0
+
+
+async def _run_export_mib(args: argparse.Namespace, settings: Settings) -> int:
+    try:
+        bundle, result = await export_mib_bundle(
+            None if args.dry_run else args.output,
+            dry_run=args.dry_run,
+            enrich_details=args.enrich_details,
+            settings=settings,
+        )
+    except (RuntimeError, ValueError) as exc:
+        print(f"MiB export failed: {exc}", file=sys.stderr)
+        return 1
+
+    skip_summary = _format_skip_reasons(result.skip_reasons)
+    print(
+        "MiB export complete: "
+        f"{len(bundle.mosques)} records written, "
+        f"{result.records_skipped} skipped{skip_summary}"
+    )
+    if not args.dry_run and result.output_path is not None:
+        print(f"Wrote {result.output_path}")
+    return 0
+
+
+async def _run_import_mib(args: argparse.Namespace, settings: Settings) -> int:
+    bundle = parse_mib_file(args.input)
+    policy = _resolve_mib_policy(args, settings)
+    if args.dry_run:
+        print(f"Dry run OK: {len(bundle.mosques)} MiB records, policy={policy.value}")
+        return 0
+
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            result = await import_muslimsinbritain_bundle(
+                session,
+                bundle,
+                publication_policy=policy,
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+    print(
+        "MiB import complete: "
+        f"{result.records_processed} records, "
+        f"{result.mosques_created} mosques created, "
+        f"{result.mosques_linked} linked, "
+        f"{result.reviews_created} reviews, "
+        f"{result.skipped} skipped"
+    )
+    if result.errors:
+        print("Errors:", file=sys.stderr)
+        for error in result.errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+async def _run_report_mib(args: argparse.Namespace, settings: Settings) -> int:
+    engine = create_engine(settings)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as session:
+            report = await build_mib_coverage_report(session)
+    finally:
+        await engine.dispose()
+
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0
+
+    print(f"MuslimsInBritain coverage report ({report.generated_at.isoformat()})")
+    print(f"  Sources: {report.source_count} ({report.linked_mosque_count} linked to mosques)")
+    print(f"  Countries: {report.country_counts or '(none)'}")
+    print(f"  Record classes: {report.record_class_counts or '(none)'}")
+    print(f"  Publication policies: {report.policy_counts or '(none)'}")
+    print(f"  Pending identity reviews: {report.pending_reviews}")
+    print(f"  Missing coordinates: {len(report.missing_coordinates)}")
+    print(f"  Missing postcodes: {len(report.missing_postcode)}")
+    print(f"  Stale sources (>{settings.mib_report_stale_days} days): {len(report.stale_sources)}")
+    print(f"  Attribution: {report.attribution_summary}")
     return 0
 
 
@@ -364,6 +523,24 @@ def main() -> None:
 
     if args.command == "report-mlm":
         raise SystemExit(asyncio.run(_run_report_mlm(args, settings)))
+
+    if args.command == "export-mib":
+        raise SystemExit(asyncio.run(_run_export_mib(args, settings)))
+
+    if args.command == "import-mib":
+        if (
+            settings.environment == Environment.PRODUCTION
+            and not settings.muslimsinbritain_enabled
+        ):
+            print(
+                "MuslimsInBritain import is disabled (muslimsinbritain_enabled=false).",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        raise SystemExit(asyncio.run(_run_import_mib(args, settings)))
+
+    if args.command == "report-mib":
+        raise SystemExit(asyncio.run(_run_report_mib(args, settings)))
 
     if args.command == "import-osm":
         raise SystemExit(asyncio.run(_run_import_osm(args, settings)))
