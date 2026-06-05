@@ -144,7 +144,9 @@ async def test_process_source_reruns_extraction_on_unchanged_after_failure(
     )
     db_session.add(mosque)
     db_session.add(source)
+    await db_session.flush()
     db_session.add(artifact)
+    await db_session.flush()
     db_session.add(failed_run)
     await db_session.flush()
 

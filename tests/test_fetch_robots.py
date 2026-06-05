@@ -8,6 +8,7 @@ import pytest
 from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.ingest.fetch.robots import clear_robots_cache
 from uk_jamaat_directory.ingest.fetch.service import fetch_url
+from uk_jamaat_directory.ingest.fetch.throttle import clear_domain_throttle
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/crawl"
 
@@ -15,6 +16,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/crawl"
 @pytest.fixture(autouse=True)
 def _clear_robots() -> None:
     clear_robots_cache()
+    clear_domain_throttle()
 
 
 @pytest.mark.asyncio
@@ -46,7 +48,7 @@ async def test_fetch_url_reports_robots_error() -> None:
         return PatchedClient(
             timeout=settings.crawl_timeout_seconds,
             headers={"User-Agent": settings.crawl_user_agent},
-            follow_redirects=True,
+            follow_redirects=False,
         )
 
     old_client_build = client_module.build_http_client

@@ -7,6 +7,9 @@ import httpx
 
 from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.ingest.fetch.client import build_http_client
+from uk_jamaat_directory.ingest.fetch.limits import ROBOTS_MAX_BYTES, read_limited_body
+from uk_jamaat_directory.ingest.fetch.security import ensure_resolvable_public_host
+from uk_jamaat_directory.ingest.fetch.throttle import wait_for_domain
 
 _robots_cache: dict[str, robotparser.RobotFileParser | None] = {}
 
@@ -28,13 +31,23 @@ async def _load_robots(
     parser = robotparser.RobotFileParser()
     parser.set_url(robots_url)
 
+    blocked = await ensure_resolvable_public_host(robots_url)
+    if blocked:
+        _robots_cache[domain] = None
+        return None
+
     try:
+        await wait_for_domain(robots_url, cfg)
         async with build_http_client(cfg) as client:
-            response = await client.get(robots_url)
-            if response.status_code >= 400:
-                _robots_cache[domain] = None
-                return None
-            parser.parse(response.text.splitlines())
+            async with client.stream("GET", robots_url) as response:
+                if response.status_code >= 400:
+                    _robots_cache[domain] = None
+                    return None
+                body, size_error = await read_limited_body(response, ROBOTS_MAX_BYTES)
+                if size_error or body is None:
+                    _robots_cache[domain] = None
+                    return None
+                parser.parse(body.decode("utf-8", errors="replace").splitlines())
     except httpx.HTTPError:
         _robots_cache[domain] = None
         return None

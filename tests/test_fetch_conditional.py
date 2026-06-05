@@ -9,12 +9,14 @@ import pytest
 from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.ingest.fetch.robots import clear_robots_cache
 from uk_jamaat_directory.ingest.fetch.service import fetch_url
+from uk_jamaat_directory.ingest.fetch.throttle import clear_domain_throttle
 from uk_jamaat_directory.models.core import SourceArtifact
 
 
 @pytest.fixture(autouse=True)
 def _clear_robots() -> None:
     clear_robots_cache()
+    clear_domain_throttle()
 
 
 @pytest.mark.asyncio
@@ -49,7 +51,7 @@ async def test_fetch_returns_304_unchanged() -> None:
         return PatchedClient(
             timeout=settings.crawl_timeout_seconds,
             headers={"User-Agent": settings.crawl_user_agent},
-            follow_redirects=True,
+            follow_redirects=False,
         )
 
     old_client_build = client_module.build_http_client
