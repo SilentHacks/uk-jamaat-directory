@@ -81,6 +81,12 @@ def osm_to_discovery_record(record: OsmPlaceRecord) -> DiscoveryRecord:
             "latitude": record.latitude,
             "longitude": record.longitude,
             "location_precision": "osm_geometry",
+            "source_record_updated_at": record.source_record_updated_at.isoformat()
+            if record.source_record_updated_at is not None
+            else None,
+            "osm_version": record.osm_version,
+            "osm_changeset": record.osm_changeset,
+            "osm_user": record.osm_user,
             "license": "ODbL-1.0",
         },
     )

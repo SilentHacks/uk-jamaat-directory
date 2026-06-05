@@ -47,6 +47,8 @@ class MibMosqueRecord(BaseModel):
     theme: str | None = None
     management: str | None = None
     attribution: str = "MuslimsInBritain.org"
+    source_record_created_at: datetime | None = None
+    source_record_updated_at: datetime | None = None
 
     @field_validator("postcode", mode="before")
     @classmethod

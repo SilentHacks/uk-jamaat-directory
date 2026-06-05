@@ -316,7 +316,6 @@ async def _latest_linked_source_record_datetime(
 _SOURCE_RECORD_DATE_KEYS = (
     "source_record_updated_at",
     "source_record_created_at",
-    "source_exported_at",
     "updated_at",
     "last_updated",
     "modified_at",

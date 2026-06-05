@@ -39,7 +39,7 @@ def test_build_uk_ie_muslim_places_query_includes_union_filters() -> None:
     assert '["religion"="muslim"]' in query
     assert '["denomination"~"^(muslim|sunni|shia|ahmadiyya)$",i]' in query
     assert '["name"~"masjid|mosque|islamic",i]' in query
-    assert query.strip().endswith("out center tags;")
+    assert query.strip().endswith("out center meta;")
 
 
 def test_build_country_queries_scope_single_area() -> None:
@@ -74,6 +74,10 @@ def test_map_overpass_element_website_and_address_normalization() -> None:
             "addr:postcode": "e21aa",
             "website": "https://example.org/central-masjid",
         },
+        "timestamp": "2026-01-15T12:34:56Z",
+        "version": 7,
+        "changeset": 12345,
+        "user": "fixture_mapper",
     }
     place, skip_reason = map_overpass_element(element)
     assert skip_reason is None
@@ -84,6 +88,11 @@ def test_map_overpass_element_website_and_address_normalization() -> None:
     assert place.postcode == "E2 1AA"
     assert place.country == "GB"
     assert place.aliases == ["Central Mosque"]
+    assert place.source_record_updated_at is not None
+    assert place.source_record_updated_at.isoformat() == "2026-01-15T12:34:56+00:00"
+    assert place.osm_version == 7
+    assert place.osm_changeset == 12345
+    assert place.osm_user == "fixture_mapper"
 
 
 def test_map_overpass_element_irish_country_and_eircode_normalization() -> None:

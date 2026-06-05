@@ -318,6 +318,7 @@ async def test_newer_public_source_name_replaces_existing_canonical_name(
                 latitude=51.5308,
                 longitude=-0.0714,
                 religion="muslim",
+                source_record_updated_at=datetime.fromisoformat("2026-01-01T00:00:00+00:00"),
             )
         ],
     )
@@ -339,6 +340,7 @@ async def test_newer_public_source_name_replaces_existing_canonical_name(
                 usage="full_time",
                 location_precision="precise",
                 metadata_confidence="high",
+                source_record_updated_at=datetime.fromisoformat("2026-06-01T00:00:00+00:00"),
             )
         ],
     )
@@ -352,3 +354,56 @@ async def test_newer_public_source_name_replaces_existing_canonical_name(
     mosque = await db_session.scalar(select(Mosque).where(Mosque.postcode == "E2 1AA"))
     assert mosque is not None
     assert mosque.name == "Newer Public Name Masjid"
+
+
+@pytest.mark.asyncio
+async def test_export_timestamp_alone_does_not_replace_canonical_name(
+    db_session: AsyncSession,
+) -> None:
+    osm_bundle = OsmImportBundle(
+        exported_at=datetime.fromisoformat("2026-01-01T00:00:00+00:00"),
+        places=[
+            OsmPlaceRecord(
+                osm_type="node",
+                osm_id=45,
+                name="Source Dated OSM Mosque",
+                city="London",
+                postcode="E2 1AA",
+                latitude=51.5308,
+                longitude=-0.0714,
+                religion="muslim",
+                source_record_updated_at=datetime.fromisoformat("2026-01-01T00:00:00+00:00"),
+            )
+        ],
+    )
+    await import_openstreetmap_bundle(db_session, osm_bundle)
+    await db_session.commit()
+
+    mib_bundle = MibImportBundle(
+        exported_at=datetime.fromisoformat("2026-12-01T00:00:00+00:00"),
+        mosques=[
+            MibMosqueRecord(
+                external_id="mib-export-date-only",
+                name="Export Date Only Name",
+                city="London",
+                postcode="E2 1AA",
+                country="GB",
+                latitude=51.5308,
+                longitude=-0.0714,
+                record_class="mosque",
+                usage="full_time",
+                location_precision="precise",
+                metadata_confidence="high",
+            )
+        ],
+    )
+    await import_muslimsinbritain_bundle(
+        db_session,
+        mib_bundle,
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+    )
+    await db_session.commit()
+
+    mosque = await db_session.scalar(select(Mosque).where(Mosque.postcode == "E2 1AA"))
+    assert mosque is not None
+    assert mosque.name == "Source Dated OSM Mosque"

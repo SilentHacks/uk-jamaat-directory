@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal
 
 from uk_jamaat_directory.ingest.normalize import normalize_postcode
@@ -40,7 +41,8 @@ def map_overpass_elements(elements: list[dict[str, Any]]) -> MapElementsResult:
         if skip_reason is not None:
             result.skip_reasons[skip_reason] += 1
             continue
-        result.places.append(place)
+        if place is not None:
+            result.places.append(place)
 
     return result
 
@@ -85,6 +87,10 @@ def map_overpass_element(
         religion=_normalize_tag(_tag(tags, "religion")),
         denomination=_normalize_tag(_tag(tags, "denomination")),
         source_url=f"https://www.openstreetmap.org/{element_type}/{element_id}",
+        source_record_updated_at=_parse_datetime(_tag_value(element, "timestamp")),
+        osm_version=_int_value(element.get("version")),
+        osm_changeset=_int_value(element.get("changeset")),
+        osm_user=_tag_value(element, "user"),
     )
 
     if not is_muslim_place(record):
@@ -94,11 +100,37 @@ def map_overpass_element(
 
 
 def _tag(tags: dict[str, Any], key: str) -> str | None:
-    value = tags.get(key)
+    return _tag_value(tags, key)
+
+
+def _tag_value(data: dict[str, Any], key: str) -> str | None:
+    value = data.get(key)
     if value is None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _int_value(value: object) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _normalize_tag(value: str | None) -> str | None:

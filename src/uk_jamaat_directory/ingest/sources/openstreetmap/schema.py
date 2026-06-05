@@ -21,6 +21,10 @@ class OsmPlaceRecord(BaseModel):
     religion: str | None = None
     denomination: str | None = None
     source_url: str | None = None
+    source_record_updated_at: datetime | None = None
+    osm_version: int | None = None
+    osm_changeset: int | None = None
+    osm_user: str | None = None
 
     @property
     def external_id(self) -> str:

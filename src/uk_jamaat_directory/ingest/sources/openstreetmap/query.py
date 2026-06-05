@@ -14,7 +14,7 @@ area["ISO3166-1"="{iso}"][admin_level=2]->.{area};
   way["amenity"="place_of_worship"]["name"~"masjid|mosque|islamic",i](area.{area});
   relation["amenity"="place_of_worship"]["name"~"masjid|mosque|islamic",i](area.{area});
 );
-out center tags;
+out center meta;
 """
 
 UK_IE_MUSLIM_PLACES_QUERY = """\
@@ -41,7 +41,7 @@ area["ISO3166-1"="IE"][admin_level=2]->.ie;
   way["amenity"="place_of_worship"]["name"~"masjid|mosque|islamic",i](area.ie);
   relation["amenity"="place_of_worship"]["name"~"masjid|mosque|islamic",i](area.ie);
 );
-out center tags;
+out center meta;
 """
 
 
