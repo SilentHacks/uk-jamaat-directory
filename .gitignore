@@ -23,6 +23,11 @@ htmlcov/
 !.env.example
 !.env.vps.example
 
+# Server-specific compose/Caddy overrides (keep on the host, not in git)
+docker-compose.vps.local.yml
+docker-compose.vps.*.local.yml
+deploy/caddy/local/
+
 # Local runtime data
 .local/
 data/artifacts/
