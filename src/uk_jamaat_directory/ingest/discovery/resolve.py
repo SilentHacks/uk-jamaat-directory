@@ -114,6 +114,8 @@ async def _score_candidates(
     record: DiscoveryRecord,
 ) -> list[ScoredMosqueCandidate]:
     stmt = select(Mosque).options(selectinload(Mosque.aliases))
+    if record.country:
+        stmt = stmt.where(Mosque.country == record.country)
     record_postcode = normalize_postcode(record.postcode)
     if record_postcode:
         compact = record_postcode.replace(" ", "")
@@ -142,6 +144,8 @@ async def _score_candidates(
 
 
 def _is_plausible_candidate(record: DiscoveryRecord, mosque: Mosque) -> bool:
+    if record.country and mosque.country and record.country != mosque.country:
+        return False
     record_postcode = normalize_postcode(record.postcode)
     mosque_postcode = normalize_postcode(mosque.postcode)
     if record_postcode and mosque_postcode:
