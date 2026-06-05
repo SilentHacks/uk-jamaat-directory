@@ -90,6 +90,7 @@ async def seed_public_mosque_bundle(session: AsyncSession) -> dict[str, object]:
         id=uuid.uuid4(),
         mosque_id=mosque.id,
         source_id=private_source.id,
+        dataset_version_id=dataset_version.id,
         date=date(2026, 6, 5),
         prayer=Prayer.DHUHR,
         jamaat_time=time(13, 15),
