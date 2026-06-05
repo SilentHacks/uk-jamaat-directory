@@ -110,9 +110,14 @@ Supported formats: JSON bundle (`.json`), NDJSON (`.ndjson`), flat CSV (`.csv`).
 
 ## Discovery import (Phase 6)
 
-Import OSM GB Muslim places of worship from synthetic fixtures and link sources to existing mosques before creating duplicates:
+Export GB Muslim places of worship from Overpass, import into Postgres, then import other discovery sources so matching can link to existing OSM mosques:
 
 ```bash
+# Live OSM acquisition (writes gitignored data/exports/)
+.venv/bin/uk-jamaat-directory export-osm --output data/exports/osm_gb_muslim.json
+.venv/bin/uk-jamaat-directory import-osm --input data/exports/osm_gb_muslim.json
+
+# Offline dev: use the synthetic import bundle instead
 .venv/bin/uk-jamaat-directory import-osm \
   --input data/fixtures/openstreetmap/sample_places.json
 
@@ -120,6 +125,8 @@ Import OSM GB Muslim places of worship from synthetic fixtures and link sources 
 .venv/bin/uk-jamaat-directory import-mlm \
   --input data/fixtures/mylocalmasjid/sample_export.json
 ```
+
+See [docs/data/import-order.md](docs/data/import-order.md) for the recommended import sequence and attribution notes.
 
 Admin identity APIs (require `ADMIN_API_KEY`):
 

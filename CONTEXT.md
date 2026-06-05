@@ -46,14 +46,14 @@ As of the current codebase (Phases 0–4):
 
 - **Done:** service scaffold, PostGIS schema, public read API (`/v1/mosques`, `/v1/times/nearby`, `/v1/changes`, `/v1/snapshots`), source publication filtering on reads, OpenAPI/JSON Schema exports in `docs/api/`.
 - **Done (Phase 5):** MyLocalMasjid adapter and `import-mlm` / `report-mlm` CLI; imports create private artifacts, sources, and `schedule_candidates` regardless of publication policy.
-- **Done (Phase 6):** Shared discovery matching, OSM fixture import (`import-osm`), MLM link-before-create, admin mosque identity APIs, community mosque submissions, private Google discovery leads (admin-only).
+- **Done (Phase 6):** Shared discovery matching, OSM live export + import (`export-osm`, `import-osm`), MLM link-before-create, admin mosque identity APIs, community mosque submissions, private Google discovery leads (admin-only).
 - **Done (Phase 7):** Deterministic schedule validation, explicit `validate-candidates` / `publish-candidates` CLI, dataset-versioned occurrences, change events on publish, freshness recompute, public reads filtered to latest published dataset.
 - **Done (Phase 8):** Admin candidate/source moderation APIs, coverage and source-health reporting, public corrections/schedule submissions/claims with private contact handling.
 - **Done (Phase 9 slice 9.1):** Standard feed crawl pipeline (fetch → MinIO artifact → extract → candidates), Celery tasks, crawl CLI. HTML/PDF/OCR/AI/Playwright deferred.
 - **Done (Phase 10):** Bulk export generation (`generate-exports` CLI, Celery task), NDJSON/CSV/changes/metadata files in object storage, manifest checksums on `dataset_versions`.
 - **Done (Phase 11):** `docker-compose.vps.yml` production stack, Caddy TLS proxy, deploy/backup/restore scripts, `docs/deploy/` runbooks.
 - **Done (Phase 12):** Dependabot, PR dependency review, proprietary code license and intended ODbL public-data license docs, security reporting policy, `docs/github/` workflow notes.
-- **Not yet:** HTML/PDF extractors, live OSM Overpass/Google API fetchers, admin web UI.
+- **Not yet:** HTML/PDF extractors, Google API fetchers, admin web UI.
 
 Snapshot API routes return export metadata from `dataset_versions.manifest.exports` after `generate-exports` runs.
 
