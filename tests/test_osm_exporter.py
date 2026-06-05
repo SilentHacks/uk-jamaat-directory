@@ -18,6 +18,9 @@ from uk_jamaat_directory.ingest.sources.openstreetmap.mapper import (
     map_overpass_elements,
 )
 from uk_jamaat_directory.ingest.sources.openstreetmap.query import (
+    build_gb_muslim_places_query,
+    build_ie_muslim_places_query,
+    build_uk_ie_muslim_places_queries,
     build_uk_ie_muslim_places_query,
 )
 
@@ -37,6 +40,21 @@ def test_build_uk_ie_muslim_places_query_includes_union_filters() -> None:
     assert '["denomination"~"^(muslim|sunni|shia|ahmadiyya)$",i]' in query
     assert '["name"~"masjid|mosque|islamic",i]' in query
     assert query.strip().endswith("out center tags;")
+
+
+def test_build_country_queries_scope_single_area() -> None:
+    gb_query = build_gb_muslim_places_query()
+    ie_query = build_ie_muslim_places_query()
+
+    assert 'area["ISO3166-1"="GB"]' in gb_query
+    assert 'area["ISO3166-1"="IE"]' not in gb_query
+    assert 'area["ISO3166-1"="IE"]' in ie_query
+    assert 'area["ISO3166-1"="GB"]' not in ie_query
+
+
+def test_build_uk_ie_muslim_places_queries_returns_gb_and_ie() -> None:
+    queries = build_uk_ie_muslim_places_queries()
+    assert [region for region, _query in queries] == ["GB", "IE"]
 
 
 def test_map_overpass_element_website_and_address_normalization() -> None:

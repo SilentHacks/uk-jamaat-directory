@@ -16,7 +16,7 @@ from uk_jamaat_directory.ingest.sources.openstreetmap.mapper import (
     map_overpass_elements,
 )
 from uk_jamaat_directory.ingest.sources.openstreetmap.query import (
-    build_uk_ie_muslim_places_query,
+    build_uk_ie_muslim_places_queries,
 )
 from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBundle
 
@@ -41,18 +41,19 @@ async def export_osm_bundle(
 ) -> tuple[OsmImportBundle, OsmExportResult]:
     cfg = settings or get_settings()
     url = overpass_url or cfg.osm_overpass_url
-    query = build_uk_ie_muslim_places_query()
-    payload = await _fetch_overpass(
-        query,
-        url=url,
-        timeout_seconds=cfg.osm_overpass_timeout_seconds,
-        settings=cfg,
-    )
-
-    elements = payload.get("elements")
-    if not isinstance(elements, list):
-        msg = "Overpass response missing 'elements' array"
-        raise ValueError(msg)
+    elements: list[dict[str, Any]] = []
+    for _region, query in build_uk_ie_muslim_places_queries():
+        payload = await _fetch_overpass(
+            query,
+            url=url,
+            timeout_seconds=cfg.osm_overpass_timeout_seconds,
+            settings=cfg,
+        )
+        region_elements = payload.get("elements")
+        if not isinstance(region_elements, list):
+            msg = "Overpass response missing 'elements' array"
+            raise ValueError(msg)
+        elements.extend(region_elements)
 
     mapped = map_overpass_elements(elements)
     bundle = OsmImportBundle(
