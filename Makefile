@@ -57,6 +57,13 @@ compose-down:
 	docker compose down
 
 compose-production-config:
+	@test -f .env || cp .env.example .env
+	POSTGRES_PASSWORD=ci-test \
+	PUBLIC_DOMAIN=ci.example.com \
+	ACME_EMAIL=ci@example.com \
+	S3_ACCESS_KEY_ID=ci \
+	S3_SECRET_ACCESS_KEY=ci-secret \
+	S3_BUCKET=uk-jamaat-directory-ci \
 	docker compose -f docker-compose.production.yml config >/dev/null
 
 deploy-migrate:
