@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–9 are in place. Phase 10 adds deterministic bulk export file generation (NDJSON/CSV/changes/metadata) to object storage. HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–10 are in place. Phase 11 adds Ubuntu VPS deployment (Docker Compose, Caddy TLS, backups, restore drills). HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -213,6 +213,38 @@ Set `EXPORT_BASE_URL` to the public object-storage or CDN endpoint that serves e
 
 `/v1/snapshots/latest` returns export URLs and checksums after generation. Celery beat runs `generate-exports` daily at 04:00 Europe/London when `EXPORT_ENABLED=true`.
 
+## VPS deployment (Phase 11)
+
+Production uses a separate Compose file with Caddy for TLS, internal-only Postgres/Redis/MinIO, and named volumes.
+
+```bash
+# On the server (after copying .env.vps.example → .env and setting secrets)
+docker compose -f docker-compose.vps.yml up -d --build
+./scripts/deploy/migrate.sh
+./scripts/deploy/smoke-test.sh
+```
+
+Routine deploys:
+
+```bash
+./scripts/deploy/deploy.sh
+```
+
+Documentation:
+
+- [docs/deploy/ubuntu-vps.md](docs/deploy/ubuntu-vps.md) — first-time VPS setup
+- [docs/deploy/checklist.md](docs/deploy/checklist.md) — deploy checklist
+- [docs/deploy/restore.md](docs/deploy/restore.md) — backup restore drills
+
+Daily backups (schedule via cron on the host):
+
+```bash
+./scripts/deploy/backup-postgres.sh
+./scripts/deploy/backup-minio.sh
+```
+
+Local development continues to use `docker-compose.yml` (hot reload, Postgres on host port 54324).
+
 ## Development
 
 ```bash
@@ -255,6 +287,7 @@ alembic/                   Database migrations
 tests/                     Unit and PostGIS integration tests
 docs/adr/                  Architecture decision records
 docs/api/                  Generated OpenAPI and JSON Schema exports
+docs/deploy/               Ubuntu VPS deployment, backups, restore drills
 PLAN.md                    Product and rollout plan
 CONTEXT.md                 Domain language and invariants
 AGENTS.md                  Agent/developer conventions
@@ -273,9 +306,10 @@ AGENTS.md                  Agent/developer conventions
 | 6 | Discovery sources, identity matching, admin/community intake | Done |
 | 7 | Schedule validation, explicit publish CLI, freshness | Done |
 | 8 | Admin moderation/reporting APIs, mosque contribution intake | Done |
-| 9+ | Crawlers, bulk exports, web UI | Planned |
-
-Bulk export files are not produced yet. Snapshot endpoints return dataset metadata from `dataset_versions`; NDJSON/CSV files come in a later phase.
+| 9 | Standard feed crawl, artifacts, Celery tasks | Done |
+| 10 | Bulk exports (NDJSON/CSV/changes/metadata) | Done |
+| 11 | Docker VPS deployment, backups, restore drills | Done |
+| 12+ | GitHub publishing workflow, web UI | Planned |
 
 ## Data Publication Rules
 
@@ -290,6 +324,7 @@ Raw fetched artifacts, extraction runs, claim contact details, private admin not
 - [AGENTS.md](AGENTS.md) — commands and conventions for contributors/agents
 - [docs/adr/](docs/adr/) — architecture decisions
 - [docs/api/](docs/api/) — generated public API contracts
+- [docs/deploy/](docs/deploy/) — Ubuntu VPS deployment and operations
 
 ## License
 

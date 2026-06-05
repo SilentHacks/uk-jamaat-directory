@@ -51,6 +51,7 @@ As of the current codebase (Phases 0–4):
 - **Done (Phase 8):** Admin candidate/source moderation APIs, coverage and source-health reporting, public corrections/schedule submissions/claims with private contact handling.
 - **Done (Phase 9 slice 9.1):** Standard feed crawl pipeline (fetch → MinIO artifact → extract → candidates), Celery tasks, crawl CLI. HTML/PDF/OCR/AI/Playwright deferred.
 - **Done (Phase 10):** Bulk export generation (`generate-exports` CLI, Celery task), NDJSON/CSV/changes/metadata files in object storage, manifest checksums on `dataset_versions`.
+- **Done (Phase 11):** `docker-compose.vps.yml` production stack, Caddy TLS proxy, deploy/backup/restore scripts, `docs/deploy/` runbooks.
 - **Not yet:** HTML/PDF extractors, live OSM Overpass/Google API fetchers, admin web UI.
 
 Snapshot API routes return export metadata from `dataset_versions.manifest.exports` after `generate-exports` runs.
