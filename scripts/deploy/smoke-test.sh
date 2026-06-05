@@ -32,8 +32,12 @@ echo "$health_json" | grep -q '"status"' || {
 
 echo "Smoke test: GET $BASE_URL/v1/health/ready"
 ready_json="$(curl -fsS "$BASE_URL/v1/health/ready")"
-echo "$ready_json" | grep -q '"ready"' || {
-  echo "error: /v1/health/ready response missing ready field" >&2
+echo "$ready_json" | grep -q '"status":"ok"' || {
+  echo "error: /v1/health/ready response missing status ok" >&2
+  exit 1
+}
+echo "$ready_json" | grep -q '"database":"ok"' || {
+  echo "error: /v1/health/ready response missing database ok" >&2
   exit 1
 }
 

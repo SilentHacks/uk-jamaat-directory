@@ -19,7 +19,7 @@ Use this checklist for every production deploy. The automated script [`scripts/d
 6. [ ] **Health** — API container healthy (`docker compose -f docker-compose.vps.yml ps`)
 7. [ ] **Smoke test** (`./scripts/deploy/smoke-test.sh`)
    - [ ] `GET /v1/health` returns 200
-   - [ ] `GET /v1/health/ready` returns ready
+   - [ ] `GET /v1/health/ready` returns `{"status":"ok","database":"ok"}`
    - [ ] `GET /v1/mosques?limit=1` returns 200
 
 Or run the full script:
