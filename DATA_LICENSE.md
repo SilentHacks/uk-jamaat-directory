@@ -53,13 +53,18 @@ exports. See [docs/adr/0003-source-publication-gates.md](docs/adr/0003-source-pu
 
 ## Partner and third-party data
 
-Some rows may credit third-party sources (for example MyLocalMasjid, mosque standard feeds,
-or mosque websites). Those facts appear in public exports **only when** the linked source
-record has `public_redistribution_allowed` and the upstream terms permit normalized public
+Some rows may credit third-party sources (for example MyLocalMasjid,
+MuslimsInBritain, mosque standard feeds, or mosque websites). Those facts appear
+in public exports **only when** the linked source record has
+`public_redistribution_allowed` and the upstream terms permit normalized public
 redistribution.
 
 Restricted partner data must never be mixed into public snapshots. If a partner permits only
 private use, their data stays out of public exports entirely.
+
+MuslimsInBritain imports default to `unknown` publication policy under
+[ADR 0011](docs/adr/0011-muslimsinbritain-import-policy.md) until a publication
+decision is recorded.
 
 ## Export manifest
 

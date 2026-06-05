@@ -110,16 +110,21 @@ Supported formats: JSON bundle (`.json`), NDJSON (`.ndjson`), flat CSV (`.csv`).
 
 ## Discovery import (Phase 6)
 
-Export GB Muslim places of worship from Overpass, import into Postgres, then import other discovery sources so matching can link to existing OSM mosques:
+Export UK and Ireland Muslim places of worship from Overpass, import into Postgres, then import other discovery sources so matching can link to existing OSM mosques:
 
 ```bash
 # Live OSM acquisition (writes gitignored data/exports/)
-.venv/bin/uk-jamaat-directory export-osm --output data/exports/osm_gb_muslim.json
-.venv/bin/uk-jamaat-directory import-osm --input data/exports/osm_gb_muslim.json
+.venv/bin/uk-jamaat-directory export-osm --output data/exports/osm_uk_ie_muslim.json
+.venv/bin/uk-jamaat-directory import-osm --input data/exports/osm_uk_ie_muslim.json
 
 # Offline dev: use the synthetic import bundle instead
 .venv/bin/uk-jamaat-directory import-osm \
   --input data/fixtures/openstreetmap/sample_places.json
+
+# Import MiB after OSM so matching can link to existing mosques
+.venv/bin/uk-jamaat-directory export-mib --output data/exports/mib_uk_ie_mosques.json
+.venv/bin/uk-jamaat-directory import-mib --input data/exports/mib_uk_ie_mosques.json
+.venv/bin/uk-jamaat-directory report-mib
 
 # Import MLM after OSM so matching can link to existing mosques
 .venv/bin/uk-jamaat-directory import-mlm \

@@ -22,6 +22,7 @@ Credit upstream sources when their data appears in material you redistribute.
 |-------------|--------------------------|----------------------|
 | OpenStreetMap | Mosque identity/discovery fields linked to OSM imports | © OpenStreetMap contributors, ODbL 1.0 |
 | MyLocalMasjid | Only when `public_redistribution_allowed` | Credit MyLocalMasjid and link to the source URL recorded on the row |
+| MuslimsInBritain | Only when `public_redistribution_allowed` | Credit MuslimsInBritain.org and link to the source URL recorded on the row |
 | Standard feed | Mosque-published `/.well-known/uk-jamaat-directory.json` | Credit the mosque or feed publisher; link `source_url` when present |
 | Mosque website | Deterministic extraction after manual approval | Credit the mosque; link `source_url` when present |
 | Community submission | After moderation and publication | Credit UK Jamaat Directory community intake |
