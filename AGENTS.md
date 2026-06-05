@@ -33,6 +33,7 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 - Phase 9 crawl: standard feed fetch/extract, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, `fetch-feed`, …). HTML/PDF/OCR/AI deferred.
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
 - Phase 11 deploy: `docker-compose.vps.yml`, Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
+- Phase 12 GitHub: CI on `master`, Dependabot, dependency review workflow, `LICENSE.md` / `DATA_LICENSE.md` / `ATTRIBUTION.md` / `SECURITY.md`, `docs/github/` (ADR 0010).
 
 Not implemented yet: HTML/PDF crawlers, frontend.
 

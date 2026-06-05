@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–10 are in place. Phase 11 adds Ubuntu VPS deployment (Docker Compose, Caddy TLS, backups, restore drills). HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–11 are in place. Phase 12 adds GitHub publishing hygiene (Dependabot, license docs, security policy). HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -309,7 +309,8 @@ AGENTS.md                  Agent/developer conventions
 | 9 | Standard feed crawl, artifacts, Celery tasks | Done |
 | 10 | Bulk exports (NDJSON/CSV/changes/metadata) | Done |
 | 11 | Docker VPS deployment, backups, restore drills | Done |
-| 12+ | GitHub publishing workflow, web UI | Planned |
+| 12 | GitHub publishing workflow (CI, Dependabot, license docs) | Done |
+| 13+ | Admin web UI, HTML/PDF crawlers | Planned |
 
 ## Data Publication Rules
 
@@ -325,7 +326,15 @@ Raw fetched artifacts, extraction runs, claim contact details, private admin not
 - [docs/adr/](docs/adr/) — architecture decisions
 - [docs/api/](docs/api/) — generated public API contracts
 - [docs/deploy/](docs/deploy/) — Ubuntu VPS deployment and operations
+- [docs/github/](docs/github/) — CI, Dependabot, and branch protection notes
 
 ## License
 
-Code is private/proprietary unless a later release changes this explicitly. Public data licensing will be documented separately before any public data release, likely with ODbL-compatible terms if OSM-derived data is included.
+| Artifact | Document |
+|----------|----------|
+| Application code (private) | [LICENSE.md](LICENSE.md) — proprietary |
+| Public normalized data (when released) | [DATA_LICENSE.md](DATA_LICENSE.md) — intended ODbL 1.0 |
+| Attribution requirements | [ATTRIBUTION.md](ATTRIBUTION.md) |
+| Security reports | [SECURITY.md](SECURITY.md) |
+
+No public data release has occurred yet. See [docs/github/README.md](docs/github/README.md) for the GitHub workflow.
