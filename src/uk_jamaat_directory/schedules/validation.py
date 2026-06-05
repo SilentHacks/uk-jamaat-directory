@@ -221,6 +221,11 @@ def _requires_manual_approval(
         return True
     if source is not None and source.source_type == SourceType.COMMUNITY:
         return True
+    if source is not None and source.source_type in (
+        SourceType.STANDARD_FEED,
+        SourceType.MOSQUE_WEBSITE,
+    ):
+        return True
     return False
 
 

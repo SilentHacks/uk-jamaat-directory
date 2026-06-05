@@ -98,6 +98,22 @@ def test_warns_jamaat_far_from_start() -> None:
     assert any(issue.code == "jamaat_far_from_start" for issue in result.warnings)
 
 
+def test_standard_feed_requires_manual_approval() -> None:
+    candidate = _candidate()
+    source = _source()
+    source.source_type = SourceType.STANDARD_FEED
+    result = validate_candidate(candidate, mosque=_mosque(), source=source)
+    assert result.is_valid
+    assert (
+        status_after_validation(
+            result,
+            extraction_kind=ExtractionKind.DETERMINISTIC,
+            source=source,
+        )
+        == CandidateStatus.PENDING
+    )
+
+
 def test_ai_extraction_stays_pending_after_validation() -> None:
     candidate = _candidate()
     result = validate_candidate(
