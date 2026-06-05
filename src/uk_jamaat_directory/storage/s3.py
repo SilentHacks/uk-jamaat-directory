@@ -30,13 +30,27 @@ def artifact_object_key(
 
 
 @lru_cache
-def _sync_client(settings: Settings):
+def _sync_client(
+    endpoint_url: str,
+    region_name: str,
+    aws_access_key_id: str,
+    aws_secret_access_key: str,
+):
     return boto3.client(
         "s3",
-        endpoint_url=settings.s3_endpoint_url,
-        region_name=settings.s3_region,
-        aws_access_key_id=settings.s3_access_key_id,
-        aws_secret_access_key=settings.s3_secret_access_key,
+        endpoint_url=endpoint_url,
+        region_name=region_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+    )
+
+
+def _client_for_settings(settings: Settings):
+    return _sync_client(
+        settings.s3_endpoint_url,
+        settings.s3_region,
+        settings.s3_access_key_id,
+        settings.s3_secret_access_key,
     )
 
 
@@ -45,7 +59,7 @@ class S3Storage:
         self._settings = settings or get_settings()
 
     async def ensure_bucket(self) -> None:
-        client = _sync_client(self._settings)
+        client = _client_for_settings(self._settings)
         bucket = self._settings.s3_bucket
 
         def _ensure() -> None:
@@ -61,7 +75,7 @@ class S3Storage:
         await asyncio.to_thread(_ensure)
 
     async def put_bytes(self, key: str, body: bytes, content_type: str) -> None:
-        client = _sync_client(self._settings)
+        client = _client_for_settings(self._settings)
         bucket = self._settings.s3_bucket
 
         def _put() -> None:
@@ -75,7 +89,7 @@ class S3Storage:
         await asyncio.to_thread(_put)
 
     async def get_bytes(self, key: str) -> bytes:
-        client = _sync_client(self._settings)
+        client = _client_for_settings(self._settings)
         bucket = self._settings.s3_bucket
 
         def _get() -> bytes:
@@ -85,7 +99,7 @@ class S3Storage:
         return await asyncio.to_thread(_get)
 
     async def head_object(self, key: str) -> bool:
-        client = _sync_client(self._settings)
+        client = _client_for_settings(self._settings)
         bucket = self._settings.s3_bucket
 
         def _head() -> bool:
