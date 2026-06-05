@@ -13,3 +13,4 @@ This directory records project decisions that are expensive to rediscover later.
 - [0007: Crawl, Artifacts, And Extraction](0007-crawl-artifacts-extraction.md)
 - [0008: Bulk Export Snapshots](0008-bulk-export-snapshots.md)
 - [0009: Docker Compose VPS Deployment](0009-docker-vps-deployment.md)
+- [0010: GitHub Publishing Workflow](0010-github-publishing-workflow.md)
