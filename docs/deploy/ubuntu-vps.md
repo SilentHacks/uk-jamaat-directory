@@ -145,9 +145,15 @@ Restore procedure: [restore.md](restore.md).
 
 Caddy in Compose is the default path. For nginx on the host instead:
 
-1. Publish the API on localhost only (custom compose override), or run nginx in Docker on the same network.
+1. Publish the API on localhost only with the bundled override:
+
+```bash
+docker compose -f docker-compose.vps.yml -f docker-compose.vps.nginx.yml up -d
+```
+
 2. Use [deploy/nginx/directory.conf](../../deploy/nginx/directory.conf) as a starting point.
 3. Obtain certificates with certbot before enabling HTTPS.
+4. Proxy `/exports/*` to MinIO separately (Caddy handles this automatically in the default stack).
 
 ## Scaling path
 
