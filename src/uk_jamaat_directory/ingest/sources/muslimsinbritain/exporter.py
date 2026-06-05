@@ -121,16 +121,37 @@ async def export_mib_bundle(
     return bundle, result
 
 
-async def fetch_mib_csv(*, source_url: str, settings: Settings | None = None) -> str:
+async def fetch_mib_csv(
+    *,
+    source_url: str,
+    settings: Settings | None = None,
+    attempts: int = 3,
+) -> str:
     cfg = settings or get_settings()
     headers = {"User-Agent": cfg.crawl_user_agent, "Accept": "text/csv,*/*"}
     timeout = httpx.Timeout(cfg.crawl_timeout_seconds)
+    last_error: Exception | None = None
     async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
-        response = await client.get(source_url)
-    if response.status_code >= 400:
-        msg = f"MiB CSV fetch failed (HTTP {response.status_code})"
-        raise RuntimeError(msg)
-    return response.text
+        for attempt in range(attempts):
+            try:
+                response = await client.get(source_url)
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt + 1 < attempts:
+                    await asyncio.sleep(1.0)
+                    continue
+                break
+            if response.status_code >= 500 and attempt + 1 < attempts:
+                await asyncio.sleep(1.0)
+                continue
+            if response.status_code >= 400:
+                msg = f"MiB CSV fetch failed (HTTP {response.status_code})"
+                raise RuntimeError(msg)
+            return response.text
+    msg = "MiB CSV fetch failed"
+    if last_error is not None:
+        raise RuntimeError(msg) from last_error
+    raise RuntimeError(msg)
 
 
 async def enrich_mib_details(
