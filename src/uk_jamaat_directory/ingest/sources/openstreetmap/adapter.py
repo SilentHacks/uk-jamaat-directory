@@ -10,6 +10,16 @@ from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBun
 MUSLIM_DENOMINATIONS = frozenset({"muslim", "sunni", "shia", "ahmadiyya"})
 
 
+def validate_osm_bundle(bundle: OsmImportBundle) -> OsmImportBundle:
+    places = [_place_from_dict(place.model_dump()) for place in bundle.places]
+    return OsmImportBundle(
+        format_version=bundle.format_version,
+        exported_at=bundle.exported_at,
+        attribution=bundle.attribution,
+        places=places,
+    )
+
+
 def parse_osm_file(path: Path) -> OsmImportBundle:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if "places" in payload:
@@ -28,13 +38,13 @@ def parse_osm_file(path: Path) -> OsmImportBundle:
 
 def _place_from_dict(data: dict[str, object]) -> OsmPlaceRecord:
     record = OsmPlaceRecord.model_validate(data)
-    if not _is_muslim_place(record):
+    if not is_muslim_place(record):
         msg = f"record {record.external_id} is not a Muslim place of worship"
         raise ValueError(msg)
     return record
 
 
-def _is_muslim_place(record: OsmPlaceRecord) -> bool:
+def is_muslim_place(record: OsmPlaceRecord) -> bool:
     religion = (record.religion or "").strip().lower()
     denomination = (record.denomination or "").strip().lower()
     if religion == "muslim":
