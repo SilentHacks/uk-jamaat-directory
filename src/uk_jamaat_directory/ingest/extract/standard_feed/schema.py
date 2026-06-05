@@ -5,7 +5,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field, field_validator
 
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.sources.mylocalmasjid.schema import PRAYER_ALIASES
+from uk_jamaat_directory.schedules.parse import parse_prayer
 
 
 class StandardFeedTimeRow(BaseModel):
@@ -24,11 +24,7 @@ class StandardFeedTimeRow(BaseModel):
         if not isinstance(value, str):
             msg = "prayer must be a string"
             raise TypeError(msg)
-        key = value.strip().lower()
-        if key not in PRAYER_ALIASES:
-            msg = f"unsupported prayer: {value}"
-            raise ValueError(msg)
-        return PRAYER_ALIASES[key]
+        return parse_prayer(value)
 
 
 class StandardFeedDocument(BaseModel):
