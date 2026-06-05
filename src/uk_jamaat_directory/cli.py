@@ -27,9 +27,11 @@ from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
 )
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.adapter import ImportFormat, parse_file
 from uk_jamaat_directory.ingest.sources.openstreetmap import (
+    export_osm_bundle,
     import_openstreetmap_bundle,
     parse_osm_file,
 )
+from uk_jamaat_directory.ingest.sources.openstreetmap.adapter import validate_osm_bundle
 from uk_jamaat_directory.models.core import MosqueSource, SourceArtifact
 from uk_jamaat_directory.schedules import (
     publish_candidates,
@@ -118,6 +120,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Parse and validate the file without writing to the database",
+    )
+
+    export_osm = subparsers.add_parser(
+        "export-osm",
+        help="Fetch GB Muslim places of worship from Overpass and write import-osm JSON",
+    )
+    export_osm.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="Path for the normalized OsmImportBundle JSON file",
+    )
+    export_osm.add_argument(
+        "--overpass-url",
+        default=None,
+        help="Override the Overpass interpreter URL from settings",
+    )
+    export_osm.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch and validate without writing the output file",
     )
 
     _add_schedule_candidate_parsers(subparsers)
@@ -345,6 +368,9 @@ def main() -> None:
     if args.command == "import-osm":
         raise SystemExit(asyncio.run(_run_import_osm(args, settings)))
 
+    if args.command == "export-osm":
+        raise SystemExit(asyncio.run(_run_export_osm(args, settings)))
+
     if args.command == "validate-candidates":
         raise SystemExit(asyncio.run(_run_validate_candidates(args, settings)))
 
@@ -559,6 +585,40 @@ async def _run_generate_exports(args: argparse.Namespace, settings: Settings) ->
         f"changes={result.change_count}, "
         f"checksum={result.checksum}"
     )
+    return 0
+
+
+def _format_skip_reasons(skip_reasons: dict[str, int] | object) -> str:
+    if not skip_reasons:
+        return ""
+    parts = [f"{reason}={count}" for reason, count in sorted(skip_reasons.items())]
+    return f" ({', '.join(parts)})"
+
+
+async def _run_export_osm(args: argparse.Namespace, settings: Settings) -> int:
+    try:
+        bundle, result = await export_osm_bundle(
+            None if args.dry_run else args.output,
+            overpass_url=args.overpass_url,
+            dry_run=args.dry_run,
+            settings=settings,
+        )
+    except (RuntimeError, ValueError) as exc:
+        print(f"OSM export failed: {exc}", file=sys.stderr)
+        return 1
+
+    validate_osm_bundle(bundle)
+    if not args.dry_run:
+        parse_osm_file(args.output)
+
+    skip_summary = _format_skip_reasons(result.skip_reasons)
+    print(
+        "OSM export complete: "
+        f"{result.places_written} places written, "
+        f"{result.places_skipped} skipped{skip_summary}"
+    )
+    if not args.dry_run and result.output_path is not None:
+        print(f"Wrote {result.output_path}")
     return 0
 
 
