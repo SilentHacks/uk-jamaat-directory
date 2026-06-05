@@ -43,10 +43,7 @@ def score_mosque_candidate(
 
     record_name = normalize_mosque_name(record.name)
     mosque_name = mosque.normalized_name
-    name_ratio = max(
-        fuzz.token_sort_ratio(record_name, mosque_name),
-        fuzz.token_set_ratio(record_name, mosque_name),
-    )
+    name_ratio = fuzz.token_sort_ratio(record_name, mosque_name)
     if name_ratio >= STRONG_NAME_RATIO:
         score += 0.30
         signals += 1
@@ -57,10 +54,7 @@ def score_mosque_candidate(
 
     if aliases:
         for alias_row in aliases:
-            alias_ratio = max(
-                fuzz.token_sort_ratio(record_name, alias_row.normalized_alias),
-                fuzz.token_set_ratio(record_name, alias_row.normalized_alias),
-            )
+            alias_ratio = fuzz.token_sort_ratio(record_name, alias_row.normalized_alias)
             if alias_ratio >= STRONG_NAME_RATIO:
                 score += 0.20
                 signals += 1
