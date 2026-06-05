@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     crawl_validate_after_extract: bool = True
     standard_feed_path: str = "/.well-known/uk-jamaat-directory.json"
 
+    export_base_url: str | None = None
+    export_s3_prefix: str = "exports"
+    export_enabled: bool = True
+
+    @property
+    def export_public_base_url(self) -> str:
+        return self.export_base_url or self.public_base_url
+
     @field_validator("api_prefix")
     @classmethod
     def api_prefix_must_start_with_slash(cls, value: str) -> str:
