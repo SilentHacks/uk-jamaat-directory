@@ -12,12 +12,22 @@ from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.domain import CandidateStatus
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
+    AdminBulkIdentityReviewAccept,
+    AdminBulkMosqueActivate,
     AdminCandidateActionResponse,
     AdminCandidateListResponse,
     AdminCandidateReject,
     AdminCoverageResponse,
     AdminDiscoveryLeadCreate,
     AdminDiscoveryLeadResponse,
+    AdminDuplicateBucket,
+    AdminIdentityActionResponse,
+    AdminIdentityOverlapItem,
+    AdminIdentityQualityResponse,
+    AdminIdentityReviewAction,
+    AdminIdentityReviewCandidate,
+    AdminIdentityReviewListResponse,
+    AdminIdentityReviewSummary,
     AdminMosqueCreate,
     AdminMosqueMerge,
     AdminMosqueResponse,
@@ -48,6 +58,49 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 
 class AdminHealthResponse(BaseModel):
     status: str
+
+
+def _identity_review_to_summary(
+    item: admin_identity.IdentityReviewItem,
+) -> AdminIdentityReviewSummary:
+    review = item.review
+    source = item.source
+    reasons = (review.reasons or {}).get("reasons") or []
+    return AdminIdentityReviewSummary(
+        review_id=review.id,
+        source_id=review.source_id,
+        source_type=source.source_type.value if source is not None else None,
+        external_id=source.external_id if source is not None else None,
+        display_name=source.display_name if source is not None else None,
+        source_url=source.source_url if source is not None else None,
+        decision=review.decision,
+        score=float(review.score) if review.score is not None else None,
+        reasons=[str(reason) for reason in reasons],
+        status=review.status,
+        candidates=[
+            AdminIdentityReviewCandidate(
+                mosque_id=candidate.mosque.id,
+                name=candidate.mosque.name,
+                status=candidate.mosque.status.value,
+                postcode=candidate.mosque.postcode,
+                city=candidate.mosque.city,
+                score=candidate.score,
+                reasons=candidate.reasons,
+            )
+            for candidate in item.candidates
+        ],
+    )
+
+
+def _bulk_identity_response(
+    result: admin_identity.BulkIdentityResult,
+) -> AdminIdentityActionResponse:
+    return AdminIdentityActionResponse(
+        changed=result.changed,
+        dry_run=result.dry_run,
+        review_ids=result.review_ids or [],
+        mosque_ids=result.mosque_ids or [],
+    )
 
 
 def _admin_http_error(exc: Exception) -> HTTPException:
@@ -157,6 +210,153 @@ async def merge_mosques(
         name=mosque.name,
         status=mosque.status.value,
     )
+
+
+@router.get("/identity-report", response_model=AdminIdentityQualityResponse)
+async def get_identity_report(
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityQualityResponse:
+    report = await admin_reporting.build_identity_quality_report(session)
+    return AdminIdentityQualityResponse(
+        generated_at=report.generated_at,
+        mosque_count=report.mosque_count,
+        active_mosque_count=report.active_mosque_count,
+        status_counts=report.status_counts,
+        source_count=report.source_count,
+        source_type_counts=report.source_type_counts,
+        policy_counts=report.policy_counts,
+        source_overlaps=[
+            AdminIdentityOverlapItem(
+                source_set=item.source_set,
+                mosque_count=item.mosque_count,
+            )
+            for item in report.source_overlaps
+        ],
+        linked_source_count=report.linked_source_count,
+        unlinked_source_count=report.unlinked_source_count,
+        pending_identity_reviews=report.pending_identity_reviews,
+        missing_postcode_count=report.missing_postcode_count,
+        missing_coordinates_count=report.missing_coordinates_count,
+        missing_website_count=report.missing_website_count,
+        active_missing_website_count=report.active_missing_website_count,
+        duplicate_candidate_count=report.duplicate_candidate_count,
+        duplicate_buckets=[
+            AdminDuplicateBucket(
+                normalized_name=item.normalized_name,
+                postcode=item.postcode,
+                mosque_count=item.mosque_count,
+                mosque_ids=item.mosque_ids,
+            )
+            for item in report.duplicate_buckets
+        ],
+    )
+
+
+@router.get("/identity-reviews", response_model=AdminIdentityReviewListResponse)
+async def list_identity_reviews(
+    status_filter: str = Query(default="pending", alias="status"),
+    source_type: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityReviewListResponse:
+    try:
+        result = await admin_identity.list_identity_reviews(
+            session,
+            status=status_filter,
+            source_type=source_type,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise _admin_http_error(exc) from exc
+    return AdminIdentityReviewListResponse(
+        items=[_identity_review_to_summary(item) for item in result.items],
+        count=result.total,
+        limit=result.limit,
+        offset=result.offset,
+    )
+
+
+@router.post("/identity-reviews/{review_id}/accept", response_model=AdminIdentityActionResponse)
+async def accept_identity_review(
+    review_id: uuid.UUID,
+    payload: AdminIdentityReviewAction,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityActionResponse:
+    try:
+        review = await admin_identity.accept_identity_review(
+            session,
+            review_id,
+            mosque_id=payload.mosque_id,
+            actor="admin_api",
+            reason=payload.reason,
+        )
+    except ValueError as exc:
+        raise _admin_http_error(exc) from exc
+    await session.commit()
+    return AdminIdentityActionResponse(
+        changed=1,
+        review_ids=[review.id],
+        mosque_ids=[review.proposed_mosque_id] if review.proposed_mosque_id else [],
+    )
+
+
+@router.post("/identity-reviews/{review_id}/reject", response_model=AdminIdentityActionResponse)
+async def reject_identity_review(
+    review_id: uuid.UUID,
+    payload: AdminIdentityReviewAction,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityActionResponse:
+    try:
+        review = await admin_identity.reject_identity_review(
+            session,
+            review_id,
+            actor="admin_api",
+            reason=payload.reason,
+        )
+    except ValueError as exc:
+        raise _admin_http_error(exc) from exc
+    await session.commit()
+    return AdminIdentityActionResponse(changed=1, review_ids=[review.id])
+
+
+@router.post("/identity-reviews/bulk-accept", response_model=AdminIdentityActionResponse)
+async def bulk_accept_identity_reviews(
+    payload: AdminBulkIdentityReviewAccept,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityActionResponse:
+    result = await admin_identity.bulk_accept_identity_reviews(
+        session,
+        min_score=payload.min_score,
+        limit=payload.limit,
+        dry_run=payload.dry_run,
+        actor="admin_api",
+    )
+    if not payload.dry_run:
+        await session.commit()
+    return _bulk_identity_response(result)
+
+
+@router.post("/identity/mosques/bulk-activate", response_model=AdminIdentityActionResponse)
+async def bulk_activate_reviewed_mosques(
+    payload: AdminBulkMosqueActivate,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminIdentityActionResponse:
+    try:
+        result = await admin_identity.bulk_activate_reviewed_mosques(
+            session,
+            source_type=payload.source_type,
+            require_public_source=payload.require_public_source,
+            limit=payload.limit,
+            dry_run=payload.dry_run,
+            actor="admin_api",
+        )
+    except ValueError as exc:
+        raise _admin_http_error(exc) from exc
+    if not payload.dry_run:
+        await session.commit()
+    return _bulk_identity_response(result)
 
 
 @router.post("/discovery-leads", response_model=AdminDiscoveryLeadResponse)
@@ -332,6 +532,11 @@ async def get_coverage(
         policy_counts=report.policy_counts,
         source_type_counts=report.source_type_counts,
         stale_source_count=report.stale_source_count,
+        pending_identity_reviews=report.pending_identity_reviews,
+        missing_postcode_count=report.missing_postcode_count,
+        missing_coordinates_count=report.missing_coordinates_count,
+        missing_website_count=report.missing_website_count,
+        duplicate_candidate_count=report.duplicate_candidate_count,
     )
 
 

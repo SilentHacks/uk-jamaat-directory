@@ -151,4 +151,3 @@ def _build_attribution(mosques: list[Mosque]) -> list[str]:
                     seen.add(stripped)
                     lines.append(stripped)
     return lines
-

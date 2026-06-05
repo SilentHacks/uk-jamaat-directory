@@ -56,6 +56,24 @@ class AdminMosqueMerge(BaseModel):
     reason: str | None = None
 
 
+class AdminIdentityReviewAction(BaseModel):
+    mosque_id: uuid.UUID | None = None
+    reason: str | None = None
+
+
+class AdminBulkIdentityReviewAccept(BaseModel):
+    min_score: float = Field(default=0.8, ge=0, le=1)
+    limit: int = Field(default=100, ge=1, le=1000)
+    dry_run: bool = False
+
+
+class AdminBulkMosqueActivate(BaseModel):
+    source_type: str | None = None
+    require_public_source: bool = True
+    limit: int = Field(default=1000, ge=1, le=5000)
+    dry_run: bool = False
+
+
 class AdminMosqueResponse(BaseModel):
     directory_mosque_id: uuid.UUID
     name: str
@@ -143,6 +161,76 @@ class AdminSourceResponse(BaseModel):
     confidence: str
 
 
+class AdminIdentityOverlapItem(BaseModel):
+    source_set: str
+    mosque_count: int
+
+
+class AdminIdentityReviewCandidate(BaseModel):
+    mosque_id: uuid.UUID
+    name: str
+    status: str
+    postcode: str | None
+    city: str | None
+    score: float
+    reasons: list[str]
+
+
+class AdminIdentityReviewSummary(BaseModel):
+    review_id: uuid.UUID
+    source_id: uuid.UUID | None
+    source_type: str | None
+    external_id: str | None
+    display_name: str | None
+    source_url: str | None
+    decision: str
+    score: float | None
+    reasons: list[str]
+    status: str
+    candidates: list[AdminIdentityReviewCandidate]
+
+
+class AdminIdentityReviewListResponse(BaseModel):
+    items: list[AdminIdentityReviewSummary]
+    count: int
+    limit: int
+    offset: int
+
+
+class AdminIdentityActionResponse(BaseModel):
+    changed: int
+    dry_run: bool = False
+    review_ids: list[uuid.UUID] = []
+    mosque_ids: list[uuid.UUID] = []
+
+
+class AdminDuplicateBucket(BaseModel):
+    normalized_name: str
+    postcode: str | None
+    mosque_count: int
+    mosque_ids: list[uuid.UUID]
+
+
+class AdminIdentityQualityResponse(BaseModel):
+    generated_at: datetime
+    mosque_count: int
+    active_mosque_count: int
+    status_counts: dict[str, int]
+    source_count: int
+    source_type_counts: dict[str, int]
+    policy_counts: dict[str, int]
+    source_overlaps: list[AdminIdentityOverlapItem]
+    linked_source_count: int
+    unlinked_source_count: int
+    pending_identity_reviews: int
+    missing_postcode_count: int
+    missing_coordinates_count: int
+    missing_website_count: int
+    active_missing_website_count: int
+    duplicate_candidate_count: int
+    duplicate_buckets: list[AdminDuplicateBucket]
+
+
 class AdminCoverageResponse(BaseModel):
     generated_at: datetime
     mosque_count: int
@@ -156,6 +244,11 @@ class AdminCoverageResponse(BaseModel):
     policy_counts: dict[str, int]
     source_type_counts: dict[str, int]
     stale_source_count: int
+    pending_identity_reviews: int = 0
+    missing_postcode_count: int = 0
+    missing_coordinates_count: int = 0
+    missing_website_count: int = 0
+    duplicate_candidate_count: int = 0
 
 
 class AdminSourceHealthItem(BaseModel):

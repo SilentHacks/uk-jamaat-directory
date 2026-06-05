@@ -20,7 +20,9 @@ from uk_jamaat_directory.models.core import Mosque, MosqueSource
 
 OSM_FIXTURE = Path(__file__).resolve().parents[1] / "data/fixtures/openstreetmap/sample_places.json"
 MLM_FIXTURE = Path(__file__).resolve().parents[1] / "data/fixtures/mylocalmasjid/sample_export.json"
-MIB_FIXTURE = Path(__file__).resolve().parents[1] / "data/fixtures/muslimsinbritain/sample_export.json"
+MIB_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "data/fixtures/muslimsinbritain/sample_export.json"
+)
 
 
 @pytest.mark.asyncio

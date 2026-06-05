@@ -317,6 +317,327 @@
         }
       }
     },
+    "/v1/admin/identity-report": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Identity Report",
+        "operationId": "get_identity_report_v1_admin_identity_report_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityQualityResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/identity-reviews": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Identity Reviews",
+        "operationId": "list_identity_reviews_v1_admin_identity_reviews_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityReviewListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/identity-reviews/{review_id}/accept": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Accept Identity Review",
+        "operationId": "accept_identity_review_v1_admin_identity_reviews__review_id__accept_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIdentityReviewAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/identity-reviews/{review_id}/reject": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Reject Identity Review",
+        "operationId": "reject_identity_review_v1_admin_identity_reviews__review_id__reject_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIdentityReviewAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/identity-reviews/bulk-accept": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Bulk Accept Identity Reviews",
+        "operationId": "bulk_accept_identity_reviews_v1_admin_identity_reviews_bulk_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBulkIdentityReviewAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/v1/admin/identity/mosques/bulk-activate": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Bulk Activate Reviewed Mosques",
+        "operationId": "bulk_activate_reviewed_mosques_v1_admin_identity_mosques_bulk_activate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBulkMosqueActivate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIdentityActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/v1/admin/discovery-leads": {
       "post": {
         "tags": [
@@ -1698,6 +2019,65 @@
         ],
         "title": "AdminAliasCreate"
       },
+      "AdminBulkIdentityReviewAccept": {
+        "properties": {
+          "min_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Score",
+            "default": 0.8
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 100
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AdminBulkIdentityReviewAccept"
+      },
+      "AdminBulkMosqueActivate": {
+        "properties": {
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "require_public_source": {
+            "type": "boolean",
+            "title": "Require Public Source",
+            "default": true
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 1000
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AdminBulkMosqueActivate"
+      },
       "AdminCandidateActionResponse": {
         "properties": {
           "candidate_id": {
@@ -1932,6 +2312,31 @@
           "stale_source_count": {
             "type": "integer",
             "title": "Stale Source Count"
+          },
+          "pending_identity_reviews": {
+            "type": "integer",
+            "title": "Pending Identity Reviews",
+            "default": 0
+          },
+          "missing_postcode_count": {
+            "type": "integer",
+            "title": "Missing Postcode Count",
+            "default": 0
+          },
+          "missing_coordinates_count": {
+            "type": "integer",
+            "title": "Missing Coordinates Count",
+            "default": 0
+          },
+          "missing_website_count": {
+            "type": "integer",
+            "title": "Missing Website Count",
+            "default": 0
+          },
+          "duplicate_candidate_count": {
+            "type": "integer",
+            "title": "Duplicate Candidate Count",
+            "default": 0
           }
         },
         "type": "object",
@@ -2011,6 +2416,45 @@
         ],
         "title": "AdminDiscoveryLeadResponse"
       },
+      "AdminDuplicateBucket": {
+        "properties": {
+          "normalized_name": {
+            "type": "string",
+            "title": "Normalized Name"
+          },
+          "postcode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postcode"
+          },
+          "mosque_count": {
+            "type": "integer",
+            "title": "Mosque Count"
+          },
+          "mosque_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Mosque Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "normalized_name",
+          "postcode",
+          "mosque_count",
+          "mosque_ids"
+        ],
+        "title": "AdminDuplicateBucket"
+      },
       "AdminHealthResponse": {
         "properties": {
           "status": {
@@ -2023,6 +2467,403 @@
           "status"
         ],
         "title": "AdminHealthResponse"
+      },
+      "AdminIdentityActionResponse": {
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "title": "Changed"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          },
+          "review_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Review Ids",
+            "default": []
+          },
+          "mosque_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Mosque Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed"
+        ],
+        "title": "AdminIdentityActionResponse"
+      },
+      "AdminIdentityOverlapItem": {
+        "properties": {
+          "source_set": {
+            "type": "string",
+            "title": "Source Set"
+          },
+          "mosque_count": {
+            "type": "integer",
+            "title": "Mosque Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_set",
+          "mosque_count"
+        ],
+        "title": "AdminIdentityOverlapItem"
+      },
+      "AdminIdentityQualityResponse": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "mosque_count": {
+            "type": "integer",
+            "title": "Mosque Count"
+          },
+          "active_mosque_count": {
+            "type": "integer",
+            "title": "Active Mosque Count"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count"
+          },
+          "source_type_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Source Type Counts"
+          },
+          "policy_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Policy Counts"
+          },
+          "source_overlaps": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIdentityOverlapItem"
+            },
+            "type": "array",
+            "title": "Source Overlaps"
+          },
+          "linked_source_count": {
+            "type": "integer",
+            "title": "Linked Source Count"
+          },
+          "unlinked_source_count": {
+            "type": "integer",
+            "title": "Unlinked Source Count"
+          },
+          "pending_identity_reviews": {
+            "type": "integer",
+            "title": "Pending Identity Reviews"
+          },
+          "missing_postcode_count": {
+            "type": "integer",
+            "title": "Missing Postcode Count"
+          },
+          "missing_coordinates_count": {
+            "type": "integer",
+            "title": "Missing Coordinates Count"
+          },
+          "missing_website_count": {
+            "type": "integer",
+            "title": "Missing Website Count"
+          },
+          "active_missing_website_count": {
+            "type": "integer",
+            "title": "Active Missing Website Count"
+          },
+          "duplicate_candidate_count": {
+            "type": "integer",
+            "title": "Duplicate Candidate Count"
+          },
+          "duplicate_buckets": {
+            "items": {
+              "$ref": "#/components/schemas/AdminDuplicateBucket"
+            },
+            "type": "array",
+            "title": "Duplicate Buckets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "mosque_count",
+          "active_mosque_count",
+          "status_counts",
+          "source_count",
+          "source_type_counts",
+          "policy_counts",
+          "source_overlaps",
+          "linked_source_count",
+          "unlinked_source_count",
+          "pending_identity_reviews",
+          "missing_postcode_count",
+          "missing_coordinates_count",
+          "missing_website_count",
+          "active_missing_website_count",
+          "duplicate_candidate_count",
+          "duplicate_buckets"
+        ],
+        "title": "AdminIdentityQualityResponse"
+      },
+      "AdminIdentityReviewAction": {
+        "properties": {
+          "mosque_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mosque Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "AdminIdentityReviewAction"
+      },
+      "AdminIdentityReviewCandidate": {
+        "properties": {
+          "mosque_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mosque Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "postcode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postcode"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mosque_id",
+          "name",
+          "status",
+          "postcode",
+          "city",
+          "score",
+          "reasons"
+        ],
+        "title": "AdminIdentityReviewCandidate"
+      },
+      "AdminIdentityReviewListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIdentityReviewSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "limit",
+          "offset"
+        ],
+        "title": "AdminIdentityReviewListResponse"
+      },
+      "AdminIdentityReviewSummary": {
+        "properties": {
+          "review_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Review Id"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIdentityReviewCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_id",
+          "source_id",
+          "source_type",
+          "external_id",
+          "display_name",
+          "source_url",
+          "decision",
+          "score",
+          "reasons",
+          "status",
+          "candidates"
+        ],
+        "title": "AdminIdentityReviewSummary"
       },
       "AdminMosqueCreate": {
         "properties": {

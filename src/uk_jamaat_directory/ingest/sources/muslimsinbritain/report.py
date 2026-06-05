@@ -86,15 +86,18 @@ async def build_coverage_report(session: AsyncSession) -> MibCoverageReport:
         if not mosque.postcode:
             report.missing_postcode.append(source.external_id)
 
-    report.pending_reviews = await session.scalar(
-        select(func.count())
-        .select_from(IdentityMatchReview)
-        .join(MosqueSource, IdentityMatchReview.source_id == MosqueSource.id)
-        .where(
-            MosqueSource.source_type == SourceType.MUSLIMSINBRITAIN,
-            IdentityMatchReview.status == "pending",
+    report.pending_reviews = (
+        await session.scalar(
+            select(func.count())
+            .select_from(IdentityMatchReview)
+            .join(MosqueSource, IdentityMatchReview.source_id == MosqueSource.id)
+            .where(
+                MosqueSource.source_type == SourceType.MUSLIMSINBRITAIN,
+                IdentityMatchReview.status == "pending",
+            )
         )
-    ) or 0
+        or 0
+    )
     return report
 
 

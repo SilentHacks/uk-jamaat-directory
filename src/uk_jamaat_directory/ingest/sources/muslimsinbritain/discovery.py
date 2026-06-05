@@ -42,8 +42,7 @@ def mib_record_to_discovery(
             "management": record.management,
             "phone": record.phone,
             "license_note": (
-                "MiB states material is drawn from the public domain; "
-                "policy remains explicit."
+                "MiB states material is drawn from the public domain; policy remains explicit."
             ),
         },
     )

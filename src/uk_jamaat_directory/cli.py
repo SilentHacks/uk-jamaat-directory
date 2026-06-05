@@ -48,6 +48,7 @@ from uk_jamaat_directory.schedules import (
     recompute_all_source_health,
     validate_candidates,
 )
+from uk_jamaat_directory.services import admin_identity, admin_reporting
 from uk_jamaat_directory.services.export_contracts import export_json_schemas, export_openapi
 
 
@@ -191,8 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     export_osm = subparsers.add_parser(
         "export-osm",
         help=(
-            "Fetch UK and Ireland Muslim places of worship from Overpass "
-            "and write import-osm JSON"
+            "Fetch UK and Ireland Muslim places of worship from Overpass and write import-osm JSON"
         ),
     )
     export_osm.add_argument(
@@ -213,6 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     _add_schedule_candidate_parsers(subparsers)
+    _add_identity_parsers(subparsers)
     _add_crawl_parsers(subparsers)
     _add_export_parsers(subparsers)
 
@@ -258,6 +259,64 @@ def _add_schedule_candidate_parsers(subparsers: argparse._SubParsersAction) -> N
     subparsers.add_parser(
         "recompute-freshness",
         help="Recompute source_health for all public-redistribution sources",
+    )
+
+
+def _add_identity_parsers(subparsers: argparse._SubParsersAction) -> None:
+    identity_report = subparsers.add_parser(
+        "identity-report",
+        help="Report identity quality, source overlap, review backlog, and missing fields",
+    )
+    identity_report.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of a human summary",
+    )
+
+    list_reviews = subparsers.add_parser(
+        "list-identity-reviews",
+        help="List pending identity match reviews with candidate mosques",
+    )
+    list_reviews.add_argument("--status", default="pending")
+    list_reviews.add_argument("--source-type", default=None)
+    list_reviews.add_argument("--limit", type=int, default=50)
+    list_reviews.add_argument("--offset", type=int, default=0)
+    list_reviews.add_argument("--json", action="store_true")
+
+    accept_review = subparsers.add_parser(
+        "accept-identity-review",
+        help="Link an identity review source to a selected canonical mosque",
+    )
+    accept_review.add_argument("--review-id", required=True, type=uuid.UUID)
+    accept_review.add_argument("--mosque-id", type=uuid.UUID, default=None)
+    accept_review.add_argument("--reason", default=None)
+
+    reject_review = subparsers.add_parser(
+        "reject-identity-review",
+        help="Reject a pending identity match review",
+    )
+    reject_review.add_argument("--review-id", required=True, type=uuid.UUID)
+    reject_review.add_argument("--reason", default=None)
+
+    bulk_accept = subparsers.add_parser(
+        "bulk-accept-identity-reviews",
+        help="Accept high-confidence identity reviews with exactly one candidate",
+    )
+    bulk_accept.add_argument("--min-score", type=float, default=0.8)
+    bulk_accept.add_argument("--limit", type=int, default=100)
+    bulk_accept.add_argument("--dry-run", action="store_true")
+
+    bulk_activate = subparsers.add_parser(
+        "activate-reviewed-mosques",
+        help="Mark reviewed needs_review mosques active for downstream crawl/public workflows",
+    )
+    bulk_activate.add_argument("--source-type", default=None)
+    bulk_activate.add_argument("--limit", type=int, default=1000)
+    bulk_activate.add_argument("--dry-run", action="store_true")
+    bulk_activate.add_argument(
+        "--include-private-sources",
+        action="store_true",
+        help="Allow activation of mosques that have no public-redistribution source",
     )
 
 
@@ -528,10 +587,7 @@ def main() -> None:
         raise SystemExit(asyncio.run(_run_export_mib(args, settings)))
 
     if args.command == "import-mib":
-        if (
-            settings.environment == Environment.PRODUCTION
-            and not settings.muslimsinbritain_enabled
-        ):
+        if settings.environment == Environment.PRODUCTION and not settings.muslimsinbritain_enabled:
             print(
                 "MuslimsInBritain import is disabled (muslimsinbritain_enabled=false).",
                 file=sys.stderr,
@@ -556,6 +612,24 @@ def main() -> None:
 
     if args.command == "recompute-freshness":
         raise SystemExit(asyncio.run(_run_recompute_freshness(settings)))
+
+    if args.command == "identity-report":
+        raise SystemExit(asyncio.run(_run_identity_report(args, settings)))
+
+    if args.command == "list-identity-reviews":
+        raise SystemExit(asyncio.run(_run_list_identity_reviews(args, settings)))
+
+    if args.command == "accept-identity-review":
+        raise SystemExit(asyncio.run(_run_accept_identity_review(args, settings)))
+
+    if args.command == "reject-identity-review":
+        raise SystemExit(asyncio.run(_run_reject_identity_review(args, settings)))
+
+    if args.command == "bulk-accept-identity-reviews":
+        raise SystemExit(asyncio.run(_run_bulk_accept_identity_reviews(args, settings)))
+
+    if args.command == "activate-reviewed-mosques":
+        raise SystemExit(asyncio.run(_run_activate_reviewed_mosques(args, settings)))
 
     if args.command == "register-crawl-sources":
         raise SystemExit(asyncio.run(_run_register_crawl_sources(settings)))
@@ -651,6 +725,200 @@ async def _run_register_crawl_sources(settings: Settings) -> int:
         f"skipped_mlm={result.skipped_mlm}, "
         f"skipped_no_domain={result.skipped_no_domain}"
     )
+    return 0
+
+
+async def _run_identity_report(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        report = await admin_reporting.build_identity_quality_report(session)
+
+    payload = {
+        "generated_at": report.generated_at.isoformat(),
+        "mosque_count": report.mosque_count,
+        "active_mosque_count": report.active_mosque_count,
+        "status_counts": report.status_counts,
+        "source_count": report.source_count,
+        "source_type_counts": report.source_type_counts,
+        "policy_counts": report.policy_counts,
+        "source_overlaps": [
+            {"source_set": item.source_set, "mosque_count": item.mosque_count}
+            for item in report.source_overlaps
+        ],
+        "linked_source_count": report.linked_source_count,
+        "unlinked_source_count": report.unlinked_source_count,
+        "pending_identity_reviews": report.pending_identity_reviews,
+        "missing_postcode_count": report.missing_postcode_count,
+        "missing_coordinates_count": report.missing_coordinates_count,
+        "missing_website_count": report.missing_website_count,
+        "active_missing_website_count": report.active_missing_website_count,
+        "duplicate_candidate_count": report.duplicate_candidate_count,
+        "duplicate_buckets": [
+            {
+                "normalized_name": item.normalized_name,
+                "postcode": item.postcode,
+                "mosque_count": item.mosque_count,
+                "mosque_ids": [str(mosque_id) for mosque_id in item.mosque_ids],
+            }
+            for item in report.duplicate_buckets
+        ],
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"Identity quality report ({report.generated_at.isoformat()})")
+    print(f"  Mosques: {report.mosque_count} active={report.active_mosque_count}")
+    print(f"  Statuses: {report.status_counts or '(none)'}")
+    print(
+        f"  Sources: {report.source_count} linked={report.linked_source_count} "
+        f"unlinked={report.unlinked_source_count}"
+    )
+    print(f"  Source types: {report.source_type_counts or '(none)'}")
+    print(f"  Source policies: {report.policy_counts or '(none)'}")
+    print(f"  Pending identity reviews: {report.pending_identity_reviews}")
+    print(
+        "  Missing fields: "
+        f"postcode={report.missing_postcode_count}, "
+        f"coordinates={report.missing_coordinates_count}, "
+        f"website={report.missing_website_count}, "
+        f"active_missing_website={report.active_missing_website_count}"
+    )
+    print(f"  Duplicate candidate mosques: {report.duplicate_candidate_count}")
+    print("  Source overlaps:")
+    for item in report.source_overlaps[:12]:
+        print(f"    - {item.source_set}: {item.mosque_count}")
+    if report.duplicate_buckets:
+        print("  Top duplicate buckets:")
+        for item in report.duplicate_buckets[:10]:
+            print(
+                f"    - {item.normalized_name} / {item.postcode or '(no postcode)'}: "
+                f"{item.mosque_count}"
+            )
+    return 0
+
+
+async def _run_list_identity_reviews(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        result = await admin_identity.list_identity_reviews(
+            session,
+            status=args.status,
+            source_type=args.source_type,
+            limit=args.limit,
+            offset=args.offset,
+        )
+
+    payload = [
+        {
+            "review_id": str(item.review.id),
+            "source_id": str(item.review.source_id) if item.review.source_id else None,
+            "source_type": item.source.source_type.value if item.source else None,
+            "external_id": item.source.external_id if item.source else None,
+            "display_name": item.source.display_name if item.source else None,
+            "score": float(item.review.score) if item.review.score is not None else None,
+            "reasons": list((item.review.reasons or {}).get("reasons") or []),
+            "candidates": [
+                {
+                    "mosque_id": str(candidate.mosque.id),
+                    "name": candidate.mosque.name,
+                    "status": candidate.mosque.status.value,
+                    "postcode": candidate.mosque.postcode,
+                    "city": candidate.mosque.city,
+                    "score": candidate.score,
+                    "reasons": candidate.reasons,
+                }
+                for candidate in item.candidates
+            ],
+        }
+        for item in result.items
+    ]
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "items": payload,
+                    "count": result.total,
+                    "limit": result.limit,
+                    "offset": result.offset,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    print(f"Identity reviews: {result.total} total, showing {len(result.items)}")
+    for item in payload:
+        print(
+            f"  {item['review_id']} {item['source_type']}:{item['external_id']} "
+            f"score={item['score']} {item['display_name']}"
+        )
+        for candidate in item["candidates"]:
+            print(
+                f"    - {candidate['mosque_id']} score={candidate['score']} "
+                f"{candidate['name']} ({candidate['postcode'] or 'no postcode'})"
+            )
+    return 0
+
+
+async def _run_accept_identity_review(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        review = await admin_identity.accept_identity_review(
+            session,
+            args.review_id,
+            mosque_id=args.mosque_id,
+            actor="cli",
+            reason=args.reason,
+        )
+        await session.commit()
+    print(f"Accepted identity review {review.id} -> mosque {review.proposed_mosque_id}")
+    return 0
+
+
+async def _run_reject_identity_review(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        review = await admin_identity.reject_identity_review(
+            session,
+            args.review_id,
+            actor="cli",
+            reason=args.reason,
+        )
+        await session.commit()
+    print(f"Rejected identity review {review.id}")
+    return 0
+
+
+async def _run_bulk_accept_identity_reviews(
+    args: argparse.Namespace,
+    settings: Settings,
+) -> int:
+    async with cli_db_session(settings) as session:
+        result = await admin_identity.bulk_accept_identity_reviews(
+            session,
+            min_score=args.min_score,
+            limit=args.limit,
+            dry_run=args.dry_run,
+            actor="cli",
+        )
+        if not args.dry_run:
+            await session.commit()
+    mode = "would accept" if result.dry_run else "accepted"
+    print(f"Bulk identity reviews: {mode} {result.changed}")
+    return 0
+
+
+async def _run_activate_reviewed_mosques(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        result = await admin_identity.bulk_activate_reviewed_mosques(
+            session,
+            source_type=args.source_type,
+            require_public_source=not args.include_private_sources,
+            limit=args.limit,
+            dry_run=args.dry_run,
+            actor="cli",
+        )
+        if not args.dry_run:
+            await session.commit()
+    mode = "would activate" if result.dry_run else "activated"
+    print(f"Reviewed mosques: {mode} {result.changed}")
     return 0
 
 
