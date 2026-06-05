@@ -119,9 +119,30 @@ async def _score_candidates(
     record_postcode = normalize_postcode(record.postcode)
     if record_postcode:
         compact = record_postcode.replace(" ", "")
-        stmt = stmt.where(
+        postcode_match = (
             func.upper(func.replace(func.coalesce(Mosque.postcode, ""), " ", "")) == compact
         )
+        no_postcode = (Mosque.postcode.is_(None)) | (Mosque.postcode == "")
+
+        fallback_conds = []
+        if record.city:
+            normalized_city = normalize_city(record.city)
+            if normalized_city:
+                fallback_conds.append(func.lower(Mosque.city) == normalized_city)
+        if record.latitude is not None and record.longitude is not None:
+            from geoalchemy2.functions import ST_DWithin
+
+            from uk_jamaat_directory.geo.search import point_wkt
+
+            origin = point_wkt(record.latitude, record.longitude)
+            fallback_conds.append(ST_DWithin(Mosque.location, origin, 1000.0))
+
+        if fallback_conds:
+            from sqlalchemy import or_
+
+            stmt = stmt.where(postcode_match | (no_postcode & or_(*fallback_conds)))
+        else:
+            stmt = stmt.where(postcode_match | no_postcode)
     elif record.city:
         normalized_city = normalize_city(record.city)
         if normalized_city:

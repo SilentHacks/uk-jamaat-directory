@@ -43,7 +43,10 @@ def score_mosque_candidate(
 
     record_name = normalize_mosque_name(record.name)
     mosque_name = mosque.normalized_name
-    name_ratio = fuzz.token_sort_ratio(record_name, mosque_name)
+    name_ratio = max(
+        fuzz.token_sort_ratio(record_name, mosque_name),
+        fuzz.token_set_ratio(record_name, mosque_name),
+    )
     if name_ratio >= STRONG_NAME_RATIO:
         score += 0.30
         signals += 1
@@ -54,7 +57,10 @@ def score_mosque_candidate(
 
     if aliases:
         for alias_row in aliases:
-            alias_ratio = fuzz.token_sort_ratio(record_name, alias_row.normalized_alias)
+            alias_ratio = max(
+                fuzz.token_sort_ratio(record_name, alias_row.normalized_alias),
+                fuzz.token_set_ratio(record_name, alias_row.normalized_alias),
+            )
             if alias_ratio >= STRONG_NAME_RATIO:
                 score += 0.20
                 signals += 1
@@ -127,6 +133,14 @@ def decide_match(
             decision=MatchDecision.NEEDS_REVIEW,
             score=best.score,
             reasons=["high_score_insufficient_signals", *best.reasons],
+            alternatives=ranked[:3],
+        )
+
+    if best.score >= 0.25:
+        return DiscoveryMatch(
+            decision=MatchDecision.NEEDS_REVIEW,
+            score=best.score,
+            reasons=["below_auto_link_threshold", *best.reasons],
             alternatives=ranked[:3],
         )
 
