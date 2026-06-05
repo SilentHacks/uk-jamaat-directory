@@ -26,7 +26,7 @@ Production needs a reproducible Ubuntu VPS path with TLS, private database/objec
 
 7. **Backup scripts** — daily Postgres `pg_dump` and MinIO volume archive via host cron; 14-day local retention by default; off-site copy is operator responsibility.
 
-8. **Deploy checklist** — `scripts/deploy/deploy.sh` and `docs/deploy/checklist.md` encode pull → backup → migrate → restart → smoke test.
+8. **Deploy checklist** — `scripts/deploy/deploy.sh` and `docs/deploy/checklist.md` encode pull → backup → build → migrate → restart → smoke test.
 
 ## Consequences
 

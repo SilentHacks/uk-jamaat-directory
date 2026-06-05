@@ -15,7 +15,11 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-echo "==> Deploy checklist: pull/build, backup, migrate, restart, smoke test"
+if [[ "$SKIP_BACKUP" == "1" || "$SKIP_MIGRATE" == "1" || "$SKIP_SMOKE" == "1" ]]; then
+  echo "WARNING: break-glass deploy skips enabled — SKIP_BACKUP=$SKIP_BACKUP SKIP_MIGRATE=$SKIP_MIGRATE SKIP_SMOKE=$SKIP_SMOKE" >&2
+fi
+
+echo "==> Deploy checklist: pull, backup, build, migrate, restart, smoke test"
 echo "    compose file: $COMPOSE_FILE"
 
 echo "==> Pull latest source (if using git on the server)"
@@ -25,8 +29,11 @@ else
   echo "    (not a git checkout — skipping pull)"
 fi
 
-echo "==> Build and start services"
-docker compose -f "$COMPOSE_FILE" up -d --build
+echo "==> Ensure data services are running"
+docker compose -f "$COMPOSE_FILE" up -d postgres redis minio
+
+echo "==> Stop application writers before backup/migrate"
+docker compose -f "$COMPOSE_FILE" stop api worker beat 2>/dev/null || true
 
 if [[ "$SKIP_BACKUP" != "1" ]]; then
   echo "==> Pre-deploy Postgres backup"
@@ -35,6 +42,9 @@ else
   echo "==> Skipping backup (SKIP_BACKUP=1)"
 fi
 
+echo "==> Build application images"
+docker compose -f "$COMPOSE_FILE" build api worker beat caddy
+
 if [[ "$SKIP_MIGRATE" != "1" ]]; then
   echo "==> Apply database migrations"
   "$ROOT_DIR/scripts/deploy/migrate.sh"
@@ -42,16 +52,22 @@ else
   echo "==> Skipping migrations (SKIP_MIGRATE=1)"
 fi
 
-echo "==> Restart application services"
-docker compose -f "$COMPOSE_FILE" up -d --build api worker beat caddy
+echo "==> Start application services"
+docker compose -f "$COMPOSE_FILE" up -d api worker beat caddy
 
 echo "==> Wait for API health"
+health_ok=0
 for _ in $(seq 1 30); do
   if docker compose -f "$COMPOSE_FILE" exec -T api curl -fsS http://localhost:8000/v1/health >/dev/null 2>&1; then
+    health_ok=1
     break
   fi
   sleep 2
 done
+if [[ "$health_ok" != "1" ]]; then
+  echo "error: API did not become healthy within 60s" >&2
+  exit 1
+fi
 
 if [[ "$SKIP_SMOKE" != "1" ]]; then
   echo "==> Public smoke test"
