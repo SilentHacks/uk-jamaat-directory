@@ -50,6 +50,17 @@ async def resolve_discovery_record(
         if is_public_source_policy(record.publication_policy):
             _apply_mosque_fields(mosque, record, only_empty=True)
             await _apply_newer_source_name(session, mosque, record, incoming_source_id=source.id)
+        await _accept_pending_reviews_for_source(
+            session,
+            source_id=source.id,
+            mosque_id=mosque.id,
+            record=record,
+            match=DiscoveryMatch(
+                decision=MatchDecision.AUTO_LINK,
+                mosque_id=mosque.id,
+                reasons=["existing_source_link"],
+            ),
+        )
         await session.flush()
         return ResolvedDiscovery(
             mosque=mosque,
@@ -75,7 +86,7 @@ async def resolve_discovery_record(
             await session.flush()
         else:
             _update_source(source, record)
-        await _create_match_review(session, record, match, source_id=source.id)
+        await _upsert_match_review(session, record, match, source_id=source.id)
         return ResolvedDiscovery(
             mosque=None,
             source=source,
@@ -116,6 +127,15 @@ async def resolve_discovery_record(
                 record,
                 incoming_source_id=source.id if source is not None else None,
             )
+
+    if outcome == ResolveOutcome.AUTO_LINK_MATCH:
+        await _accept_pending_reviews_for_source(
+            session,
+            source_id=source.id,
+            mosque_id=mosque.id,
+            record=record,
+            match=match,
+        )
 
     for alias in record.aliases:
         await _ensure_alias(session, mosque.id, alias, record.source_type)
@@ -386,30 +406,74 @@ async def _ensure_alias(
     )
 
 
-async def _create_match_review(
+async def _upsert_match_review(
     session: AsyncSession,
     record: DiscoveryRecord,
     match: DiscoveryMatch,
     *,
     source_id: uuid.UUID | None,
 ) -> None:
-    review = IdentityMatchReview(
-        id=uuid.uuid4(),
-        source_id=source_id,
-        proposed_mosque_id=match.mosque_id,
-        score=match.score,
-        decision=match.decision.value,
-        reasons={"reasons": match.reasons, "record_external_id": record.external_id},
-        alternatives={
-            "candidates": [
-                {
-                    "mosque_id": str(item.mosque_id),
-                    "score": item.score,
-                    "reasons": item.reasons,
-                }
-                for item in match.alternatives
-            ]
-        },
-        status="pending",
-    )
-    session.add(review)
+    review = None
+    if source_id is not None:
+        review = await session.scalar(
+            select(IdentityMatchReview).where(
+                IdentityMatchReview.source_id == source_id,
+                IdentityMatchReview.status == "pending",
+            )
+        )
+
+    if review is None:
+        review = IdentityMatchReview(
+            id=uuid.uuid4(),
+            source_id=source_id,
+            status="pending",
+        )
+        session.add(review)
+
+    _apply_review_match(review, record, match)
+
+
+async def _accept_pending_reviews_for_source(
+    session: AsyncSession,
+    *,
+    source_id: uuid.UUID,
+    mosque_id: uuid.UUID,
+    record: DiscoveryRecord,
+    match: DiscoveryMatch,
+) -> None:
+    reviews = (
+        await session.scalars(
+            select(IdentityMatchReview).where(
+                IdentityMatchReview.source_id == source_id,
+                IdentityMatchReview.status == "pending",
+            )
+        )
+    ).all()
+    for review in reviews:
+        _apply_review_match(review, record, match)
+        review.proposed_mosque_id = mosque_id
+        review.decision = MatchDecision.AUTO_LINK.value
+        review.status = "accepted"
+        review.reviewer = "resolver"
+        review.reviewed_at = datetime.now(UTC)
+
+
+def _apply_review_match(
+    review: IdentityMatchReview,
+    record: DiscoveryRecord,
+    match: DiscoveryMatch,
+) -> None:
+    review.proposed_mosque_id = match.mosque_id
+    review.score = match.score
+    review.decision = match.decision.value
+    review.reasons = {"reasons": match.reasons, "record_external_id": record.external_id}
+    review.alternatives = {
+        "candidates": [
+            {
+                "mosque_id": str(item.mosque_id),
+                "score": item.score,
+                "reasons": item.reasons,
+            }
+            for item in match.alternatives
+        ]
+    }

@@ -22,7 +22,7 @@ from uk_jamaat_directory.ingest.sources.openstreetmap import (
     parse_osm_file,
 )
 from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBundle, OsmPlaceRecord
-from uk_jamaat_directory.models.core import Mosque, MosqueSource
+from uk_jamaat_directory.models.core import IdentityMatchReview, Mosque, MosqueSource
 
 OSM_FIXTURE = Path(__file__).resolve().parents[1] / "data/fixtures/openstreetmap/sample_places.json"
 MLM_FIXTURE = Path(__file__).resolve().parents[1] / "data/fixtures/mylocalmasjid/sample_export.json"
@@ -184,6 +184,122 @@ async def test_precise_close_geo_match_links_despite_postcode_and_name_mismatch(
     )
     assert osm_source is not None and mib_source is not None
     assert mib_source.mosque_id == osm_source.mosque_id
+
+
+@pytest.mark.asyncio
+async def test_reimport_auto_link_accepts_existing_pending_identity_review(
+    db_session: AsyncSession,
+) -> None:
+    osm_bundle = OsmImportBundle(
+        exported_at=datetime.fromisoformat("2026-01-01T00:00:00+00:00"),
+        places=[
+            OsmPlaceRecord(
+                osm_type="node",
+                osm_id=44,
+                name="Canonical Masjid",
+                city="London",
+                postcode="E2 1AA",
+                latitude=51.5308,
+                longitude=-0.0714,
+                religion="muslim",
+            )
+        ],
+    )
+    await import_openstreetmap_bundle(db_session, osm_bundle)
+    await db_session.commit()
+
+    first_mib_bundle = MibImportBundle(
+        exported_at=datetime.fromisoformat("2026-01-02T00:00:00+00:00"),
+        mosques=[
+            MibMosqueRecord(
+                external_id="mib-review-then-link",
+                name="Ambiguous Community Hall",
+                city="London",
+                postcode="E9 9ZZ",
+                country="GB",
+                latitude=51.5308,
+                longitude=-0.0714,
+                record_class="uncertain",
+                usage="irregular",
+                location_precision="approximate",
+                metadata_confidence="low",
+            )
+        ],
+    )
+    first_result = await import_muslimsinbritain_bundle(
+        db_session,
+        first_mib_bundle,
+        publication_policy=SourcePublicationPolicy.UNKNOWN,
+    )
+    await db_session.commit()
+    assert first_result.reviews_created == 1
+
+    source = await db_session.scalar(
+        select(MosqueSource).where(
+            MosqueSource.source_type == SourceType.MUSLIMSINBRITAIN,
+            MosqueSource.external_id == "mib-review-then-link",
+        )
+    )
+    assert source is not None
+    assert source.mosque_id is None
+
+    pending_count = await db_session.scalar(
+        select(func.count())
+        .select_from(IdentityMatchReview)
+        .where(
+            IdentityMatchReview.source_id == source.id,
+            IdentityMatchReview.status == "pending",
+        )
+    )
+    assert pending_count == 1
+
+    second_mib_bundle = MibImportBundle(
+        exported_at=datetime.fromisoformat("2026-01-03T00:00:00+00:00"),
+        mosques=[
+            MibMosqueRecord(
+                external_id="mib-review-then-link",
+                name="Ambiguous Community Hall",
+                city="London",
+                postcode="E9 9ZZ",
+                country="GB",
+                latitude=51.5308,
+                longitude=-0.0714,
+                record_class="mosque",
+                usage="full_time",
+                location_precision="precise",
+                metadata_confidence="high",
+            )
+        ],
+    )
+    second_result = await import_muslimsinbritain_bundle(
+        db_session,
+        second_mib_bundle,
+        publication_policy=SourcePublicationPolicy.UNKNOWN,
+    )
+    await db_session.commit()
+    assert second_result.mosques_linked == 1
+
+    await db_session.refresh(source)
+    assert source.mosque_id is not None
+
+    pending_count = await db_session.scalar(
+        select(func.count())
+        .select_from(IdentityMatchReview)
+        .where(
+            IdentityMatchReview.source_id == source.id,
+            IdentityMatchReview.status == "pending",
+        )
+    )
+    accepted_count = await db_session.scalar(
+        select(func.count())
+        .select_from(IdentityMatchReview)
+        .where(
+            IdentityMatchReview.source_id == source.id,
+            IdentityMatchReview.status == "accepted",
+        )
+    )
+    assert pending_count == 0
+    assert accepted_count == 1
 
 
 @pytest.mark.asyncio
