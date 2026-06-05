@@ -31,6 +31,7 @@ data/private/
 minio-data/
 postgres-data/
 redis-data/
+backups/
 
 # Node/frontend, if added later
 node_modules/
