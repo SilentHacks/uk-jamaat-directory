@@ -122,6 +122,7 @@ services:
     environment:
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
+      S3_BUCKET: ${S3_BUCKET}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

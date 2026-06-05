@@ -50,7 +50,8 @@ Edit `.env` and set at minimum:
 - `ADMIN_API_KEY` — strong random secret
 - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — MinIO credentials
 - `ALLOWED_HOSTS` — same as `PUBLIC_DOMAIN`
-- `EXPORT_BASE_URL` — public URL for export objects (CDN or bucket URL)
+- `EXPORT_BASE_URL` — public origin for export URLs (`https://<PUBLIC_DOMAIN>` when Caddy serves `/exports/*` from MinIO; use your CDN/R2/S3 base when external)
+- `EXPORT_ENABLED` — leave `false` until export serving is configured; set `true` after verifying `/exports/*` is reachable (or external object storage is wired)
 
 Ensure `DATABASE_URL` uses the same `POSTGRES_PASSWORD` and the `postgres` hostname (not `localhost`).
 
@@ -94,7 +95,7 @@ Internet
 - **postgres** — PostGIS; data in named volume `postgres_data`
 - **redis** — Celery broker; named volume `redis_data`
 - **minio** — S3-compatible object storage for artifacts and exports; named volume `minio_data`
-- **caddy** — TLS termination and reverse proxy
+- **caddy** — TLS termination, `/exports/*` → MinIO, and API reverse proxy
 
 Local development continues to use `docker-compose.yml` (reload, host port 8000, Postgres on 54324).
 

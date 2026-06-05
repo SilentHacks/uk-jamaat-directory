@@ -11,6 +11,12 @@
 {$PUBLIC_DOMAIN} {
 	encode gzip
 
+	# Public bulk export objects (MinIO path-style: /{bucket}/exports/...)
+	handle_path /exports/* {
+		rewrite * /{$S3_BUCKET}/exports{path}
+		reverse_proxy minio:9000
+	}
+
 	reverse_proxy api:8000 {
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-Host {host}
