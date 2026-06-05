@@ -36,6 +36,8 @@ def mib_record_to_discovery(
             "usage": record.usage,
             "capacity": record.capacity,
             "women_facilities": record.women_facilities,
+            "latitude": record.latitude,
+            "longitude": record.longitude,
             "location_precision": record.location_precision,
             "metadata_confidence": record.metadata_confidence,
             "theme": record.theme,

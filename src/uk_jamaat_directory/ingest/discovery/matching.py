@@ -4,6 +4,7 @@ import math
 
 from geoalchemy2.shape import to_shape
 from rapidfuzz import fuzz
+from shapely.geometry import Point
 
 from uk_jamaat_directory.ingest.discovery.records import (
     DiscoveryMatch,
@@ -21,7 +22,9 @@ from uk_jamaat_directory.models.core import Mosque, MosqueAlias
 
 AUTO_LINK_THRESHOLD = 0.75
 STRONG_NAME_RATIO = 92
+GEO_IDENTITY_METERS = 25
 NEARBY_METERS = 150
+GEO_CANDIDATE_METERS = 500
 
 
 def score_mosque_candidate(
@@ -74,12 +77,16 @@ def score_mosque_candidate(
         score += 0.10
         reasons.append("city_match")
 
-    lat, lon = _mosque_coordinates(mosque)
-    distance_m = _distance_meters(record.latitude, record.longitude, lat, lon)
-    if distance_m is not None and distance_m <= NEARBY_METERS:
-        score += 0.30
-        signals += 1
-        reasons.append(f"distance_{int(distance_m)}m")
+    lat, lon = mosque_coordinates(mosque)
+    distance_m = distance_meters(record.latitude, record.longitude, lat, lon)
+    geo_score, geo_signals, geo_reasons = _geo_score(
+        distance_m,
+        allow_identity=_allows_geo_identity(record),
+    )
+    if geo_score:
+        score += geo_score
+        signals += geo_signals
+        reasons.extend(geo_reasons)
 
     if score < 0.25:
         return None
@@ -161,7 +168,7 @@ def _fuzzy_ratio_from_reason(reason: str) -> int | None:
 def _count_strong_signals(reasons: list[str]) -> int:
     count = 0
     for reason in reasons:
-        if reason.startswith(("postcode_", "distance_")):
+        if reason.startswith(("postcode_", "distance_", "geo_identity_")):
             count += 1
         elif reason.startswith("domain_"):
             count += 1
@@ -174,7 +181,7 @@ def _count_strong_signals(reasons: list[str]) -> int:
 
 def _has_identity_signal(reasons: list[str]) -> bool:
     for reason in reasons:
-        if reason.startswith("domain_"):
+        if reason.startswith(("domain_", "geo_identity_")):
             return True
         ratio = _fuzzy_ratio_from_reason(reason)
         if ratio is not None and ratio >= STRONG_NAME_RATIO:
@@ -182,13 +189,69 @@ def _has_identity_signal(reasons: list[str]) -> bool:
     return False
 
 
-def _distance_meters(
+def _geo_score(
+    distance_m: float | None,
+    *,
+    allow_identity: bool,
+) -> tuple[float, int, list[str]]:
+    if distance_m is None:
+        return 0.0, 0, []
+
+    rounded = int(round(distance_m))
+    if distance_m <= GEO_IDENTITY_METERS:
+        if allow_identity:
+            return 0.75, 2, [f"distance_{rounded}m", f"geo_identity_{GEO_IDENTITY_METERS}m"]
+        return 0.25, 1, [f"distance_{rounded}m"]
+    if distance_m <= 50:
+        if allow_identity:
+            return 0.45, 1, [f"distance_{rounded}m"]
+        return 0.20, 0, [f"distance_{rounded}m"]
+    if distance_m <= 100:
+        if allow_identity:
+            return 0.35, 1, [f"distance_{rounded}m"]
+        return 0.20, 0, [f"distance_{rounded}m"]
+    if distance_m <= NEARBY_METERS:
+        if allow_identity:
+            return 0.25, 1, [f"distance_{rounded}m"]
+        return 0.15, 0, [f"distance_{rounded}m"]
+    if distance_m <= GEO_CANDIDATE_METERS:
+        if allow_identity:
+            return 0.15, 0, [f"distance_{rounded}m"]
+        return 0.10, 0, [f"distance_{rounded}m"]
+    return 0.0, 0, []
+
+
+def _allows_geo_identity(record: DiscoveryRecord) -> bool:
+    precision = _metadata_value(record, "location_precision")
+    if precision in {"approximate", "unknown"}:
+        return False
+
+    metadata_confidence = _metadata_value(record, "metadata_confidence")
+    if metadata_confidence == "low":
+        return False
+
+    record_class = _metadata_value(record, "record_class")
+    if record_class in {"defunct", "uncertain", "multi_faith", "other"}:
+        return False
+
+    return True
+
+
+def _metadata_value(record: DiscoveryRecord, key: str) -> str | None:
+    value = record.metadata.get(key)
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    return text or None
+
+
+def distance_meters(
     lat1: float | None,
     lon1: float | None,
     lat2: float | None,
     lon2: float | None,
 ) -> float | None:
-    if None in (lat1, lon1, lat2, lon2):
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
         return None
     radius_m = 6_371_000
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -198,11 +261,13 @@ def _distance_meters(
     return radius_m * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _mosque_coordinates(mosque: Mosque) -> tuple[float | None, float | None]:
+def mosque_coordinates(mosque: Mosque) -> tuple[float | None, float | None]:
     if mosque.location is None:
         return None, None
     try:
         shape = to_shape(mosque.location)
-        return shape.y, shape.x
+        if isinstance(shape, Point):
+            return shape.y, shape.x
     except Exception:  # noqa: BLE001
         return None, None
+    return None, None

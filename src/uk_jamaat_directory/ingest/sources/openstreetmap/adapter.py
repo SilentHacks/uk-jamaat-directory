@@ -78,6 +78,9 @@ def osm_to_discovery_record(record: OsmPlaceRecord) -> DiscoveryRecord:
             "osm_id": record.osm_id,
             "religion": record.religion,
             "denomination": record.denomination,
+            "latitude": record.latitude,
+            "longitude": record.longitude,
+            "location_precision": "osm_geometry",
             "license": "ODbL-1.0",
         },
     )

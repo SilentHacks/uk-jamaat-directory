@@ -3,13 +3,19 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from uk_jamaat_directory.domain import MosqueStatus, SourceType
 from uk_jamaat_directory.geo.location import set_mosque_point
-from uk_jamaat_directory.ingest.discovery.matching import decide_match, score_mosque_candidate
+from uk_jamaat_directory.ingest.discovery.matching import (
+    GEO_CANDIDATE_METERS,
+    decide_match,
+    distance_meters,
+    mosque_coordinates,
+    score_mosque_candidate,
+)
 from uk_jamaat_directory.ingest.discovery.records import (
     DiscoveryMatch,
     DiscoveryRecord,
@@ -43,6 +49,7 @@ async def resolve_discovery_record(
         _update_source(source, record)
         if is_public_source_policy(record.publication_policy):
             _apply_mosque_fields(mosque, record, only_empty=True)
+            await _apply_newer_source_name(session, mosque, record, incoming_source_id=source.id)
         await session.flush()
         return ResolvedDiscovery(
             mosque=mosque,
@@ -100,7 +107,15 @@ async def resolve_discovery_record(
         _update_source(source, record)
 
     if is_public_source_policy(record.publication_policy):
-        _apply_mosque_fields(mosque, record, only_empty=outcome == ResolveOutcome.AUTO_LINK_MATCH)
+        only_empty = outcome == ResolveOutcome.AUTO_LINK_MATCH
+        _apply_mosque_fields(mosque, record, only_empty=only_empty)
+        if only_empty:
+            await _apply_newer_source_name(
+                session,
+                mosque,
+                record,
+                incoming_source_id=source.id if source is not None else None,
+            )
 
     for alias in record.aliases:
         await _ensure_alias(session, mosque.id, alias, record.source_type)
@@ -116,39 +131,30 @@ async def _score_candidates(
     stmt = select(Mosque).options(selectinload(Mosque.aliases))
     if record.country:
         stmt = stmt.where(Mosque.country == record.country)
+
+    candidate_filters = []
     record_postcode = normalize_postcode(record.postcode)
     if record_postcode:
         compact = record_postcode.replace(" ", "")
-        postcode_match = (
+        candidate_filters.append(
             func.upper(func.replace(func.coalesce(Mosque.postcode, ""), " ", "")) == compact
         )
-        no_postcode = (Mosque.postcode.is_(None)) | (Mosque.postcode == "")
 
-        fallback_conds = []
-        if record.city:
-            normalized_city = normalize_city(record.city)
-            if normalized_city:
-                fallback_conds.append(func.lower(Mosque.city) == normalized_city)
-        if record.latitude is not None and record.longitude is not None:
-            from geoalchemy2.functions import ST_DWithin
-
-            from uk_jamaat_directory.geo.search import point_wkt
-
-            origin = point_wkt(record.latitude, record.longitude)
-            fallback_conds.append(ST_DWithin(Mosque.location, origin, 1000.0))
-
-        if fallback_conds:
-            from sqlalchemy import or_
-
-            stmt = stmt.where(postcode_match | (no_postcode & or_(*fallback_conds)))
-        else:
-            stmt = stmt.where(postcode_match | no_postcode)
-    elif record.city:
+    if record.city:
         normalized_city = normalize_city(record.city)
         if normalized_city:
-            stmt = stmt.where(func.lower(Mosque.city) == normalized_city)
-        else:
-            stmt = stmt.limit(500)
+            candidate_filters.append(func.lower(Mosque.city) == normalized_city)
+
+    if record.latitude is not None and record.longitude is not None:
+        from geoalchemy2.functions import ST_DWithin
+
+        from uk_jamaat_directory.geo.search import point_wkt
+
+        origin = point_wkt(record.latitude, record.longitude)
+        candidate_filters.append(ST_DWithin(Mosque.location, origin, float(GEO_CANDIDATE_METERS)))
+
+    if candidate_filters:
+        stmt = stmt.where(or_(*candidate_filters))
     else:
         stmt = stmt.limit(500)
 
@@ -167,10 +173,19 @@ async def _score_candidates(
 def _is_plausible_candidate(record: DiscoveryRecord, mosque: Mosque) -> bool:
     if record.country and mosque.country and record.country != mosque.country:
         return False
+
     record_postcode = normalize_postcode(record.postcode)
     mosque_postcode = normalize_postcode(mosque.postcode)
+    if record_postcode and mosque_postcode and record_postcode == mosque_postcode:
+        return True
+
+    distance_m = distance_meters(record.latitude, record.longitude, *mosque_coordinates(mosque))
+    if distance_m is not None and distance_m <= GEO_CANDIDATE_METERS:
+        return True
+
     if record_postcode and mosque_postcode:
-        return record_postcode == mosque_postcode
+        return False
+
     record_city = normalize_city(record.city)
     mosque_city = normalize_city(mosque.city)
     if record_city and mosque_city:
@@ -233,6 +248,87 @@ def _new_mosque(record: DiscoveryRecord) -> Mosque:
     )
     set_mosque_point(mosque, record.latitude, record.longitude)
     return mosque
+
+
+async def _apply_newer_source_name(
+    session: AsyncSession,
+    mosque: Mosque,
+    record: DiscoveryRecord,
+    *,
+    incoming_source_id: uuid.UUID | None,
+) -> None:
+    record_date = _source_record_datetime(record.metadata)
+    if record_date is None or normalize_mosque_name(mosque.name) == normalize_mosque_name(
+        record.name
+    ):
+        return
+
+    latest_existing_date = await _latest_linked_source_record_datetime(
+        session,
+        mosque.id,
+        exclude_source_id=incoming_source_id,
+    )
+    if latest_existing_date is None or record_date > latest_existing_date:
+        mosque.name = record.name
+        mosque.normalized_name = normalize_mosque_name(record.name)
+
+
+async def _latest_linked_source_record_datetime(
+    session: AsyncSession,
+    mosque_id: uuid.UUID,
+    *,
+    exclude_source_id: uuid.UUID | None,
+) -> datetime | None:
+    stmt = select(MosqueSource).where(MosqueSource.mosque_id == mosque_id)
+    if exclude_source_id is not None:
+        stmt = stmt.where(MosqueSource.id != exclude_source_id)
+    sources = (await session.scalars(stmt)).all()
+    dates = [
+        parsed
+        for source in sources
+        if (parsed := _source_record_datetime(source.metadata_)) is not None
+    ]
+    if not dates:
+        return None
+    return max(dates)
+
+
+_SOURCE_RECORD_DATE_KEYS = (
+    "source_record_updated_at",
+    "source_record_created_at",
+    "source_exported_at",
+    "updated_at",
+    "last_updated",
+    "modified_at",
+    "date_added",
+    "created_at",
+)
+
+
+def _source_record_datetime(metadata: dict[str, object]) -> datetime | None:
+    for key in _SOURCE_RECORD_DATE_KEYS:
+        raw = metadata.get(key)
+        if raw is None:
+            continue
+        parsed = _parse_datetime(raw)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _parse_datetime(raw: object) -> datetime | None:
+    if isinstance(raw, datetime):
+        parsed = raw
+    elif isinstance(raw, str):
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _apply_mosque_fields(

@@ -60,7 +60,7 @@ def test_name_only_match_is_not_auto_linked() -> None:
     assert match.decision in {MatchDecision.NEEDS_REVIEW, MatchDecision.CREATE_NEEDS_REVIEW}
 
 
-def test_geo_only_match_needs_review_not_auto_link() -> None:
+def test_very_close_geo_only_unique_match_can_auto_link() -> None:
     record = DiscoveryRecord(
         source_type=SourceType.OPENSTREETMAP,
         external_id="node/99",
@@ -75,12 +75,69 @@ def test_geo_only_match_needs_review_not_auto_link() -> None:
         _mosque(
             name="Central Masjid",
             normalized_name="central masjid",
+            postcode="E2 9ZZ",
             website_url=None,
             location=WKTElement("POINT(-0.0714 51.5308)", srid=4326),
         ),
     )
     assert scored is not None
     assert scored.score >= 0.75
+    assert "geo_identity_25m" in scored.reasons
+    match = decide_match(record, [scored])
+    assert match.decision == MatchDecision.AUTO_LINK
+
+
+def test_approximate_uncertain_geo_only_match_needs_review() -> None:
+    record = DiscoveryRecord(
+        source_type=SourceType.MUSLIMSINBRITAIN,
+        external_id="mib-uncertain",
+        name="Riverside Community Hall",
+        postcode="E2 1AA",
+        city="London",
+        latitude=51.5308,
+        longitude=-0.0714,
+        metadata={
+            "record_class": "uncertain",
+            "location_precision": "approximate",
+            "metadata_confidence": "low",
+        },
+    )
+    scored = score_mosque_candidate(
+        record,
+        _mosque(
+            name="Central Masjid",
+            normalized_name="central masjid",
+            website_url=None,
+            location=WKTElement("POINT(-0.0714 51.5308)", srid=4326),
+        ),
+    )
+    assert scored is not None
+    assert "geo_identity_25m" not in scored.reasons
+    match = decide_match(record, [scored])
+    assert match.decision == MatchDecision.NEEDS_REVIEW
+
+
+def test_nearby_geo_with_postcode_match_needs_review_when_name_differs() -> None:
+    record = DiscoveryRecord(
+        source_type=SourceType.OPENSTREETMAP,
+        external_id="node/100",
+        name="Riverside Community Centre",
+        postcode="E2 1AA",
+        city="London",
+        latitude=51.5308,
+        longitude=-0.0714,
+    )
+    scored = score_mosque_candidate(
+        record,
+        _mosque(
+            name="Central Masjid",
+            normalized_name="central masjid",
+            website_url=None,
+            location=WKTElement("POINT(-0.0708 51.5308)", srid=4326),
+        ),
+    )
+    assert scored is not None
+    assert 0.75 <= scored.score < 1.0
     match = decide_match(record, [scored])
     assert match.decision == MatchDecision.NEEDS_REVIEW
     assert "high_score_insufficient_signals" in match.reasons[0]

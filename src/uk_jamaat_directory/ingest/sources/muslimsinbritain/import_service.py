@@ -42,6 +42,8 @@ async def import_muslimsinbritain_bundle(
                     record,
                     publication_policy=publication_policy,
                 )
+                if bundle.exported_at is not None:
+                    discovery.metadata["source_exported_at"] = bundle.exported_at.isoformat()
                 resolved = await resolve_discovery_record(session, discovery)
                 _record_result(result, resolved)
         except (ValueError, SQLAlchemyError) as exc:

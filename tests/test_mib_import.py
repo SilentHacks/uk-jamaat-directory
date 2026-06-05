@@ -39,6 +39,11 @@ async def test_import_mib_creates_private_sources(db_session: AsyncSession) -> N
     assert {source.publication_policy for source in sources} == {SourcePublicationPolicy.UNKNOWN}
     assert {source.metadata_["country"] for source in sources} == {"GB", "IE"}
 
+    first_source = next(source for source in sources if source.external_id == "mib-synth-001")
+    assert first_source.metadata_["latitude"] == 51.5308
+    assert first_source.metadata_["longitude"] == -0.0714
+    assert first_source.metadata_["source_exported_at"] == "2026-06-05T10:00:00+00:00"
+
 
 @pytest.mark.asyncio
 async def test_mib_unknown_policy_does_not_overwrite_existing_public_fields(

@@ -34,6 +34,8 @@ async def import_openstreetmap_bundle(
         try:
             async with session.begin_nested():
                 discovery = osm_to_discovery_record(place)
+                if bundle.exported_at is not None:
+                    discovery.metadata["source_exported_at"] = bundle.exported_at.isoformat()
                 resolved = await resolve_discovery_record(session, discovery)
                 _record_result(result, resolved)
         except (ValueError, SQLAlchemyError) as exc:
