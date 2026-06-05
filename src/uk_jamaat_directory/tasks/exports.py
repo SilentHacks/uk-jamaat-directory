@@ -15,6 +15,8 @@ async def _generate_latest_exports_async() -> dict[str, object]:
 
     async with cli_db_session(settings) as session:
         result = await generate_dataset_exports(session, settings=settings)
+        if result.errors:
+            raise RuntimeError("; ".join(result.errors))
         await session.commit()
 
     return {
@@ -24,7 +26,6 @@ async def _generate_latest_exports_async() -> dict[str, object]:
         "occurrence_count": result.occurrence_count,
         "change_count": result.change_count,
         "checksum": result.checksum,
-        "errors": result.errors,
     }
 
 

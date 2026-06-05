@@ -77,7 +77,7 @@ class Settings(BaseSettings):
 
     export_base_url: str | None = None
     export_s3_prefix: str = "exports"
-    export_enabled: bool = True
+    export_enabled: bool = False
 
     @property
     def export_public_base_url(self) -> str:
