@@ -14,6 +14,11 @@ from uk_jamaat_directory import __version__
 from uk_jamaat_directory.config import Environment, Settings, get_settings
 from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.db.session import create_engine
+from uk_jamaat_directory.ingest.crawl.pipeline import process_source
+from uk_jamaat_directory.ingest.crawl.register import ensure_standard_feed_sources
+from uk_jamaat_directory.ingest.extract.runner import run_extraction
+from uk_jamaat_directory.ingest.extract.standard_feed import extract_standard_feed
+from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
 from uk_jamaat_directory.ingest.sources.mylocalmasjid import (
     build_coverage_report,
@@ -24,6 +29,7 @@ from uk_jamaat_directory.ingest.sources.openstreetmap import (
     import_openstreetmap_bundle,
     parse_osm_file,
 )
+from uk_jamaat_directory.models.core import MosqueSource, SourceArtifact
 from uk_jamaat_directory.schedules import (
     publish_candidates,
     recompute_all_source_health,
@@ -114,6 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     _add_schedule_candidate_parsers(subparsers)
+    _add_crawl_parsers(subparsers)
 
     return parser
 
@@ -157,6 +164,47 @@ def _add_schedule_candidate_parsers(subparsers: argparse._SubParsersAction) -> N
     subparsers.add_parser(
         "recompute-freshness",
         help="Recompute source_health for all public-redistribution sources",
+    )
+
+
+def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
+    subparsers.add_parser(
+        "register-crawl-sources",
+        help="Create standard_feed mosque sources from active mosque website URLs",
+    )
+
+    fetch_source = subparsers.add_parser(
+        "fetch-source",
+        help="Fetch one crawl source URL (respects robots.txt)",
+    )
+    fetch_source.add_argument("--source-id", required=True, type=uuid.UUID)
+
+    process_source = subparsers.add_parser(
+        "process-source",
+        help="Fetch and extract schedule candidates for one crawl source",
+    )
+    process_source.add_argument("--source-id", required=True, type=uuid.UUID)
+    process_source.add_argument(
+        "--force",
+        action="store_true",
+        help="Fetch even if next_fetch_at is in the future",
+    )
+
+    extract_artifact = subparsers.add_parser(
+        "extract-artifact",
+        help="Re-run extraction for a stored source artifact",
+    )
+    extract_artifact.add_argument("--artifact-id", required=True, type=uuid.UUID)
+
+    fetch_feed = subparsers.add_parser(
+        "fetch-feed",
+        help="Fetch a standard feed URL without writing to the database",
+    )
+    fetch_feed.add_argument("--url", required=True)
+    fetch_feed.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse feed body and print row count only",
     )
 
 
@@ -286,6 +334,21 @@ def main() -> None:
     if args.command == "recompute-freshness":
         raise SystemExit(asyncio.run(_run_recompute_freshness(settings)))
 
+    if args.command == "register-crawl-sources":
+        raise SystemExit(asyncio.run(_run_register_crawl_sources(settings)))
+
+    if args.command == "fetch-source":
+        raise SystemExit(asyncio.run(_run_fetch_source(args, settings)))
+
+    if args.command == "process-source":
+        raise SystemExit(asyncio.run(_run_process_source(args, settings)))
+
+    if args.command == "extract-artifact":
+        raise SystemExit(asyncio.run(_run_extract_artifact(args, settings)))
+
+    if args.command == "fetch-feed":
+        raise SystemExit(asyncio.run(_run_fetch_feed(args, settings)))
+
     parser.print_help()
 
 
@@ -347,6 +410,106 @@ async def _run_recompute_freshness(settings: Settings) -> int:
         await session.commit()
 
     print(f"Recomputed freshness for {count} public sources")
+    return 0
+
+
+async def _run_register_crawl_sources(settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        result = await ensure_standard_feed_sources(session, settings=settings)
+        await session.commit()
+
+    print(
+        "Crawl source registration: "
+        f"created={result.created}, "
+        f"skipped_existing={result.skipped_existing}, "
+        f"skipped_mlm={result.skipped_mlm}, "
+        f"skipped_no_domain={result.skipped_no_domain}"
+    )
+    return 0
+
+
+async def _run_fetch_source(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        source = await session.get(MosqueSource, args.source_id)
+        if source is None or not source.source_url:
+            print("Source not found or missing source_url", file=sys.stderr)
+            return 1
+        from uk_jamaat_directory.ingest.artifacts import latest_artifact_for_source
+
+        prior = await latest_artifact_for_source(session, source.id)
+        fetch = await fetch_url(source.source_url, prior_artifact=prior, settings=settings)
+
+    print(
+        f"Fetch {source.source_url}: "
+        f"status={fetch.status_code}, unchanged={fetch.unchanged}, "
+        f"bytes={len(fetch.body)}, error={fetch.error}"
+    )
+    return 0 if fetch.ok else 1
+
+
+async def _run_process_source(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        result = await process_source(
+            session,
+            args.source_id,
+            settings=settings,
+            force=args.force,
+        )
+        await session.commit()
+
+    print(
+        f"Process source {result.source_id}: "
+        f"fetched={result.fetched}, unchanged={result.unchanged}, "
+        f"artifact_created={result.artifact_created}, extracted={result.extracted}, "
+        f"candidates_created={result.candidates_created}, "
+        f"skipped={result.skipped_reason}, error={result.error}"
+    )
+    if result.warnings:
+        for warning in result.warnings[:10]:
+            print(f"  warning: {warning}", file=sys.stderr)
+    return 0 if result.error is None else 1
+
+
+async def _run_extract_artifact(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        artifact = await session.get(SourceArtifact, args.artifact_id)
+        if artifact is None:
+            print("Artifact not found", file=sys.stderr)
+            return 1
+        source = await session.get(MosqueSource, artifact.source_id)
+        if source is None:
+            print("Source not found", file=sys.stderr)
+            return 1
+        extraction = await run_extraction(session, artifact, source, settings=settings)
+        await session.commit()
+
+    print(
+        f"Extraction {extraction.extraction_run_id}: status={extraction.status}, "
+        f"candidates_created={extraction.candidates_created}, "
+        f"skipped={extraction.candidates_skipped}"
+    )
+    if extraction.errors:
+        for error in extraction.errors:
+            print(f"  error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+async def _run_fetch_feed(args: argparse.Namespace, settings: Settings) -> int:
+    fetch = await fetch_url(args.url, settings=settings)
+    if not fetch.ok:
+        print(f"Fetch failed: {fetch.error}", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        result = extract_standard_feed(fetch.body)
+        print(
+            f"Dry run OK: rows={len(result.rows)}, warnings={len(result.warnings)}, "
+            f"extractor={result.extractor_version}"
+        )
+        return 0
+
+    print(fetch.body.decode("utf-8", errors="replace"))
     return 0
 
 
