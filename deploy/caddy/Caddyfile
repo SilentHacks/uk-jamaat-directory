@@ -1,0 +1,23 @@
+# TLS reverse proxy for the Directory API.
+# Set PUBLIC_DOMAIN and ACME_EMAIL in .env on the VPS.
+#
+# Caddy obtains and renews certificates automatically when PUBLIC_DOMAIN
+# resolves to this host and ports 80/443 are reachable.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$PUBLIC_DOMAIN} {
+	encode gzip
+
+	reverse_proxy api:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
