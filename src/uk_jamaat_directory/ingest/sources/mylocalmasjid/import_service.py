@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -10,11 +9,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.domain import (
-    ArtifactStatus,
     ExtractionKind,
     FreshnessStatus,
     SourcePublicationPolicy,
 )
+from uk_jamaat_directory.ingest.artifacts import record_fetched_artifact
 from uk_jamaat_directory.ingest.discovery.records import MatchDecision, ResolveOutcome
 from uk_jamaat_directory.ingest.discovery.resolve import resolve_discovery_record
 from uk_jamaat_directory.ingest.sources.mylocalmasjid.discovery import mlm_record_to_discovery
@@ -26,7 +25,6 @@ from uk_jamaat_directory.models.core import (
     ExtractionRun,
     Mosque,
     MosqueSource,
-    SourceArtifact,
     SourceHealth,
 )
 from uk_jamaat_directory.schedules.candidates import upsert_schedule_candidate
@@ -61,7 +59,6 @@ async def import_mylocalmasjid_bundle(
 ) -> MyLocalMasjidImportResult:
     """Persist a parsed MyLocalMasjid bundle as private sources, artifacts, and candidates."""
     result = MyLocalMasjidImportResult()
-    content_hash = hashlib.sha256(raw_payload).hexdigest()
     imported_at = datetime.now(UTC)
     affected_source_ids: set[uuid.UUID] = set()
 
@@ -86,14 +83,17 @@ async def import_mylocalmasjid_bundle(
         else:
             continue
 
-        artifact, artifact_created = await _record_artifact(
+        artifact, artifact_created, _content_hash = await record_fetched_artifact(
             session,
-            source=source,
+            source,
             fetched_url=fetched_url,
-            content_hash=content_hash,
-            raw_payload=raw_payload,
-            object_key=store_artifact_object_key,
+            body=raw_payload,
+            content_type="application/json",
+            upload_to_s3=store_artifact_object_key is not None,
         )
+        if store_artifact_object_key and artifact.object_key is None:
+            artifact.object_key = store_artifact_object_key
+            await session.flush()
         if artifact_created:
             result.artifacts_created += 1
             extraction_run = ExtractionRun(
@@ -154,40 +154,6 @@ async def _latest_extraction_run(
         .order_by(ExtractionRun.finished_at.desc().nullslast(), ExtractionRun.started_at.desc())
         .limit(1)
     )
-
-
-async def _record_artifact(
-    session: AsyncSession,
-    *,
-    source: MosqueSource,
-    fetched_url: str,
-    content_hash: str,
-    raw_payload: bytes,
-    object_key: str | None,
-) -> tuple[SourceArtifact, bool]:
-    existing = await session.scalar(
-        select(SourceArtifact).where(
-            SourceArtifact.source_id == source.id,
-            SourceArtifact.content_hash == content_hash,
-        )
-    )
-    if existing is not None:
-        return existing, False
-
-    artifact = SourceArtifact(
-        id=uuid.uuid4(),
-        source_id=source.id,
-        fetched_url=fetched_url,
-        object_key=object_key,
-        content_type="application/json",
-        content_hash=content_hash,
-        status=ArtifactStatus.FETCHED,
-        fetched_at=datetime.now(UTC),
-    )
-    session.add(artifact)
-    await session.flush()
-    _ = raw_payload  # hash stored; object upload deferred to crawl phase
-    return artifact, True
 
 
 async def _create_candidates(

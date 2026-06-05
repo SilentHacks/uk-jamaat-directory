@@ -64,6 +64,17 @@ class Settings(BaseSettings):
     mlm_report_stale_days: int = 7
     publish_allow_ai: bool = False
 
+    crawl_enabled: bool = False
+    crawl_user_agent: str = (
+        "UKJamaatDirectoryBot/0.1 (+https://github.com/SilentHacks/uk-jamaat-directory)"
+    )
+    crawl_timeout_seconds: float = 20.0
+    crawl_max_bytes: int = 5_000_000
+    crawl_per_domain_delay_seconds: float = 2.0
+    crawl_feed_interval_hours: int = 24
+    crawl_validate_after_extract: bool = True
+    standard_feed_path: str = "/.well-known/uk-jamaat-directory.json"
+
     @field_validator("api_prefix")
     @classmethod
     def api_prefix_must_start_with_slash(cls, value: str) -> str:
