@@ -14,6 +14,7 @@ from uk_jamaat_directory import __version__
 from uk_jamaat_directory.config import Environment, Settings, get_settings
 from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.db.session import create_engine
+from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
 from uk_jamaat_directory.ingest.crawl.register import ensure_standard_feed_sources
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
@@ -121,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     _add_schedule_candidate_parsers(subparsers)
     _add_crawl_parsers(subparsers)
+    _add_export_parsers(subparsers)
 
     return parser
 
@@ -205,6 +207,24 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         "--dry-run",
         action="store_true",
         help="Parse feed body and print row count only",
+    )
+
+
+def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
+    generate_exports = subparsers.add_parser(
+        "generate-exports",
+        help="Build NDJSON/CSV snapshot files for a published dataset version",
+    )
+    generate_exports.add_argument(
+        "--version",
+        default=None,
+        help="Dataset version name (defaults to latest published)",
+    )
+    generate_exports.add_argument(
+        "--version-id",
+        type=uuid.UUID,
+        default=None,
+        help="Dataset version UUID (overrides --version)",
     )
 
 
@@ -348,6 +368,9 @@ def main() -> None:
 
     if args.command == "fetch-feed":
         raise SystemExit(asyncio.run(_run_fetch_feed(args, settings)))
+
+    if args.command == "generate-exports":
+        raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
 
     parser.print_help()
 
@@ -510,6 +533,32 @@ async def _run_fetch_feed(args: argparse.Namespace, settings: Settings) -> int:
         return 0
 
     print(fetch.body.decode("utf-8", errors="replace"))
+    return 0
+
+
+async def _run_generate_exports(args: argparse.Namespace, settings: Settings) -> int:
+    async with cli_db_session(settings) as session:
+        result = await generate_dataset_exports(
+            session,
+            version_name=args.version,
+            version_id=args.version_id,
+            settings=settings,
+        )
+        await session.commit()
+
+    if result.errors:
+        for error in result.errors:
+            print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        f"Generated exports for {result.version}: "
+        f"files={result.files_written}, "
+        f"mosques={result.mosque_count}, "
+        f"occurrences={result.occurrence_count}, "
+        f"changes={result.change_count}, "
+        f"checksum={result.checksum}"
+    )
     return 0
 
 

@@ -15,7 +15,7 @@ celery_app = Celery(
 celery_app.conf.update(
     task_default_queue="directory",
     timezone="Europe/London",
-    include=["uk_jamaat_directory.tasks.crawl"],
+    include=["uk_jamaat_directory.tasks.crawl", "uk_jamaat_directory.tasks.exports"],
     beat_schedule={
         "crawl-register-sources": {
             "task": "uk_jamaat_directory.tasks.crawl.register_sources",
@@ -24,6 +24,10 @@ celery_app.conf.update(
         "crawl-fetch-due-sources": {
             "task": "uk_jamaat_directory.tasks.crawl.fetch_due_sources",
             "schedule": crontab(minute=0),
+        },
+        "exports-generate-latest": {
+            "task": "uk_jamaat_directory.tasks.exports.generate_latest",
+            "schedule": crontab(hour=4, minute=0),
         },
     },
 )
