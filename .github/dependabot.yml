@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+      day: 1
+      time: "09:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 10
+    groups:
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      day: 1
+      time: "09:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
