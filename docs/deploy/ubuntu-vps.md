@@ -107,7 +107,7 @@ Use the deploy checklist script:
 ./scripts/deploy/deploy.sh
 ```
 
-This runs: pull (if git checkout), build/up, pre-deploy Postgres backup, migrations, service restart, and public smoke tests.
+This runs: pull (if git checkout), pre-deploy Postgres backup, image build, migrations, service restart, health wait, and public smoke tests.
 
 Skip steps when needed:
 
