@@ -15,6 +15,7 @@ class SourceType(StrEnum):
     STANDARD_FEED = "standard_feed"
     MOSQUE_WEBSITE = "mosque_website"
     OPENSTREETMAP = "openstreetmap"
+    MUSLIMSINBRITAIN = "muslimsinbritain"
     CHARITY_REGISTER = "charity_register"
     COMMUNITY = "community"
     MANUAL = "manual"
