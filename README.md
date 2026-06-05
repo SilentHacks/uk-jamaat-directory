@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–7 are in place (scaffolding, API shell, database schema, public read API, MyLocalMasjid import, discovery/canonicalization, schedule validation and publication). Crawlers and bulk export file generation are not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–8 are in place (through admin moderation and community intake). Phase 9 adds standard-feed crawl, private artifact storage, and Celery-backed fetch/extract (standard JSON feed only; HTML/PDF deferred). Bulk export file generation is not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -16,7 +16,7 @@ Sirat and other consumers should sync from the Directory through snapshots or ch
 
 - Python 3.12, FastAPI, Pydantic v2
 - PostgreSQL 16 + PostGIS, SQLAlchemy async, Alembic
-- Redis and Celery (wired; background jobs not implemented yet)
+- Redis and Celery (worker + beat; crawl tasks when `CRAWL_ENABLED=true`)
 - S3-compatible object storage (MinIO locally)
 - Docker Compose for local services and VPS-style deployment
 - Local `.venv` for fast API and test work
@@ -166,6 +166,27 @@ Imports create `schedule_candidates` only. To expose times on the public API, ru
 ```
 
 Filters for validate/publish: `--source-id`, `--mosque-id`, `--from`, `--to`. Use `validate-candidates --dry-run` to inspect without status updates. Filtered publish merges into the latest snapshot: occurrences outside the filter are carried forward from the previous published dataset; only rows in scope are replaced or removed.
+
+## Standard feed crawl (Phase 9)
+
+Mosques can publish [`/.well-known/uk-jamaat-directory.json`](docs/feeds/standard-feed-v1.md). The Directory registers `standard_feed` sources from active mosque `website_url` values (skipping mosques with recent MyLocalMasjid data), fetches feeds respectfully, stores raw JSON in MinIO, and creates pending `schedule_candidates`.
+
+Crawl is **opt-in** (`CRAWL_ENABLED=false` by default). Requires MinIO/S3 for artifact bytes.
+
+```bash
+# Register standard_feed sources for mosques with website_url
+.venv/bin/uk-jamaat-directory register-crawl-sources
+
+# Fetch and extract one source end-to-end (set CRAWL_ENABLED=true in .env)
+.venv/bin/uk-jamaat-directory process-source --source-id <uuid> --force
+
+# Debug a feed URL without database writes
+.venv/bin/uk-jamaat-directory fetch-feed \
+  --url https://example.org/.well-known/uk-jamaat-directory.json \
+  --dry-run
+```
+
+Celery beat (when worker/beat containers run) registers sources daily and enqueues hourly due fetches. MyLocalMasjid is **not** crawled in Phase 9.
 
 ## Development
 
