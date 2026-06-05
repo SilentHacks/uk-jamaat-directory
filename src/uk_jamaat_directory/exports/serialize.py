@@ -5,7 +5,7 @@ import io
 import json
 from datetime import UTC, datetime
 
-from uk_jamaat_directory.exports.checksums import sha256_prefixed
+from uk_jamaat_directory.exports.manifest import EXPORT_LICENSE_SUMMARY, build_manifest_json
 from uk_jamaat_directory.exports.types import ExportDataset, ExportFileInfo
 
 OCCURRENCE_CSV_COLUMNS = (
@@ -75,10 +75,7 @@ def build_metadata_json(dataset: ExportDataset) -> bytes:
             "excluded_restricted": dataset.source_counts.excluded_restricted_sources,
             "total_linked": dataset.source_counts.total_linked_sources,
         },
-        "license_summary": (
-            "Public snapshot rows include only sources with "
-            "public_redistribution_allowed. Restricted partner data is excluded."
-        ),
+        "license_summary": EXPORT_LICENSE_SUMMARY,
         "attribution": dataset.attribution,
     }
     return (json.dumps(payload, sort_keys=True, indent=2, default=str) + "\n").encode("utf-8")
@@ -98,16 +95,16 @@ def build_export_files(
 ) -> list[ExportFileInfo]:
     from uk_jamaat_directory.exports.paths import export_object_key, export_public_url
 
-    builders: list[tuple[str, str, str, bytes]] = [
-        ("snapshot.ndjson", "application/x-ndjson", "ndjson", build_snapshot_ndjson(dataset)),
-        ("occurrences.csv", "text/csv", "csv", build_occurrences_csv(dataset)),
-        ("changes.ndjson", "application/x-ndjson", "changes", build_changes_ndjson(dataset)),
-        ("metadata.json", "application/json", "metadata", build_metadata_json(dataset)),
-        ("attribution.txt", "text/plain", "attribution", build_attribution_txt(dataset)),
+    builders: list[tuple[str, str, bytes]] = [
+        ("snapshot.ndjson", "application/x-ndjson", build_snapshot_ndjson(dataset)),
+        ("occurrences.csv", "text/csv", build_occurrences_csv(dataset)),
+        ("changes.ndjson", "application/x-ndjson", build_changes_ndjson(dataset)),
+        ("metadata.json", "application/json", build_metadata_json(dataset)),
+        ("attribution.txt", "text/plain", build_attribution_txt(dataset)),
     ]
 
     files: list[ExportFileInfo] = []
-    for filename, content_type, _export_name, body in builders:
+    for filename, content_type, body in builders:
         files.append(
             ExportFileInfo(
                 name=filename,
@@ -139,38 +136,3 @@ def build_export_files(
         )
     )
     return files
-
-
-def build_manifest_json(dataset: ExportDataset, files: list[ExportFileInfo]) -> bytes:
-    exports: dict[str, dict[str, object]] = {}
-    for file_info in files:
-        if file_info.name == "manifest.json":
-            continue
-        export_key = file_info.name.rsplit(".", 1)[0]
-        if export_key == "snapshot":
-            export_key = "ndjson"
-        elif export_key == "occurrences":
-            export_key = "csv"
-        exports[export_key] = {
-            "filename": file_info.name,
-            "url": file_info.url,
-            "object_key": file_info.object_key,
-            "checksum": sha256_prefixed(file_info.body),
-            "size_bytes": file_info.size_bytes,
-            "content_type": file_info.content_type,
-        }
-
-    payload = {
-        "version": dataset.version,
-        "schema_version": dataset.schema_version,
-        "generated_at": datetime.now(UTC).isoformat(),
-        "exports": exports,
-        "source_counts": {
-            "public_redistribution_allowed": dataset.source_counts.public_sources,
-            "excluded_restricted": dataset.source_counts.excluded_restricted_sources,
-        },
-        "license_summary": (
-            "Public snapshot rows include only sources with public_redistribution_allowed."
-        ),
-    }
-    return (json.dumps(payload, sort_keys=True, indent=2, default=str) + "\n").encode("utf-8")

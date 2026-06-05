@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -24,6 +25,23 @@ async def get_latest_published_version(session: AsyncSession) -> DatasetVersion 
         .limit(1)
     )
     return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def resolve_dataset_version(
+    session: AsyncSession,
+    *,
+    version_name: str | None = None,
+    version_id: uuid.UUID | None = None,
+) -> DatasetVersion | None:
+    if version_id is not None:
+        return await session.get(DatasetVersion, version_id)
+
+    if version_name is not None:
+        return await session.scalar(
+            select(DatasetVersion).where(DatasetVersion.version == version_name)
+        )
+
+    return await get_latest_published_version(session)
 
 
 async def create_published_dataset_version(session: AsyncSession) -> DatasetVersion:

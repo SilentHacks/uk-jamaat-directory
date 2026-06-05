@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -154,21 +152,3 @@ def _build_attribution(mosques: list[Mosque]) -> list[str]:
                     lines.append(stripped)
     return lines
 
-
-async def resolve_dataset_version(
-    session: AsyncSession,
-    *,
-    version_name: str | None = None,
-    version_id: uuid.UUID | None = None,
-) -> DatasetVersion | None:
-    if version_id is not None:
-        return await session.get(DatasetVersion, version_id)
-
-    if version_name is not None:
-        return await session.scalar(
-            select(DatasetVersion).where(DatasetVersion.version == version_name)
-        )
-
-    from uk_jamaat_directory.schedules.dataset import get_latest_published_version
-
-    return await get_latest_published_version(session)

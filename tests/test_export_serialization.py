@@ -4,9 +4,14 @@ import json
 import uuid
 from datetime import UTC, date, datetime, time
 
-from uk_jamaat_directory.exports.checksums import sha256_prefixed
+from uk_jamaat_directory.exports.manifest import (
+    EXPORT_LICENSE_SUMMARY,
+    build_exports_manifest,
+    sha256_prefixed,
+)
 from uk_jamaat_directory.exports.serialize import (
     build_changes_ndjson,
+    build_export_files,
     build_metadata_json,
     build_occurrences_csv,
     build_snapshot_ndjson,
@@ -87,6 +92,7 @@ def test_metadata_and_changes_include_counts() -> None:
     metadata = json.loads(build_metadata_json(dataset))
     assert metadata["occurrence_count"] == 1
     assert metadata["source_counts"]["excluded_restricted"] == 2
+    assert metadata["license_summary"] == EXPORT_LICENSE_SUMMARY
 
     changes = build_changes_ndjson(dataset).decode("utf-8").strip().splitlines()
     assert len(changes) == 1
@@ -96,3 +102,20 @@ def test_metadata_and_changes_include_counts() -> None:
 def test_checksum_prefix() -> None:
     body = b"example"
     assert sha256_prefixed(body).startswith("sha256:")
+
+
+def test_manifest_exports_match_file_manifest() -> None:
+    dataset = _dataset()
+    files = build_export_files(
+        dataset,
+        version=dataset.version,
+        base_url="http://example.org",
+    )
+    manifest_file = next(file_info for file_info in files if file_info.name == "manifest.json")
+    manifest_payload = json.loads(manifest_file.body)
+    assert manifest_payload["exports"] == build_exports_manifest(files)
+
+
+def test_metadata_includes_generated_at() -> None:
+    metadata = json.loads(build_metadata_json(_dataset()))
+    assert metadata["generated_at"]
