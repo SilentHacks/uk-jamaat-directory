@@ -47,6 +47,8 @@ def map_overpass_elements(elements: list[dict[str, Any]]) -> MapElementsResult:
 
 def map_overpass_element(
     element: dict[str, Any],
+    *,
+    default_country: str = "GB",
 ) -> tuple[OsmPlaceRecord | None, SkipReason | None] | None:
     element_type = element.get("type")
     if element_type not in {"node", "way", "relation"}:
@@ -76,7 +78,7 @@ def map_overpass_element(
         address_line1=_pick_address_line1(tags),
         city=_pick_city(tags),
         postcode=normalize_postcode(_tag(tags, "addr:postcode")),
-        country="GB",
+        country=_pick_country(tags, default_country=default_country),
         website_url=_pick_website(tags),
         latitude=latitude,
         longitude=longitude,
@@ -167,6 +169,16 @@ def _pick_website(tags: dict[str, Any]) -> str | None:
             return value
         return f"https://{value}"
     return None
+
+
+def _pick_country(tags: dict[str, Any], *, default_country: str) -> str:
+    for key in ("addr:country", "is_in:country_code", "ISO3166-1:alpha2"):
+        value = _normalize_tag(_tag(tags, key))
+        if value == "ie":
+            return "IE"
+        if value in {"gb", "uk"}:
+            return "GB"
+    return default_country
 
 
 def _pick_coordinates(element: dict[str, Any]) -> tuple[float | None, float | None]:

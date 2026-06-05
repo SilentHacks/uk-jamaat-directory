@@ -15,7 +15,9 @@ from uk_jamaat_directory.ingest.sources.openstreetmap.mapper import (
     MapElementsResult,
     map_overpass_elements,
 )
-from uk_jamaat_directory.ingest.sources.openstreetmap.query import build_gb_muslim_places_query
+from uk_jamaat_directory.ingest.sources.openstreetmap.query import (
+    build_uk_ie_muslim_places_query,
+)
 from uk_jamaat_directory.ingest.sources.openstreetmap.schema import OsmImportBundle
 
 OSM_ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0)"
@@ -39,7 +41,7 @@ async def export_osm_bundle(
 ) -> tuple[OsmImportBundle, OsmExportResult]:
     cfg = settings or get_settings()
     url = overpass_url or cfg.osm_overpass_url
-    query = build_gb_muslim_places_query()
+    query = build_uk_ie_muslim_places_query()
     payload = await _fetch_overpass(
         query,
         url=url,

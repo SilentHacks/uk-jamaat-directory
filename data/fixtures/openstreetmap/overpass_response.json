@@ -73,6 +73,20 @@
     },
     {
       "type": "node",
+      "id": 910009,
+      "lat": 53.3498,
+      "lon": -6.2603,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "name": "Fixture Dublin Mosque",
+        "addr:city": "Dublin",
+        "addr:postcode": "d02x285",
+        "addr:country": "IE"
+      }
+    },
+    {
+      "type": "node",
       "id": 910006,
       "lat": 51.5000,
       "lon": -0.1200,

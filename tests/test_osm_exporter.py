@@ -17,7 +17,9 @@ from uk_jamaat_directory.ingest.sources.openstreetmap.mapper import (
     map_overpass_element,
     map_overpass_elements,
 )
-from uk_jamaat_directory.ingest.sources.openstreetmap.query import build_gb_muslim_places_query
+from uk_jamaat_directory.ingest.sources.openstreetmap.query import (
+    build_uk_ie_muslim_places_query,
+)
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/openstreetmap"
 OVERPASS_FIXTURE = FIXTURES / "overpass_response.json"
@@ -27,9 +29,10 @@ def _load_overpass_fixture() -> dict[str, object]:
     return json.loads(OVERPASS_FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_build_gb_muslim_places_query_includes_union_filters() -> None:
-    query = build_gb_muslim_places_query()
+def test_build_uk_ie_muslim_places_query_includes_union_filters() -> None:
+    query = build_uk_ie_muslim_places_query()
     assert 'area["ISO3166-1"="GB"]' in query
+    assert 'area["ISO3166-1"="IE"]' in query
     assert '["religion"="muslim"]' in query
     assert '["denomination"~"^(muslim|sunni|shia|ahmadiyya)$",i]' in query
     assert '["name"~"masjid|mosque|islamic",i]' in query
@@ -61,7 +64,30 @@ def test_map_overpass_element_website_and_address_normalization() -> None:
     assert place.address_line1 == "10 High Street"
     assert place.city == "London"
     assert place.postcode == "E2 1AA"
+    assert place.country == "GB"
     assert place.aliases == ["Central Mosque"]
+
+
+def test_map_overpass_element_irish_country_and_eircode_normalization() -> None:
+    element = {
+        "type": "node",
+        "id": 910009,
+        "lat": 53.3498,
+        "lon": -6.2603,
+        "tags": {
+            "amenity": "place_of_worship",
+            "religion": "muslim",
+            "name": "Fixture Dublin Mosque",
+            "addr:city": "Dublin",
+            "addr:postcode": "d02x285",
+            "addr:country": "IE",
+        },
+    }
+    place, skip_reason = map_overpass_element(element)
+    assert skip_reason is None
+    assert place is not None
+    assert place.country == "IE"
+    assert place.postcode == "D02 X285"
 
 
 def test_map_overpass_element_prefers_website_over_contact_website() -> None:
@@ -141,7 +167,7 @@ def test_build_bundle_from_overpass_fixture() -> None:
     payload = _load_overpass_fixture()
     bundle, mapped = build_bundle_from_overpass_payload(payload)
 
-    assert len(bundle.places) == 5
+    assert len(bundle.places) == 6
     assert all(is_muslim_place(place) for place in bundle.places)
     assert mapped.skip_reasons["no_name"] == 1
     assert mapped.skip_reasons["no_coords"] == 1
@@ -154,6 +180,7 @@ def test_build_bundle_from_overpass_fixture() -> None:
         "way/910003",
         "relation/910004",
         "node/910005",
+        "node/910009",
     }
 
 
