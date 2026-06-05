@@ -22,15 +22,15 @@ Run a restore drill at least quarterly, or after any backup script change.
 1. Stop writers so the database is quiesced:
 
 ```bash
-docker compose -f docker-compose.vps.yml stop api worker beat
+docker compose -f docker-compose.production.yml stop api worker beat
 ```
 
 2. Drop and recreate the database (destructive):
 
 ```bash
-docker compose -f docker-compose.vps.yml exec -T postgres \
+docker compose -f docker-compose.production.yml exec -T postgres \
   psql -U directory -d postgres -c "DROP DATABASE IF EXISTS directory;"
-docker compose -f docker-compose.vps.yml exec -T postgres \
+docker compose -f docker-compose.production.yml exec -T postgres \
   psql -U directory -d postgres -c "CREATE DATABASE directory;"
 ```
 
@@ -38,14 +38,14 @@ docker compose -f docker-compose.vps.yml exec -T postgres \
 
 ```bash
 gunzip -c backups/postgres/directory-YYYYMMDDTHHMMSSZ.sql.gz \
-  | docker compose -f docker-compose.vps.yml exec -T postgres \
+  | docker compose -f docker-compose.production.yml exec -T postgres \
       psql -U directory -d directory
 ```
 
 4. Restart services and smoke test:
 
 ```bash
-docker compose -f docker-compose.vps.yml up -d api worker beat caddy
+docker compose -f docker-compose.production.yml up -d api worker beat caddy
 ./scripts/deploy/smoke-test.sh
 ```
 
@@ -56,9 +56,9 @@ docker compose -f docker-compose.vps.yml up -d api worker beat caddy
 If the dump is corrupt or you need a clean volume:
 
 ```bash
-docker compose -f docker-compose.vps.yml down
-docker volume rm "$(docker compose -f docker-compose.vps.yml volume ls -q | grep _postgres_data$)"
-docker compose -f docker-compose.vps.yml up -d postgres
+docker compose -f docker-compose.production.yml down
+docker volume rm "$(docker compose -f docker-compose.production.yml volume ls -q | grep _postgres_data$)"
+docker compose -f docker-compose.production.yml up -d postgres
 # wait for healthy, then restore SQL as above
 ```
 
@@ -74,13 +74,13 @@ docker compose -f docker-compose.vps.yml up -d postgres
 1. Stop MinIO and dependent services:
 
 ```bash
-docker compose -f docker-compose.vps.yml stop api worker beat minio
+docker compose -f docker-compose.production.yml stop api worker beat minio
 ```
 
 2. Identify the volume:
 
 ```bash
-volume_name="$(docker compose -f docker-compose.vps.yml volume ls --format '{{.Name}}' | grep '_minio_data$' | head -n 1)"
+volume_name="$(docker compose -f docker-compose.production.yml volume ls --format '{{.Name}}' | grep '_minio_data$' | head -n 1)"
 echo "$volume_name"
 ```
 
@@ -97,7 +97,7 @@ docker run --rm \
 4. Start services:
 
 ```bash
-docker compose -f docker-compose.vps.yml up -d
+docker compose -f docker-compose.production.yml up -d
 ./scripts/deploy/smoke-test.sh
 ```
 
@@ -109,10 +109,10 @@ Order for full stack loss on a new VPS:
 
 1. Install Docker and clone the repo.
 2. Copy `.env` from secure backup (not from git).
-3. `docker compose -f docker-compose.vps.yml up -d postgres redis minio`
+3. `docker compose -f docker-compose.production.yml up -d postgres redis minio`
 4. Restore Postgres SQL dump.
 5. Restore MinIO volume archive.
-6. `docker compose -f docker-compose.vps.yml up -d --build`
+6. `docker compose -f docker-compose.production.yml up -d --build`
 7. Run `./scripts/deploy/smoke-test.sh`
 8. Confirm Celery beat schedules and latest export manifest.
 

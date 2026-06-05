@@ -230,8 +230,8 @@ Set `EXPORT_BASE_URL` to the public object-storage or CDN endpoint that serves e
 Production uses a separate Compose file with Caddy for TLS, internal-only Postgres/Redis/MinIO, and named volumes.
 
 ```bash
-# On the server (after copying .env.vps.example → .env and setting secrets)
-docker compose -f docker-compose.vps.yml up -d --build
+# On the server (after copying .env.example → .env and setting production secrets)
+docker compose -f docker-compose.production.yml up -d --build
 ./scripts/deploy/migrate.sh
 ./scripts/deploy/smoke-test.sh
 ```

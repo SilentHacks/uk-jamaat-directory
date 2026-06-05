@@ -38,7 +38,7 @@ cd uk-jamaat-directory
 2. Create production environment file (never commit this):
 
 ```bash
-cp .env.vps.example .env
+cp .env.example .env
 ```
 
 Edit `.env` and set at minimum:
@@ -58,7 +58,7 @@ Ensure `DATABASE_URL` uses the same `POSTGRES_PASSWORD` and the `postgres` hostn
 3. Start the stack:
 
 ```bash
-docker compose -f docker-compose.vps.yml up -d --build
+docker compose -f docker-compose.production.yml up -d --build
 ```
 
 4. Run migrations (explicit step — not automatic on container start):
@@ -141,19 +141,14 @@ Copy backups off the VPS (object storage, another host, or backup provider) befo
 
 Restore procedure: [restore.md](restore.md).
 
-## nginx alternative
+## Host-local overrides
 
-Caddy in Compose is the default path. For nginx on the host instead:
+When the VPS already has a shared reverse proxy (or host nginx) that owns ports
+80/443, add a gitignored `docker-compose.local.yml` on the server. Deploy
+scripts pick it up automatically. See [local-overrides.md](local-overrides.md).
 
-1. Publish the API on localhost only with the bundled override:
-
-```bash
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.nginx.yml up -d
-```
-
-2. Use [deploy/nginx/directory.conf](../../deploy/nginx/directory.conf) as a starting point.
-3. Obtain certificates with certbot before enabling HTTPS.
-4. Proxy `/exports/*` to MinIO separately (Caddy handles this automatically in the default stack).
+Do not commit operator-specific paths, usernames, or existing proxy site files.
+Host runbooks may live under `.local/` on the server (also gitignored).
 
 ## Scaling path
 
@@ -173,7 +168,7 @@ Change `S3_ENDPOINT_URL` and credentials to point at external object storage wit
 
 **Caddy certificate errors** — confirm DNS, ports 80/443, and `PUBLIC_DOMAIN` in `.env`.
 
-**502 from Caddy** — check API health: `docker compose -f docker-compose.vps.yml logs api` and `docker compose -f docker-compose.vps.yml ps`.
+**502 from Caddy** — check API health: `docker compose -f docker-compose.production.yml logs api` and `docker compose -f docker-compose.production.yml ps`.
 
 **Migrations fail** — ensure Postgres is healthy and `DATABASE_URL` matches `POSTGRES_PASSWORD`.
 

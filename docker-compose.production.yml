@@ -1,9 +1,12 @@
-# Standalone production stack for Ubuntu VPS.
+# Production stack for Ubuntu VPS.
 #
-# Usage (from repo root on the server):
-#   docker compose -f docker-compose.vps.yml up -d --build
+# Usage:
+#   docker compose -f docker-compose.production.yml up -d --build
 #
-# Requires .env on the server (copy from .env.vps.example). Never commit .env.
+# Optional host-specific overrides (gitignored):
+#   docker compose -f docker-compose.production.yml -f docker-compose.local.yml up -d --build
+#
+# Requires .env on the server (copy from .env.example). Never commit .env.
 
 services:
   api:

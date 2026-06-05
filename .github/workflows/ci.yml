@@ -40,8 +40,8 @@ jobs:
       - name: Ruff
         run: ruff check src tests alembic
 
-      - name: VPS compose config
-        run: make compose-vps-config
+      - name: Production compose config
+        run: make compose-production-config
 
       - name: Alembic migrations
         run: alembic upgrade head

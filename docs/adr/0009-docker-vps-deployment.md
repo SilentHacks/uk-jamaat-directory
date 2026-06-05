@@ -14,11 +14,11 @@ Production needs a reproducible Ubuntu VPS path with TLS, private database/objec
 
 1. **Keep `docker-compose.yml` for local development** — API reload, source mounts, Postgres on host port 54324, public dev ports for MinIO console.
 
-2. **Add `docker-compose.vps.yml` as a standalone production stack** — no host bindings for Postgres/Redis/MinIO/API; Caddy on 80/443; `restart: unless-stopped`; production env defaults (`ENVIRONMENT=production`, `DOCS_ENABLED=false`). Proxy header trust is enforced by uvicorn `--proxy-headers` and `--forwarded-allow-ips` on the API service; `TRUST_PROXY_HEADERS` in `.env` documents operator intent only.
+2. **Add `docker-compose.production.yml` as a standalone production stack** — no host bindings for Postgres/Redis/MinIO/API; bundled Caddy on 80/443; `restart: unless-stopped`; production env defaults (`ENVIRONMENT=production`, `DOCS_ENABLED=false`). Proxy header trust is enforced by uvicorn `--proxy-headers` and `--forwarded-allow-ips` on the API service; `TRUST_PROXY_HEADERS` in `.env` documents operator intent only. Host-specific networking uses gitignored `docker-compose.local.yml` (see `docs/deploy/local-overrides.md`).
 
 3. **TLS via Caddy in Compose** — automatic certificates using `PUBLIC_DOMAIN` and `ACME_EMAIL` from server `.env`. Document nginx as an optional host-level alternative.
 
-4. **Secrets only on the server** — `.env.vps.example` documents required variables; real `.env` is gitignored.
+4. **Secrets only on the server** — `.env.example` documents required variables; real `.env` is gitignored.
 
 5. **Migrations are an explicit deploy step** — `scripts/deploy/migrate.sh` runs `alembic upgrade head` in a one-off API container; application containers do not auto-migrate on start.
 

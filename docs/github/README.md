@@ -23,7 +23,7 @@ Default branch is **`master`** (not `main`).
 CI runs on every push to `master` and on pull requests targeting `master`:
 
 1. Ruff lint
-2. VPS Compose config validation (`make compose-vps-config`)
+2. Production compose config validation (`make compose-production-config`)
 3. `alembic upgrade head` against a PostGIS service container
 4. Full pytest suite with `UK_JAMAAT_TEST_POSTGRES=1`
 

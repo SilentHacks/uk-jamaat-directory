@@ -1,4 +1,4 @@
-.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down export-contracts export-osm export-mib compose-vps-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
+.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down export-contracts export-osm export-mib compose-production-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
 
 VENV := .venv
 BIN := $(VENV)/bin
@@ -56,8 +56,8 @@ compose-up:
 compose-down:
 	docker compose down
 
-compose-vps-config:
-	docker compose -f docker-compose.vps.yml config >/dev/null
+compose-production-config:
+	docker compose -f docker-compose.production.yml config >/dev/null
 
 deploy-migrate:
 	./scripts/deploy/migrate.sh

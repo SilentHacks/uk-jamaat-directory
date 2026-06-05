@@ -51,7 +51,7 @@ As of the current codebase (Phases 0–4):
 - **Done (Phase 8):** Admin candidate/source moderation APIs, coverage and source-health reporting, public corrections/schedule submissions/claims with private contact handling.
 - **Done (Phase 9 slice 9.1):** Standard feed crawl pipeline (fetch → MinIO artifact → extract → candidates), Celery tasks, crawl CLI. HTML/PDF/OCR/AI/Playwright deferred.
 - **Done (Phase 10):** Bulk export generation (`generate-exports` CLI, Celery task), NDJSON/CSV/changes/metadata files in object storage, manifest checksums on `dataset_versions`.
-- **Done (Phase 11):** `docker-compose.vps.yml` production stack, Caddy TLS proxy, deploy/backup/restore scripts, `docs/deploy/` runbooks.
+- **Done (Phase 11):** `docker-compose.production.yml` production stack, bundled Caddy TLS proxy, deploy/backup/restore scripts, `docs/deploy/` runbooks.
 - **Done (Phase 12):** Dependabot, PR dependency review, proprietary code license and intended ODbL public-data license docs, security reporting policy, `docs/github/` workflow notes.
 - **Not yet:** HTML/PDF extractors, Google API fetchers, admin web UI.
 

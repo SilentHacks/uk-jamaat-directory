@@ -2,13 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/postgres}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 ARCHIVE="$BACKUP_DIR/directory-$TIMESTAMP.sql.gz"
 
 cd "$ROOT_DIR"
+eval "$("$ROOT_DIR/scripts/deploy/compose-args.sh")"
 
 if [[ ! -f .env ]]; then
   echo "error: .env not found in $ROOT_DIR" >&2
@@ -18,7 +18,7 @@ fi
 mkdir -p "$BACKUP_DIR"
 
 echo "Backing up Postgres to $ARCHIVE ..."
-docker compose -f "$COMPOSE_FILE" exec -T postgres \
+docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
   pg_dump -U directory -d directory --no-owner --no-acl \
   | gzip -9 >"$ARCHIVE"
 

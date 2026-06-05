@@ -6,7 +6,8 @@
 - Run API locally: `make dev`
 - Run dependency services only: `docker compose up postgres redis minio -d`
 - Run full stack: `docker compose up --build` or `make compose-up`
-- VPS production stack: `docker compose -f docker-compose.vps.yml up -d --build` (see `docs/deploy/ubuntu-vps.md`)
+- VPS production stack: `docker compose -f docker-compose.production.yml up -d --build` (see `docs/deploy/ubuntu-vps.md`)
+- Host-specific production overrides: gitignored `docker-compose.local.yml` on the server (see `docs/deploy/local-overrides.md`); never commit operator paths or proxy site files
 - VPS deploy script: `make deploy` or `./scripts/deploy/deploy.sh`
 - Apply migrations: `make migrate` (local) or `make deploy-migrate` (VPS)
 - Lint: `make lint`
@@ -32,7 +33,7 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 - Phase 8 admin: candidate approve/reject/list, source list/patch, coverage, source-health; public corrections, schedule submissions, and claims on `/v1/mosques/{id}/…`
 - Phase 9 crawl: standard feed fetch/extract, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, `fetch-feed`, …). HTML/PDF/OCR/AI deferred.
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
-- Phase 11 deploy: `docker-compose.vps.yml`, Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
+- Phase 11 deploy: `docker-compose.production.yml`, bundled Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
 - Phase 12 GitHub: CI on `master`, Dependabot, dependency review workflow, `LICENSE.md` / `DATA_LICENSE.md` / `ATTRIBUTION.md` / `SECURITY.md`, `docs/github/` (ADR 0010).
 
 Not implemented yet: HTML/PDF crawlers, frontend.
