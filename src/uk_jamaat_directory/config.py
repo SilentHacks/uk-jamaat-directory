@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     crawl_validate_after_extract: bool = True
     standard_feed_path: str = "/.well-known/uk-jamaat-directory.json"
 
+    osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
+    osm_overpass_timeout_seconds: float = 180.0
+
     export_base_url: str | None = None
     export_s3_prefix: str = "exports"
     export_enabled: bool = False
