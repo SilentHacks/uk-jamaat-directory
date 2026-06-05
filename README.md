@@ -190,13 +190,13 @@ Celery beat (when worker/beat containers run) registers sources daily and enqueu
 
 ## Bulk exports (Phase 10)
 
-After publishing, generate reproducible snapshot files for the latest (or specified) dataset version. Files are stored in MinIO/S3 and manifest URLs/checksums are written to `dataset_versions.manifest.exports`.
+After publishing, generate reproducible snapshot files for the latest (or specified) **published** dataset version. Files are stored in MinIO/S3 and manifest URLs/checksums are written to `dataset_versions.manifest.exports`.
 
 ```bash
 # Latest published dataset version
 .venv/bin/uk-jamaat-directory generate-exports
 
-# Specific version
+# Specific published version
 .venv/bin/uk-jamaat-directory generate-exports --version 2026-06-04.1
 ```
 
@@ -206,6 +206,10 @@ Generated per version under `exports/{version}/`:
 - `occurrences.csv` — flat occurrence rows
 - `changes.ndjson` — change events for the dataset version
 - `metadata.json`, `attribution.txt`, `manifest.json`
+
+`snapshot.ndjson` and `occurrences.csv` are byte-deterministic for a fixed database state. `metadata.json` and `manifest.json` include a `generated_at` timestamp and may differ between runs.
+
+Set `EXPORT_BASE_URL` to the public object-storage or CDN endpoint that serves export blobs. The API does not proxy `/exports/*`; if unset, `PUBLIC_BASE_URL` is used. Export generation is opt-in (`EXPORT_ENABLED=false` by default). Re-running `generate-exports` for the same version is idempotent and overwrites prior objects.
 
 `/v1/snapshots/latest` returns export URLs and checksums after generation. Celery beat runs `generate-exports` daily at 04:00 Europe/London when `EXPORT_ENABLED=true`.
 
