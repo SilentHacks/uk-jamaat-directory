@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"]
     )
+    # Documented operator intent; production VPS enforces proxy headers via
+    # uvicorn --proxy-headers in docker-compose.vps.yml, not app middleware.
     trust_proxy_headers: bool = False
 
     mylocalmasjid_enabled: bool = False

@@ -14,7 +14,7 @@ Production needs a reproducible Ubuntu VPS path with TLS, private database/objec
 
 1. **Keep `docker-compose.yml` for local development** — API reload, source mounts, Postgres on host port 54324, public dev ports for MinIO console.
 
-2. **Add `docker-compose.vps.yml` as a standalone production stack** — no host bindings for Postgres/Redis/MinIO/API; Caddy on 80/443; `restart: unless-stopped`; production env defaults (`ENVIRONMENT=production`, `DOCS_ENABLED=false`, `TRUST_PROXY_HEADERS=true`).
+2. **Add `docker-compose.vps.yml` as a standalone production stack** — no host bindings for Postgres/Redis/MinIO/API; Caddy on 80/443; `restart: unless-stopped`; production env defaults (`ENVIRONMENT=production`, `DOCS_ENABLED=false`). Proxy header trust is enforced by uvicorn `--proxy-headers` and `--forwarded-allow-ips` on the API service; `TRUST_PROXY_HEADERS` in `.env` documents operator intent only.
 
 3. **TLS via Caddy in Compose** — automatic certificates using `PUBLIC_DOMAIN` and `ACME_EMAIL` from server `.env`. Document nginx as an optional host-level alternative.
 
