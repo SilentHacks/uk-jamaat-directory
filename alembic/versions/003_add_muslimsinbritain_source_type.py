@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "003_add_muslimsinbritain_source_type"
+revision = "003_muslimsinbritain"
 down_revision = "002_identity_match_reviews"
 branch_labels = None
 depends_on = None
