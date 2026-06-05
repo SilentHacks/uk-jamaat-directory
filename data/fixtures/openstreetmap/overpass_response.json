@@ -1,0 +1,116 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API synthetic fixture",
+  "elements": [
+    {
+      "type": "node",
+      "id": 910001,
+      "lat": 51.5308,
+      "lon": -0.0714,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "denomination": "sunni",
+        "name": "Fixture Central Masjid",
+        "alt_name": "Central Mosque",
+        "addr:housenumber": "10",
+        "addr:street": "High Street",
+        "addr:city": "London",
+        "addr:postcode": "e21aa",
+        "website": "https://example.org/central-masjid"
+      }
+    },
+    {
+      "type": "node",
+      "id": 910002,
+      "lat": 53.4808,
+      "lon": -2.2426,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "name": "Fixture Riverside Mosque",
+        "contact:website": "riverside-mosque.example.org"
+      }
+    },
+    {
+      "type": "way",
+      "id": 910003,
+      "center": {
+        "lat": 52.4862,
+        "lon": -1.8904
+      },
+      "tags": {
+        "amenity": "place_of_worship",
+        "denomination": "sunni",
+        "name": "Fixture Way Masjid",
+        "addr:town": "Birmingham",
+        "addr:postcode": "B1 1AA"
+      }
+    },
+    {
+      "type": "relation",
+      "id": 910004,
+      "center": {
+        "lat": 53.8008,
+        "lon": -1.5491
+      },
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "name": "Fixture Relation Mosque",
+        "addr:city": "Leeds"
+      }
+    },
+    {
+      "type": "node",
+      "id": 910005,
+      "lat": 51.5074,
+      "lon": -0.1278,
+      "tags": {
+        "amenity": "place_of_worship",
+        "name": "Fixture Islamic Centre"
+      }
+    },
+    {
+      "type": "node",
+      "id": 910006,
+      "lat": 51.5000,
+      "lon": -0.1200,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "christian",
+        "name": "Fixture St Example Church"
+      }
+    },
+    {
+      "type": "node",
+      "id": 910007,
+      "lat": 51.4900,
+      "lon": -0.1100,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim"
+      }
+    },
+    {
+      "type": "way",
+      "id": 910008,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "name": "Fixture Missing Center Way"
+      }
+    },
+    {
+      "type": "node",
+      "id": 910001,
+      "lat": 51.5308,
+      "lon": -0.0714,
+      "tags": {
+        "amenity": "place_of_worship",
+        "religion": "muslim",
+        "name": "Fixture Central Masjid duplicate"
+      }
+    }
+  ]
+}
