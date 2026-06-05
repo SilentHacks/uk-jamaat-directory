@@ -40,6 +40,11 @@ def mib_record_to_discovery(
             "longitude": record.longitude,
             "location_precision": record.location_precision,
             "metadata_confidence": record.metadata_confidence,
+            "website_url": record.website_url,
+            "data_accuracy": record.data_accuracy,
+            "data_accuracy_code": record.data_accuracy_code,
+            "data_sources": record.data_sources,
+            "detail_page_url": record.detail_page_url,
             "source_record_created_at": record.source_record_created_at.isoformat()
             if record.source_record_created_at is not None
             else None,

@@ -38,6 +38,7 @@ class MibMosqueRecord(BaseModel):
     longitude: float | None = None
     website_url: str | None = None
     source_url: str | None = None
+    detail_page_url: str | None = None
     record_class: MibRecordClass = "mosque"
     usage: MibUsage = "unknown"
     capacity: int | None = None
@@ -46,6 +47,9 @@ class MibMosqueRecord(BaseModel):
     metadata_confidence: MibConfidence = "unknown"
     theme: str | None = None
     management: str | None = None
+    data_accuracy: str | None = None
+    data_accuracy_code: str | None = None
+    data_sources: list[str] = Field(default_factory=list)
     attribution: str = "MuslimsInBritain.org"
     source_record_created_at: datetime | None = None
     source_record_updated_at: datetime | None = None

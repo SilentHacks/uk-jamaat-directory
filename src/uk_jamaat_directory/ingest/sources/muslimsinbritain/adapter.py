@@ -147,6 +147,7 @@ def mib_record_from_csv_row(row: list[str]) -> MibMosqueRecord:
         latitude=latitude,
         longitude=longitude,
         source_url=f"{MIB_BASE_URL}/index.php?id={mib_id}",
+        detail_page_url=f"{MIB_BASE_URL}/show-mosque.php?id={mib_id}&map",
         record_class=record_class,
         usage=info.usage,
         capacity=info.capacity,

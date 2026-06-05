@@ -5,6 +5,7 @@ import asyncio
 import json
 import sys
 import uuid
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
@@ -481,10 +482,16 @@ async def _run_export_mib(args: argparse.Namespace, settings: Settings) -> int:
         return 1
 
     skip_summary = _format_skip_reasons(result.skip_reasons)
+    detail_summary = ""
+    if args.enrich_details:
+        detail_summary = (
+            f", detail_pages_enriched={result.detail_pages_enriched}, "
+            f"detail_pages_failed={result.detail_pages_failed}"
+        )
     print(
         "MiB export complete: "
         f"{len(bundle.mosques)} records written, "
-        f"{result.records_skipped} skipped{skip_summary}"
+        f"{result.records_skipped} skipped{skip_summary}{detail_summary}"
     )
     if not args.dry_run and result.output_path is not None:
         print(f"Wrote {result.output_path}")
@@ -1033,7 +1040,7 @@ async def _run_generate_exports(args: argparse.Namespace, settings: Settings) ->
     return 0
 
 
-def _format_skip_reasons(skip_reasons: dict[str, int] | object) -> str:
+def _format_skip_reasons(skip_reasons: Mapping[str, int]) -> str:
     if not skip_reasons:
         return ""
     parts = [f"{reason}={count}" for reason, count in sorted(skip_reasons.items())]

@@ -45,6 +45,7 @@ def test_mib_record_from_csv_row_maps_live_shape() -> None:
     assert record.postcode == "E2 1AA"
     assert record.country == "GB"
     assert record.source_url == "https://mosques.muslimsinbritain.org/index.php?id=1"
+    assert record.detail_page_url == "https://mosques.muslimsinbritain.org/show-mosque.php?id=1&map"
 
 
 def test_mib_record_from_csv_row_detects_irish_eircode() -> None:
