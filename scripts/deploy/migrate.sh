@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 
 cd "$ROOT_DIR"
 
@@ -11,10 +12,8 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-eval "$("$ROOT_DIR/scripts/deploy/compose-args.sh")"
-
-echo "Running Alembic migrations (compose: ${COMPOSE_ARGS[*]})..."
-docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps api \
+echo "Running Alembic migrations (compose file: $COMPOSE_FILE)..."
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps api \
   alembic upgrade head
 
 echo "Migrations complete."

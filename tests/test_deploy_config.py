@@ -48,7 +48,6 @@ def test_caddyfile_proxies_exports_to_minio() -> None:
 def test_deploy_scripts_exist_and_are_executable() -> None:
     script_dir = ROOT / "scripts" / "deploy"
     for name in (
-        "compose-args.sh",
         "migrate.sh",
         "backup-postgres.sh",
         "backup-minio.sh",
@@ -70,24 +69,12 @@ def test_smoke_test_asserts_readiness_response_fields() -> None:
 def test_deploy_script_order_matches_checklist() -> None:
     deploy = (ROOT / "scripts" / "deploy" / "deploy.sh").read_text()
     backup_idx = deploy.index("backup-postgres.sh")
-    build_idx = deploy.index('build "${build_services[@]}"')
+    build_idx = deploy.index("build api worker beat caddy")
     migrate_idx = deploy.index("migrate.sh")
     smoke_idx = deploy.index("smoke-test.sh")
     assert backup_idx < build_idx < migrate_idx < smoke_idx
     assert "health_ok" in deploy
     assert "SKIP_BACKUP" in deploy and "WARNING" in deploy
-    assert "compose-args.sh" in deploy
-    assert "SHARED_PROXY" in deploy
-
-
-def test_shared_proxy_compose_attaches_api_to_web_network() -> None:
-    text = (ROOT / "docker-compose.vps.shared-proxy.yml").read_text()
-    assert "profiles:" in text
-    assert "bundled-caddy" in text
-    assert "aliases:" in text
-    assert "mosques" in text
-    assert "default: {}" in text
-    assert 'name: web' in text
 
 
 def test_vps_env_example_documents_required_keys() -> None:
@@ -102,7 +89,6 @@ def test_vps_env_example_documents_required_keys() -> None:
         "TRUST_PROXY_HEADERS",
         "EXPORT_BASE_URL",
         "EXPORT_ENABLED",
-        "SHARED_PROXY",
     ):
         assert key in text, key
 

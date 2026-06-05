@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 SKIP_MIGRATE="${SKIP_MIGRATE:-0}"
 SKIP_SMOKE="${SKIP_SMOKE:-0}"
@@ -14,14 +15,12 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-eval "$("$ROOT_DIR/scripts/deploy/compose-args.sh")"
-
 if [[ "$SKIP_BACKUP" == "1" || "$SKIP_MIGRATE" == "1" || "$SKIP_SMOKE" == "1" ]]; then
   echo "WARNING: break-glass deploy skips enabled — SKIP_BACKUP=$SKIP_BACKUP SKIP_MIGRATE=$SKIP_MIGRATE SKIP_SMOKE=$SKIP_SMOKE" >&2
 fi
 
 echo "==> Deploy checklist: pull, backup, build, migrate, restart, smoke test"
-echo "    compose: ${COMPOSE_ARGS[*]}"
+echo "    compose file: $COMPOSE_FILE"
 
 echo "==> Pull latest source (if using git on the server)"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -31,10 +30,10 @@ else
 fi
 
 echo "==> Ensure data services are running"
-docker compose "${COMPOSE_ARGS[@]}" up -d postgres redis minio
+docker compose -f "$COMPOSE_FILE" up -d postgres redis minio
 
 echo "==> Stop application writers before backup/migrate"
-docker compose "${COMPOSE_ARGS[@]}" stop api worker beat 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" stop api worker beat 2>/dev/null || true
 
 if [[ "$SKIP_BACKUP" != "1" ]]; then
   echo "==> Pre-deploy Postgres backup"
@@ -43,21 +42,8 @@ else
   echo "==> Skipping backup (SKIP_BACKUP=1)"
 fi
 
-build_services=(api worker beat)
-start_services=(api worker beat)
-# shellcheck disable=SC1091
-set -a
-source .env
-set +a
-if [[ "${SHARED_PROXY:-0}" != "1" && "${SHARED_PROXY:-}" != "true" ]]; then
-  build_services+=(caddy)
-  start_services+=(caddy)
-else
-  echo "==> SHARED_PROXY enabled — skipping bundled caddy (use caddy-infra)"
-fi
-
 echo "==> Build application images"
-docker compose "${COMPOSE_ARGS[@]}" build "${build_services[@]}"
+docker compose -f "$COMPOSE_FILE" build api worker beat caddy
 
 if [[ "$SKIP_MIGRATE" != "1" ]]; then
   echo "==> Apply database migrations"
@@ -67,12 +53,12 @@ else
 fi
 
 echo "==> Start application services"
-docker compose "${COMPOSE_ARGS[@]}" up -d "${start_services[@]}"
+docker compose -f "$COMPOSE_FILE" up -d api worker beat caddy
 
 echo "==> Wait for API health"
 health_ok=0
 for _ in $(seq 1 30); do
-  if docker compose "${COMPOSE_ARGS[@]}" exec -T api curl -fsS http://localhost:8000/v1/health >/dev/null 2>&1; then
+  if docker compose -f "$COMPOSE_FILE" exec -T api curl -fsS http://localhost:8000/v1/health >/dev/null 2>&1; then
     health_ok=1
     break
   fi
