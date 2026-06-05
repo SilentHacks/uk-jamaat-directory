@@ -25,7 +25,8 @@ from uk_jamaat_directory.ingest.sources.muslimsinbritain.schema import (
 )
 
 MIB_CSV_URL = "https://mosques.muslimsinbritain.org/gps-csv.php?includecomment=1"
-DETAIL_CONCURRENCY = 8
+DETAIL_CONCURRENCY = 3
+DETAIL_REQUEST_DELAY_SECONDS = 0.35
 
 _LAST_UPDATED = re.compile(r"\bLast\s+Updated:\s*(\d{1,2}/\d{1,2}/\d{4})\b", re.IGNORECASE)
 _PHONE = re.compile(
@@ -159,6 +160,7 @@ async def enrich_mib_details(
     *,
     settings: Settings | None = None,
     concurrency: int = DETAIL_CONCURRENCY,
+    request_delay_seconds: float = DETAIL_REQUEST_DELAY_SECONDS,
 ) -> tuple[int, int]:
     cfg = settings or get_settings()
     headers = {"User-Agent": cfg.crawl_user_agent, "Accept": "text/html,*/*"}
@@ -176,6 +178,7 @@ async def enrich_mib_details(
                 return False
             async with semaphore:
                 detail = await fetch_mib_detail_page(client, url)
+                await asyncio.sleep(request_delay_seconds)
             if detail is None:
                 return False
             apply_mib_detail(record, detail)
