@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–8 are in place (through admin moderation and community intake). Phase 9 adds standard-feed crawl, private artifact storage, and Celery-backed fetch/extract (standard JSON feed only; HTML/PDF deferred). Bulk export file generation is not implemented yet. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–9 are in place. Phase 10 adds deterministic bulk export file generation (NDJSON/CSV/changes/metadata) to object storage. HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
 
@@ -187,6 +187,27 @@ Crawl is **opt-in** (`CRAWL_ENABLED=false` by default). Requires MinIO/S3 for ar
 ```
 
 Celery beat (when worker/beat containers run) registers sources daily and enqueues hourly due fetches. MyLocalMasjid is **not** crawled in Phase 9.
+
+## Bulk exports (Phase 10)
+
+After publishing, generate reproducible snapshot files for the latest (or specified) dataset version. Files are stored in MinIO/S3 and manifest URLs/checksums are written to `dataset_versions.manifest.exports`.
+
+```bash
+# Latest published dataset version
+.venv/bin/uk-jamaat-directory generate-exports
+
+# Specific version
+.venv/bin/uk-jamaat-directory generate-exports --version 2026-06-04.1
+```
+
+Generated per version under `exports/{version}/`:
+
+- `snapshot.ndjson` — mosques and occurrences (public-safe fields only)
+- `occurrences.csv` — flat occurrence rows
+- `changes.ndjson` — change events for the dataset version
+- `metadata.json`, `attribution.txt`, `manifest.json`
+
+`/v1/snapshots/latest` returns export URLs and checksums after generation. Celery beat runs `generate-exports` daily at 04:00 Europe/London when `EXPORT_ENABLED=true`.
 
 ## Development
 
