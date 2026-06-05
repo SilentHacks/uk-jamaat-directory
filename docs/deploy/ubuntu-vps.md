@@ -141,6 +141,34 @@ Copy backups off the VPS (object storage, another host, or backup provider) befo
 
 Restore procedure: [restore.md](restore.md).
 
+## Shared caddy-infra reverse proxy
+
+When a VPS already runs a single Caddy instance for multiple apps (for example
+`caddy-infra` owned by the `abid` user), do **not** start the bundled `caddy`
+service from this compose file.
+
+1. Set `SHARED_PROXY=1` in `.env`.
+2. Deploy with the shared-proxy override (deploy scripts pick this up automatically
+   when `SHARED_PROXY=1`):
+
+```bash
+docker compose -f docker-compose.vps.yml -f docker-compose.vps.shared-proxy.yml up -d --build
+```
+
+3. Copy and edit the site block template, then install it under caddy-infra:
+
+```bash
+cp deploy/caddy/shared-infra/mosques.caddy /home/abid/caddy-infra/sites/
+# replace directory.example.com with PUBLIC_DOMAIN
+docker exec caddy-infra-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+```
+
+The override attaches the API to the external Docker network `web` with alias
+`mosques` so caddy-infra can `reverse_proxy mosques:8000`. Postgres, Redis, and
+MinIO stay on the project default network.
+
+Host-specific compose tweaks can live under `.local/` (gitignored) on the server.
+
 ## nginx alternative
 
 Caddy in Compose is the default path. For nginx on the host instead:

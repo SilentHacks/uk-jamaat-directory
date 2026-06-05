@@ -3,13 +3,15 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from uk_jamaat_directory.config import Settings
+from uk_jamaat_directory.config import Environment, Settings
 from uk_jamaat_directory.main import create_app
 
 
 @pytest.mark.asyncio
 async def test_health_endpoint_returns_service_metadata() -> None:
-    app = create_app(Settings(allowed_hosts=["test"]))
+    app = create_app(
+        Settings(allowed_hosts=["test"], environment=Environment.DEVELOPMENT),
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/v1/health", headers={"X-Request-ID": "test-request"})
