@@ -31,7 +31,7 @@ def upgrade() -> None:
           source_type = 'mosque_website',
           external_id = 'web-' || ms.mosque_id::text,
           source_url = COALESCE(m.website_url, 'https://' || ms.external_id),
-          metadata_ = COALESCE(ms.metadata_, '{}'::jsonb) || jsonb_build_object(
+          metadata = COALESCE(ms.metadata, '{}'::jsonb) || jsonb_build_object(
             'migrated_from', 'standard_feed',
             'homepage_url', COALESCE(m.website_url, 'https://' || ms.external_id),
             'profile_status', 'pending'

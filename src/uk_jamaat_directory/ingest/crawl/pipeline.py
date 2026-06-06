@@ -138,7 +138,7 @@ async def _touch_source_health(
         health.message = message
     else:
         health.last_failure_at = now
-        health.consecutive_failures += 1
+        health.consecutive_failures = (health.consecutive_failures or 0) + 1
         health.message = message
         if health.consecutive_failures >= 3:
             health.freshness_status = FreshnessStatus.SOURCE_FAILED
