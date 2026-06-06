@@ -31,7 +31,8 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 
 - Phase 7 schedules: `validate-candidates`, `publish-candidates`, `recompute-freshness` CLI; explicit publish only (see ADR 0006)
 - Phase 8 admin: candidate approve/reject/list, source list/patch, coverage, source-health; public corrections, schedule submissions, and claims on `/v1/mosques/{id}/…`
-- Phase 9 crawl: mosque_website fetch, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, …). HTML/PDF/OCR/AI deferred.
+- Phase 7 AI: `profile-source`, `profile-sources` CLI; Groq + llama-3.1-8b-instant reconnaissance profiling; `ExtractionProfile` schema; 30 RPM token-bucket rate limiter; admin API `GET/POST /v1/admin/sources/{id}/profile` (ADR 0015).
+- Phase 9 crawl: mosque_website fetch, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, …). HTML/PDF/OCR deferred.
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
 - Phase 11 deploy: `docker-compose.production.yml`, bundled Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
 - Phase 12 GitHub: CI on `master`, Dependabot, dependency review workflow, `LICENSE.md` / `DATA_LICENSE.md` / `ATTRIBUTION.md` / `SECURITY.md`, `docs/github/` (ADR 0010).

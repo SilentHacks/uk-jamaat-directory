@@ -14,3 +14,7 @@ This directory records project decisions that are expensive to rediscover later.
 - [0008: Bulk Export Snapshots](0008-bulk-export-snapshots.md)
 - [0009: Docker Compose VPS Deployment](0009-docker-vps-deployment.md)
 - [0010: GitHub Publishing Workflow](0010-github-publishing-workflow.md)
+- [0011: MuslimsInBritain Import Policy](0011-muslimsinbritain-import-policy.md)
+- [0012: Website Discovery Policy](0012-website-discovery-policy.md)
+- [0014: Retire Standard Feed](0014-retire-standard-feed.md)
+- [0015: AI Extraction Profiles](0015-ai-extraction-profiles.md)
