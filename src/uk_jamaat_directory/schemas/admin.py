@@ -84,6 +84,13 @@ class AdminDiscoveryLeadCreate(BaseModel):
     query: str = Field(min_length=1)
     notes: str | None = None
     location_hint: str | None = None
+    provider: str = Field(
+        default="google",
+        description=(
+            "Signal source of the lead (e.g. 'google', 'mib_metadata', "
+            "'osm_tag_recheck', 'charity_commission', 'wikidata', 'duckduckgo')."
+        ),
+    )
 
 
 class AdminDiscoveryLeadResponse(BaseModel):

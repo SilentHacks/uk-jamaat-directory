@@ -560,19 +560,20 @@ async def record_discovery_lead(
     notes: str | None,
     location_hint: str | None,
     actor: str,
+    provider: str = "google",
 ) -> uuid.UUID:
     lead_id = uuid.uuid4()
     await _audit(
         session,
         actor=actor,
-        action="google_discovery_lead",
+        action="discovery_lead",
         entity_type="discovery_lead",
         entity_id=lead_id,
         reason=notes,
         metadata={
             "query": query,
             "location_hint": location_hint,
-            "provider": "google",
+            "provider": provider,
             "policy": "admin_only_private",
         },
     )

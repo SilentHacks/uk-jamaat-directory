@@ -370,6 +370,7 @@ async def create_discovery_lead(
         notes=payload.notes,
         location_hint=payload.location_hint,
         actor="admin_api",
+        provider=payload.provider,
     )
     await session.commit()
     return AdminDiscoveryLeadResponse(

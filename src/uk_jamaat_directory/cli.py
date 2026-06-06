@@ -404,6 +404,29 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Report counts without writing to the database",
     )
 
+    discover_websites = subparsers.add_parser(
+        "discover-websites",
+        help=(
+            "Run Phase 5 website discovery over mosques with no website_url. "
+            "Defaults to the MiB metadata walk; pass --provider to add others."
+        ),
+    )
+    discover_websites.add_argument(
+        "--provider",
+        action="append",
+        choices=("mib_metadata", "osm_tag_recheck", "duckduckgo"),
+        help=(
+            "Lead source(s) to include. May be passed multiple times. "
+            "Currently only mib_metadata is implemented; osm_tag_recheck and "
+            "duckduckgo are reserved for future use."
+        ),
+    )
+    discover_websites.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run the providers and verification but do not write promotions",
+    )
+
 
 def _resolve_mlm_policy(args: argparse.Namespace, settings: Settings):
     raw = args.publication_policy or settings.mylocalmasjid_publication_policy
@@ -682,6 +705,8 @@ def main() -> None:
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
     if args.command == "backfill-mib-websites":
         raise SystemExit(asyncio.run(_run_backfill_mib_websites(args, settings)))
+    if args.command == "discover-websites":
+        raise SystemExit(asyncio.run(_run_discover_websites(args, settings)))
 
     parser.print_help()
 
@@ -1150,6 +1175,40 @@ async def _run_backfill_mib_websites(args: argparse.Namespace, settings: Setting
         f"skipped_no_website_in_metadata={result.skipped_no_website_in_metadata} "
         f"errors={len(result.errors)}"
     )
+    if result.errors:
+        print("Errors:", file=sys.stderr)
+        for error in result.errors[:20]:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+async def _run_discover_websites(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from uk_jamaat_directory.services.website_discovery import run_website_discovery
+
+    async with cli_db_session(settings) as session:
+        result = await run_website_discovery(
+            session,
+            actor="discover_websites_cli",
+        )
+        if not args.dry_run:
+            await session.commit()
+
+    print(
+        f"Phase 5 website discovery: "
+        f"verified={result.verified} "
+        f"promoted={result.promoted} "
+        f"denied={result.denied} "
+        f"fetch_failed={result.fetch_failed} "
+        f"no_match={result.no_match} "
+        f"leads_recorded={result.leads_recorded}"
+    )
+    for name, provider_result in result.providers.items():
+        print(
+            f"  provider {name}: proposed={provider_result.candidates_proposed}"
+        )
     if result.errors:
         print("Errors:", file=sys.stderr)
         for error in result.errors[:20]:
