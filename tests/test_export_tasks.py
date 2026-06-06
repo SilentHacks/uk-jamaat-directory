@@ -41,12 +41,12 @@ async def test_generate_latest_exports_raises_on_errors(test_settings) -> None:
 
 def test_generate_latest_exports_task_runs_async_helper() -> None:
     with patch(
-        "uk_jamaat_directory.tasks.exports.asyncio.run",
-        return_value={"version": "2026-06-04.1"},
-    ) as run_mock:
+        "uk_jamaat_directory.tasks.exports._generate_latest_exports_async",
+        new=AsyncMock(return_value={"version": "2026-06-04.1"}),
+    ) as async_mock:
         from uk_jamaat_directory.tasks.exports import generate_latest_exports_task
 
         result = generate_latest_exports_task()
 
-    run_mock.assert_called_once()
+    async_mock.assert_awaited_once()
     assert result == {"version": "2026-06-04.1"}

@@ -77,8 +77,32 @@ POSTGIS_SYSTEM_TABLES = frozenset(
     }
 )
 
+# Tables are listed in reverse dependency order (children first) so plain
+# DELETE statements succeed without disabling FK checks.
+_DELETE_ORDER = [
+    "change_events",
+    "schedule_occurrences",
+    "schedule_candidates",
+    "extraction_runs",
+    "source_artifacts",
+    "source_health",
+    "identity_match_reviews",
+    "mosque_claims",
+    "corrections",
+    "mosque_aliases",
+    "mosque_attributes",
+    "mosque_sources",
+    "dataset_versions",
+    "moderation_actions",
+    "mosques",
+]
 
-async def _truncate_public_tables(connection) -> None:
+# Extra tables discovered from pg_tables that aren't in _DELETE_ORDER
+# will be deleted at the end.
+_truncatable_tables: list[str] | None = None
+
+
+async def _discover_truncatable_tables(connection) -> list[str]:
     result = await connection.execute(
         text(
             """
@@ -87,11 +111,21 @@ async def _truncate_public_tables(connection) -> None:
             """
         )
     )
-    tables = [row[0] for row in result if row[0] not in POSTGIS_SYSTEM_TABLES]
-    if not tables:
-        return
-    table_list = ", ".join(f'"{name}"' for name in tables)
-    await connection.execute(text(f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE"))
+    return [row[0] for row in result if row[0] not in POSTGIS_SYSTEM_TABLES]
+
+
+async def _truncate_public_tables(connection) -> None:
+    global _truncatable_tables
+    extra = _truncatable_tables
+    if extra is None:
+        all_tables = await _discover_truncatable_tables(connection)
+        extra = [t for t in all_tables if t not in _DELETE_ORDER]
+        _truncatable_tables = extra
+
+    for name in _DELETE_ORDER:
+        await connection.execute(text(f'DELETE FROM "{name}"'))
+    for name in extra:
+        await connection.execute(text(f'DELETE FROM "{name}"'))
 
 
 async def _bootstrap_schema(database_url: str) -> None:

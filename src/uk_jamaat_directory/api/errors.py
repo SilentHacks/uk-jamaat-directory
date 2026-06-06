@@ -54,7 +54,7 @@ async def http_exception_handler(
         code = "unauthorized"
     elif exc.status_code == status.HTTP_403_FORBIDDEN:
         code = "forbidden"
-    elif exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+    elif exc.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT:
         code = "validation_error"
     elif exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
         code = "service_unavailable"
@@ -69,7 +69,7 @@ async def validation_exception_handler(
 ) -> JSONResponse:
     return error_response(
         request=request,
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         code="validation_error",
         message="Request validation failed",
         details=exc.errors(),

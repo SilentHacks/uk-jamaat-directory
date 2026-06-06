@@ -45,9 +45,11 @@ class ExaClient:
         api_key: str,
         timeout: float = 15.0,
         max_concurrency: int = 8,
+        retry_backoff_base: float = _RETRY_BACKOFF_BASE,
     ) -> None:
         self._api_key = api_key
         self._timeout = timeout
+        self._retry_backoff_base = retry_backoff_base
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._client = httpx.AsyncClient(timeout=timeout)
 
@@ -81,11 +83,11 @@ class ExaClient:
                         json=payload,
                     )
                     if response.status_code == 429:
-                        wait = _RETRY_BACKOFF_BASE**attempt
+                        wait = self._retry_backoff_base**attempt
                         await asyncio.sleep(wait)
                         continue
                     if 500 <= response.status_code < 600:
-                        wait = _RETRY_BACKOFF_BASE**attempt
+                        wait = self._retry_backoff_base**attempt
                         await asyncio.sleep(wait)
                         continue
                     response.raise_for_status()
@@ -94,7 +96,7 @@ class ExaClient:
                 except (httpx.HTTPStatusError, httpx.RequestError) as exc:
                     last_exception = exc
                     if attempt < _MAX_RETRIES:
-                        wait = _RETRY_BACKOFF_BASE**attempt
+                        wait = self._retry_backoff_base**attempt
                         await asyncio.sleep(wait)
                     continue
 
