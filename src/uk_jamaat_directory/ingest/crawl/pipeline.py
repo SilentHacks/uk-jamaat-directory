@@ -161,7 +161,11 @@ async def list_due_source_ids(
         (
             await session.execute(
                 select(MosqueSource.id)
-                .where(MosqueSource.source_type == SourceType.STANDARD_FEED)
+                .where(
+                    MosqueSource.source_type.in_(
+                        [SourceType.STANDARD_FEED, SourceType.MOSQUE_WEBSITE]
+                    )
+                )
                 .where(MosqueSource.source_url.is_not(None))
             )
         )

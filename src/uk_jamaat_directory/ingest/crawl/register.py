@@ -14,17 +14,24 @@ from uk_jamaat_directory.domain import (
     SourcePublicationPolicy,
     SourceType,
 )
-from uk_jamaat_directory.ingest.normalize import normalize_domain
+from uk_jamaat_directory.ingest.normalize import canonical_homepage, normalize_domain
 from uk_jamaat_directory.models.core import Mosque, MosqueSource, SourceHealth
+
+_CRAWL_SOURCE_TYPES = (SourceType.STANDARD_FEED, SourceType.MOSQUE_WEBSITE)
 
 
 @dataclass
 class RegisterResult:
-    created: int = 0
+    created_mosque_website: int = 0
     skipped_existing: int = 0
     skipped_mlm: int = 0
     skipped_no_domain: int = 0
+    synced: int = 0
     errors: list[str] = field(default_factory=list)
+
+    @property
+    def created(self) -> int:
+        return self.created_mosque_website
 
 
 async def _has_recent_mlm_source(
@@ -53,25 +60,37 @@ async def _has_recent_mlm_source(
     return False
 
 
-async def ensure_standard_feed_sources(
+async def _existing_crawl_source_for_mosque(
+    session: AsyncSession,
+    mosque_id: uuid.UUID,
+) -> MosqueSource | None:
+    return await session.scalar(
+        select(MosqueSource).where(
+            MosqueSource.mosque_id == mosque_id,
+            MosqueSource.source_type.in_(_CRAWL_SOURCE_TYPES),
+        )
+    )
+
+
+async def ensure_crawl_sources(
     session: AsyncSession,
     *,
     settings: Settings | None = None,
+    limit: int | None = None,
+    dry_run: bool = False,
 ) -> RegisterResult:
     cfg = settings or get_settings()
     result = RegisterResult()
 
-    mosques = (
-        (
-            await session.execute(
-                select(Mosque)
-                .where(Mosque.status == MosqueStatus.ACTIVE)
-                .where(Mosque.website_url.is_not(None))
-            )
-        )
-        .scalars()
-        .all()
+    stmt = (
+        select(Mosque)
+        .where(Mosque.status == MosqueStatus.ACTIVE)
+        .where(Mosque.website_url.is_not(None))
     )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    mosques = (await session.execute(stmt)).scalars().all()
 
     for mosque in mosques:
         domain = normalize_domain(mosque.website_url)
@@ -79,12 +98,7 @@ async def ensure_standard_feed_sources(
             result.skipped_no_domain += 1
             continue
 
-        existing = await session.scalar(
-            select(MosqueSource).where(
-                MosqueSource.source_type == SourceType.STANDARD_FEED,
-                MosqueSource.external_id == domain,
-            )
-        )
+        existing = await _existing_crawl_source_for_mosque(session, mosque.id)
         if existing is not None:
             result.skipped_existing += 1
             continue
@@ -93,22 +107,42 @@ async def ensure_standard_feed_sources(
             result.skipped_mlm += 1
             continue
 
-        feed_url = f"https://{domain}{cfg.standard_feed_path}"
+        homepage = canonical_homepage(mosque.website_url)
+        if homepage is None:
+            result.skipped_no_domain += 1
+            continue
+
+        if dry_run:
+            result.created_mosque_website += 1
+            continue
+
         source = MosqueSource(
             id=uuid.uuid4(),
             mosque_id=mosque.id,
-            source_type=SourceType.STANDARD_FEED,
-            external_id=domain,
-            source_url=feed_url,
+            source_type=SourceType.MOSQUE_WEBSITE,
+            external_id=f"web-{mosque.id}",
+            source_url=homepage,
             publication_policy=SourcePublicationPolicy.UNKNOWN,
             confidence=Confidence.OFFICIAL_IMPORT,
             metadata_={
                 "crawl_enabled": True,
                 "discovered_by": "website_url_bootstrap",
+                "homepage_url": homepage,
+                "profile_status": "pending",
+                "allowed_crawl_paths": ["/"],
             },
         )
         session.add(source)
-        result.created += 1
+        result.created_mosque_website += 1
 
-    await session.flush()
+    if not dry_run:
+        await session.flush()
     return result
+
+
+async def ensure_standard_feed_sources(
+    session: AsyncSession,
+    *,
+    settings: Settings | None = None,
+) -> RegisterResult:
+    return await ensure_crawl_sources(session, settings=settings)

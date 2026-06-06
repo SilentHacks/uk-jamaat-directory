@@ -48,6 +48,20 @@ def normalize_domain(url: str | None) -> str | None:
     return host or None
 
 
+def canonical_homepage(url: str | None) -> str | None:
+    if url is None or not url.strip():
+        return None
+    parsed = urlparse(url.strip() if "://" in url else f"https://{url.strip()}")
+    scheme = parsed.scheme or "https"
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return None
+    path = parsed.path.rstrip("/") or "/"
+    return f"{scheme}://{host}{path}"
+
+
 def normalize_city(city: str | None) -> str | None:
     if city is None:
         return None

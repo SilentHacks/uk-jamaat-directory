@@ -6,17 +6,17 @@ import uuid
 from uk_jamaat_directory.config import get_settings
 from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.ingest.crawl.pipeline import list_due_source_ids, process_source
-from uk_jamaat_directory.ingest.crawl.register import ensure_standard_feed_sources
+from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
 from uk_jamaat_directory.worker import celery_app
 
 
 async def _register_sources_async() -> dict[str, int]:
     settings = get_settings()
     async with cli_db_session(settings) as session:
-        result = await ensure_standard_feed_sources(session, settings=settings)
+        result = await ensure_crawl_sources(session, settings=settings)
         await session.commit()
     return {
-        "created": result.created,
+        "created_mosque_website": result.created_mosque_website,
         "skipped_existing": result.skipped_existing,
         "skipped_mlm": result.skipped_mlm,
         "skipped_no_domain": result.skipped_no_domain,

@@ -17,7 +17,7 @@ from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.db.session import create_engine
 from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
-from uk_jamaat_directory.ingest.crawl.register import ensure_standard_feed_sources
+from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
 from uk_jamaat_directory.ingest.extract.standard_feed import extract_standard_feed
 from uk_jamaat_directory.ingest.fetch import fetch_url
@@ -332,9 +332,20 @@ def _add_identity_parsers(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
-    subparsers.add_parser(
+    register_cmd = subparsers.add_parser(
         "register-crawl-sources",
-        help="Create standard_feed mosque sources from active mosque website URLs",
+        help="Create mosque_website crawl sources from active mosque website URLs",
+    )
+    register_cmd.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only process the first N mosques missing crawl sources",
+    )
+    register_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report would-create counts without writing to the database",
     )
 
     fetch_source = subparsers.add_parser(
@@ -729,7 +740,7 @@ def main() -> None:
         raise SystemExit(asyncio.run(_run_activate_reviewed_mosques(args, settings)))
 
     if args.command == "register-crawl-sources":
-        raise SystemExit(asyncio.run(_run_register_crawl_sources(settings)))
+        raise SystemExit(asyncio.run(_run_register_crawl_sources(args, settings)))
 
     if args.command == "fetch-source":
         raise SystemExit(asyncio.run(_run_fetch_source(args, settings)))
@@ -816,14 +827,21 @@ async def _run_recompute_freshness(settings: Settings) -> int:
     return 0
 
 
-async def _run_register_crawl_sources(settings: Settings) -> int:
+async def _run_register_crawl_sources(args: argparse.Namespace, settings: Settings) -> int:
     async with cli_db_session(settings) as session:
-        result = await ensure_standard_feed_sources(session, settings=settings)
-        await session.commit()
+        result = await ensure_crawl_sources(
+            session,
+            settings=settings,
+            limit=args.limit,
+            dry_run=args.dry_run,
+        )
+        if not args.dry_run:
+            await session.commit()
 
+    mode = "DRY RUN" if args.dry_run else "registered"
     print(
-        "Crawl source registration: "
-        f"created={result.created}, "
+        f"Crawl source registration ({mode}): "
+        f"created_mosque_website={result.created_mosque_website}, "
         f"skipped_existing={result.skipped_existing}, "
         f"skipped_mlm={result.skipped_mlm}, "
         f"skipped_no_domain={result.skipped_no_domain}"
