@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 
 from geoalchemy2.shape import to_shape
 from rapidfuzz import fuzz
@@ -22,9 +23,22 @@ from uk_jamaat_directory.models.core import Mosque, MosqueAlias
 
 AUTO_LINK_THRESHOLD = 0.75
 STRONG_NAME_RATIO = 92
+NAME_OVERRIDE_RATIO = 85
+NAME_OVERRIDE_MAX_GAP = 0.25
+PARENT_ORG_PENALTY = 0.20
 GEO_IDENTITY_METERS = 25
 NEARBY_METERS = 150
 GEO_CANDIDATE_METERS = 500
+
+_PARENT_ORG_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bwelfare\s+association\b", re.IGNORECASE),
+    re.compile(r"\beducation\s+society\b", re.IGNORECASE),
+    re.compile(r"\beducation\s+trust\b", re.IGNORECASE),
+    re.compile(r"\borganisation\b", re.IGNORECASE),
+    re.compile(r"\borganization\b", re.IGNORECASE),
+    re.compile(r"\bcharity\b", re.IGNORECASE),
+    re.compile(r"\bfalah\s+education\b", re.IGNORECASE),
+)
 
 
 def score_mosque_candidate(
@@ -88,6 +102,18 @@ def score_mosque_candidate(
         signals += geo_signals
         reasons.extend(geo_reasons)
 
+    best_name_ratio = max(
+        [
+            ratio
+            for reason in reasons
+            if (ratio := _fuzzy_ratio_from_reason(reason)) is not None
+        ],
+        default=0,
+    )
+    if _is_parent_org_name(record.name) and best_name_ratio < NAME_OVERRIDE_RATIO:
+        score -= PARENT_ORG_PENALTY
+        reasons.append("parent_org_source")
+
     if score < 0.25:
         return None
 
@@ -106,13 +132,22 @@ def decide_match(
         )
 
     ranked = sorted(candidates, key=lambda item: item.score, reverse=True)
+    override_idx = _name_evidence_override(ranked)
+    override_applied = False
+    if override_idx is not None:
+        promoted = ranked.pop(override_idx)
+        ranked.insert(0, promoted)
+        override_applied = True
     best = ranked[0]
 
     if len(ranked) > 1 and ranked[1].score >= 0.5 and (best.score - ranked[1].score) < 0.1:
+        reasons_list = ["ambiguous_multiple_candidates"]
+        if override_applied:
+            reasons_list.append("name_evidence_override")
         return DiscoveryMatch(
             decision=MatchDecision.NEEDS_REVIEW,
             score=best.score,
-            reasons=["ambiguous_multiple_candidates"],
+            reasons=reasons_list,
             alternatives=ranked[:3],
         )
 
@@ -130,18 +165,24 @@ def decide_match(
         )
 
     if best.score >= AUTO_LINK_THRESHOLD:
+        reasons_list = ["high_score_insufficient_signals", *best.reasons]
+        if override_applied:
+            reasons_list.insert(0, "name_evidence_override")
         return DiscoveryMatch(
             decision=MatchDecision.NEEDS_REVIEW,
             score=best.score,
-            reasons=["high_score_insufficient_signals", *best.reasons],
+            reasons=reasons_list,
             alternatives=ranked[:3],
         )
 
     if best.score >= 0.25:
+        reasons_list = ["below_auto_link_threshold", *best.reasons]
+        if override_applied:
+            reasons_list.insert(0, "name_evidence_override")
         return DiscoveryMatch(
             decision=MatchDecision.NEEDS_REVIEW,
             score=best.score,
-            reasons=["below_auto_link_threshold", *best.reasons],
+            reasons=reasons_list,
             alternatives=ranked[:3],
         )
 
@@ -163,6 +204,50 @@ def _fuzzy_ratio_from_reason(reason: str) -> int | None:
         return int(suffix)
     except ValueError:
         return None
+
+
+def _highest_name_ratio(reasons: list[str]) -> int:
+    return max(
+        (ratio for reason in reasons if (ratio := _fuzzy_ratio_from_reason(reason)) is not None),
+        default=0,
+    )
+
+
+def _name_evidence_override(ranked: list[ScoredMosqueCandidate]) -> int | None:
+    """Return the index of a candidate to promote to the top of `ranked`.
+
+    The override applies when the highest-scoring candidate has no name
+    evidence at all but a lower-ranked candidate shares a meaningful
+    portion of the name. This protects against the case where a
+    geo+postcode-only candidate outranks a name-matching candidate just
+    because it happens to be closer.
+    """
+    if len(ranked) < 2:
+        return None
+    if _highest_name_ratio(ranked[0].reasons) >= NAME_OVERRIDE_RATIO:
+        return None
+    top = ranked[0]
+    for idx, alt in enumerate(ranked[1:], start=1):
+        if _highest_name_ratio(alt.reasons) < NAME_OVERRIDE_RATIO:
+            continue
+        if top.score - alt.score > NAME_OVERRIDE_MAX_GAP:
+            return None
+        return idx
+    return None
+
+
+def _is_parent_org_name(name: str | None) -> bool:
+    """Return True if `name` looks like a parent organisation rather than a venue.
+
+    These are records that share a building with a real mosque but are not
+    the mosque itself (e.g. "Islamic Cultural Welfare Association",
+    "Falah Education Society", "IMAM Organisation UK"). When the source
+    has such a name and there is no name match with the candidate, the
+    score is penalised so the matcher does not auto-link them.
+    """
+    if not name:
+        return False
+    return any(pattern.search(name) for pattern in _PARENT_ORG_PATTERNS)
 
 
 def _count_strong_signals(reasons: list[str]) -> int:

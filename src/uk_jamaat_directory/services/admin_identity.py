@@ -315,6 +315,7 @@ async def list_identity_reviews(
     *,
     status: str = "pending",
     source_type: str | None = None,
+    reason: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> IdentityReviewList:
@@ -340,6 +341,12 @@ async def list_identity_reviews(
         count_stmt = count_stmt.join(MosqueSource).where(
             MosqueSource.source_type == parsed_source_type
         )
+    if reason is not None:
+        # The reasons column stores a JSONB object whose `reasons` key is an
+        # array of tokens. The Postgres `?` operator tests array membership.
+        reasons_filter = IdentityMatchReview.reasons["reasons"].op("?")(reason)
+        stmt = stmt.where(reasons_filter)
+        count_stmt = count_stmt.where(reasons_filter)
 
     rows = list((await session.execute(stmt)).all())
     items = [

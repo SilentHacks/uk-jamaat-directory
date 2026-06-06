@@ -280,6 +280,15 @@ def _add_identity_parsers(subparsers: argparse._SubParsersAction) -> None:
     )
     list_reviews.add_argument("--status", default="pending")
     list_reviews.add_argument("--source-type", default=None)
+    list_reviews.add_argument(
+        "--reason",
+        default=None,
+        help=(
+            "Filter to reviews whose reasons array contains this token "
+            "(e.g. parent_org_source, name_evidence_override, "
+            "high_score_insufficient_signals, below_auto_link_threshold)."
+        ),
+    )
     list_reviews.add_argument("--limit", type=int, default=50)
     list_reviews.add_argument("--offset", type=int, default=0)
     list_reviews.add_argument("--json", action="store_true")
@@ -810,6 +819,7 @@ async def _run_list_identity_reviews(args: argparse.Namespace, settings: Setting
             session,
             status=args.status,
             source_type=args.source_type,
+            reason=args.reason,
             limit=args.limit,
             offset=args.offset,
         )
