@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
@@ -10,6 +11,14 @@ from uk_jamaat_directory.ingest.artifacts import latest_artifact_for_source
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.fetch.types import FetchResult
 from uk_jamaat_directory.models.core import MosqueSource
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html_tags(text: str) -> str:
+    """Remove HTML tags and collapse whitespace."""
+    stripped = _TAG_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", stripped).strip()
 
 # Common paths to probe when looking for prayer timetables.
 _TIMETABLE_PATHS = (
@@ -86,11 +95,12 @@ async def fetch_bounded_pages(
         if "html" not in ct:
             continue
 
-        text = fetch.body.decode("utf-8", errors="replace")
+        raw = fetch.body.decode("utf-8", errors="replace")
+        text = _strip_html_tags(raw)[:max_chars]
         pages.append(
             BoundedPageResult(
                 url=url,
-                body_snippet=text[:max_chars],
+                body_snippet=text,
                 content_type=fetch.content_type or "text/html",
                 status_code=fetch.status_code,
             )

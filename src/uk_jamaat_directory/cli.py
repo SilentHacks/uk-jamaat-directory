@@ -1480,9 +1480,14 @@ async def _run_profile_sources(args: argparse.Namespace, settings: Settings) -> 
 
         for source in sources:
             attempted += 1
-            result = await profile_mosque_website(session, source.id, settings)
-            if not args.dry_run:
-                await session.commit()
+            try:
+                result = await profile_mosque_website(session, source.id, settings)
+                if not args.dry_run:
+                    await session.commit()
+            except Exception as exc:
+                print(f"  error profiling {source.id}: {exc}", file=sys.stderr)
+                errors += 1
+                continue
 
             if result.profile is None:
                 errors += 1

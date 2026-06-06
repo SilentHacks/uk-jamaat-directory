@@ -85,39 +85,9 @@ class TestGroqChatCompletion:
         assert kwargs["headers"]["Authorization"] == "Bearer test-key"
 
     @pytest.mark.asyncio
-    async def test_429_retry_then_success(self):
+    async def test_429_raises_rate_limit_error(self):
         settings = Settings(groq_api_key="test-key")
-
-        def _json_200():
-            return {"choices": [{"message": {"content": "{}"}}]}
-
-        responses = [
-            AsyncMock(status_code=429, text="rate limited"),
-            AsyncMock(status_code=200, json=_json_200),
-        ]
-
-        mock_post = AsyncMock(side_effect=responses)
-
-        with patch("httpx.AsyncClient.post", new=mock_post):
-            result = await groq_chat_completion(
-                [GroqMessage(role="user", content="hello")],
-                model="llama-3.1-8b-instant",
-                settings=settings,
-            )
-
-        assert mock_post.call_count == 2
-        assert result == {"choices": [{"message": {"content": "{}"}}]}
-
-    @pytest.mark.asyncio
-    async def test_429_twice_raises_rate_limit_error(self):
-        settings = Settings(groq_api_key="test-key")
-
-        responses = [
-            AsyncMock(status_code=429, text="rate limited"),
-            AsyncMock(status_code=429, text="still rate limited"),
-        ]
-
-        mock_post = AsyncMock(side_effect=responses)
+        mock_post = AsyncMock(return_value=AsyncMock(status_code=429, text="rate limited"))
 
         with patch("httpx.AsyncClient.post", new=mock_post):
             with pytest.raises(GroqRateLimitError):
@@ -127,7 +97,7 @@ class TestGroqChatCompletion:
                     settings=settings,
                 )
 
-        assert mock_post.call_count == 2
+        assert mock_post.call_count == 1
 
     @pytest.mark.asyncio
     async def test_4xx_raises_groq_error(self):

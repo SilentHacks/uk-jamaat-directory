@@ -110,11 +110,6 @@ async def groq_chat_completion(
     async with httpx.AsyncClient(timeout=cfg.ai_profiling_timeout_seconds) as client:
         response = await client.post(_GROQ_API_URL, headers=headers, json=payload)
 
-        # One retry on 429
-        if response.status_code == 429:
-            await asyncio.sleep(5.0)
-            response = await client.post(_GROQ_API_URL, headers=headers, json=payload)
-
         if response.status_code == 429:
             raise GroqRateLimitError(
                 f"Groq rate limited after retry (429). Body: {response.text[:200]}"
