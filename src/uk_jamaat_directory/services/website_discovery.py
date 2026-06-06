@@ -41,6 +41,9 @@ from uk_jamaat_directory.ingest.discovery.websites.verify import (
     public_linked_provider,
     verify_website,
 )
+from uk_jamaat_directory.ingest.discovery.websites.verify_cache import (
+    VerificationPageCache,
+)
 from uk_jamaat_directory.models.core import Mosque, MosqueSource
 from uk_jamaat_directory.services.admin_identity import record_discovery_lead
 
@@ -226,6 +229,7 @@ async def run_website_discovery(
     providers: list[WebsiteLeadProvider] | None = None,
     actor: str = "phase5_discovery",
     user_agent: str | None = None,
+    page_cache: VerificationPageCache | None = None,
 ) -> DiscoveryRunResult:
     """Run the full discovery + verification + promotion loop.
 
@@ -235,6 +239,7 @@ async def run_website_discovery(
     settings = get_settings()
     user_agent = user_agent or settings.crawl_user_agent
     selected = providers or [propose_mib_metadata_leads, propose_osm_tag_leads]
+    cache = page_cache or VerificationPageCache()
 
     result = DiscoveryRunResult()
     mosques = await _select_mosques_missing_website(session)
@@ -273,7 +278,9 @@ async def run_website_discovery(
                         notes="public linked source (MiB/OSM/charity/wikidata)",
                     )
                 else:
-                    outcome = await verify_website(lead, verify_mosque, user_agent=user_agent)
+                    outcome = await verify_website(
+                        lead, verify_mosque, user_agent=user_agent, page_cache=cache
+                    )
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(f"{lead.url}: {exc}")
                 continue
@@ -303,4 +310,5 @@ async def run_website_discovery(
                 )
                 result.leads_recorded += 1
 
+    cache.commit()
     return result

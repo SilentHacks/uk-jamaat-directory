@@ -231,6 +231,7 @@ async def verify_website(
     user_agent: str,
     timeout: float = _PAGE_FETCH_TIMEOUT,
     fetcher=None,
+    page_cache=None,
 ) -> VerificationOutcome:
     """Verify a single :class:`WebsiteLead` against the moderate policy.
 
@@ -247,6 +248,10 @@ async def verify_website(
     fetcher
         Optional async callable ``fetcher(url) -> (title, text) | None`` to
         inject into tests. Production calls use :func:`_fetch_for_verification`.
+    page_cache
+        Optional :class:`VerificationPageCache` instance. When provided, the
+        gate checks the cache before fetching and stores successful fetches so
+        that a subsequent dry-run → live-run reuses the same page text.
     """
     if domain_is_denied(lead.url):
         return VerificationOutcome(
@@ -270,6 +275,31 @@ async def verify_website(
             notes="public linked source (MiB/OSM/charity/wikidata)",
         )
 
+    # Try cache first
+    cached_page = page_cache.get(lead.url) if page_cache else None
+    if cached_page is not None:
+        title, body = cached_page
+        haystack = f"{title}\n{body[:50000]}"
+        ratio = name_ratio(mosque.name, haystack)
+        matched_postcode = _postcode_appears(mosque.postcode, haystack)
+        matched_address = _address_appears(mosque.address_line1, haystack)
+        any_contact_match = matched_postcode or matched_address
+        verified = ratio >= _NAME_RATIO_THRESHOLD and any_contact_match
+        notes = (
+            f"name_ratio={ratio:.0f} "
+            f"postcode={matched_postcode} "
+            f"address={matched_address} (cached)"
+        )
+        return VerificationOutcome(
+            lead=lead,
+            verified=verified,
+            name_ratio=ratio,
+            matched_postcode=matched_postcode,
+            matched_address=matched_address,
+            domain_denied=False,
+            notes=notes,
+        )
+
     fetch = fetcher or (
         lambda u: _fetch_for_verification(u, user_agent=user_agent, timeout=timeout)
     )
@@ -286,6 +316,9 @@ async def verify_website(
         )
 
     title, body = page
+    if page_cache is not None:
+        page_cache.set(lead.url, title, body)
+
     haystack = f"{title}\n{body[:50000]}"
     ratio = name_ratio(mosque.name, haystack)
     matched_postcode = _postcode_appears(mosque.postcode, haystack)

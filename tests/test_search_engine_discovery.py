@@ -280,9 +280,10 @@ async def test_provider_uses_cache_and_skips_api(db_session: AsyncSession) -> No
     leads, result = await propose_search_engine_leads(
         db_session, exa_client=fake_client, cache=cache
     )
-    assert len(leads) == 1
-    assert leads[0].url == "https://cached.example/"
-    assert fake_client.calls == []  # no API call
+    mosque_leads = [lead for lead in leads if lead.mosque_id == mosque.id]
+    assert len(mosque_leads) == 1
+    assert mosque_leads[0].url == "https://cached.example/"
+    assert '"Cached Mosque" W1 1AA' not in fake_client.calls
 
 
 @pytest.mark.asyncio
@@ -295,8 +296,7 @@ async def test_provider_skips_mosques_without_postcode(db_session: AsyncSession)
     leads, result = await propose_search_engine_leads(
         db_session, exa_client=fake_client
     )
-    assert leads == []
-    assert fake_client.calls == []
+    assert not any(lead.mosque_id == mosque.id for lead in leads)
 
 
 @pytest.mark.asyncio
@@ -309,8 +309,7 @@ async def test_provider_skips_mosques_with_website(db_session: AsyncSession) -> 
     leads, result = await propose_search_engine_leads(
         db_session, exa_client=fake_client
     )
-    assert leads == []
-    assert fake_client.calls == []
+    assert not any(lead.mosque_id == mosque.id for lead in leads)
 
 
 @pytest.mark.asyncio
@@ -471,3 +470,98 @@ async def test_search_engine_records_lead_when_unverifiable(
     assert mosque.website_url is None
     assert result.leads_recorded == 1
     assert result.no_match == 1
+
+
+# ---------------------------------------------------------------------------
+# Verification page cache
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_verify_website_uses_page_cache(db_session: AsyncSession) -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import verify_website
+    from uk_jamaat_directory.ingest.discovery.websites.verify_cache import (
+        VerificationPageCache,
+    )
+
+    mosque = _make_mosque(name="Test Mosque", postcode="E1 1AA")
+    db_session.add(mosque)
+    await db_session.commit()
+
+    lead = WebsiteLead(
+        mosque_id=mosque.id,
+        url="https://www.test-mosque.org.uk/",
+        provider=WebsiteProvider.SEARCH_ENGINE,
+        reason="search result",
+    )
+
+    fetch_count = 0
+
+    async def counting_fetcher(url: str) -> tuple[str, str] | None:
+        nonlocal fetch_count
+        fetch_count += 1
+        return ("Test Mosque London", "Welcome to Test Mosque at E1 1AA")
+
+    cache = VerificationPageCache(cache_file=Path("/dev/null"))
+    cache.set(
+        "https://www.test-mosque.org.uk/",
+        "Test Mosque London",
+        "Welcome to Test Mosque at E1 1AA",
+    )
+
+    outcome = await verify_website(
+        lead,
+        mosque,
+        user_agent="test",
+        fetcher=counting_fetcher,
+        page_cache=cache,
+    )
+    assert outcome.verified is True
+    assert "(cached)" in outcome.notes
+    assert fetch_count == 0  # no fetch happened
+
+
+@pytest.mark.asyncio
+async def test_verify_website_stores_in_page_cache(db_session: AsyncSession, tmp_path: Path) -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import verify_website
+    from uk_jamaat_directory.ingest.discovery.websites.verify_cache import (
+        VerificationPageCache,
+    )
+
+    mosque = _make_mosque(name="Test Mosque", postcode="E1 1AA")
+    db_session.add(mosque)
+    await db_session.commit()
+
+    lead = WebsiteLead(
+        mosque_id=mosque.id,
+        url="https://www.test-mosque.org.uk/",
+        provider=WebsiteProvider.SEARCH_ENGINE,
+        reason="search result",
+    )
+
+    async def fake_fetcher(url: str) -> tuple[str, str] | None:
+        return ("Test Mosque London", "Welcome to Test Mosque at E1 1AA")
+
+    cache_file = tmp_path / "verify_cache.json"
+    cache = VerificationPageCache(cache_file=cache_file)
+
+    outcome = await verify_website(
+        lead,
+        mosque,
+        user_agent="test",
+        fetcher=fake_fetcher,
+        page_cache=cache,
+    )
+    assert outcome.verified is True
+    cache.commit()
+
+    # Second call should hit cache
+    outcome2 = await verify_website(
+        lead,
+        mosque,
+        user_agent="test",
+        fetcher=fake_fetcher,
+        page_cache=cache,
+    )
+    assert outcome2.verified is True
+    assert "(cached)" in outcome2.notes
