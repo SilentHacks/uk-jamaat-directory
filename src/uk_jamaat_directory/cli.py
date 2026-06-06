@@ -448,6 +448,12 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Exa Search API key (overrides EXA_SEARCH_API_KEY from .env)",
     )
     discover_websites.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only search the first N mosques (useful for trial runs)",
+    )
+    discover_websites.add_argument(
         "--dry-run",
         action="store_true",
         help="Run the providers and verification but do not write promotions",
@@ -1285,21 +1291,28 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
                         file=sys.stderr,
                     )
                     return 2
-                client = ExaClient(api_key=api_key)
+                client = ExaClient(
+                    api_key=api_key,
+                    max_concurrency=settings.search_engine_max_concurrency,
+                )
                 cache = SearchCache()
 
                 async def _run_with_search(
                     session,
                     _client=client,
                     _cache=cache,
-                    _delay=settings.search_engine_delay_seconds,
+                    _limit=args.limit,
                 ):
-                    return await propose_search_engine_leads(
-                        session,
-                        exa_client=_client,
-                        cache=_cache,
-                        delay_seconds=_delay,
-                    )
+                    try:
+                        return await propose_search_engine_leads(
+                            session,
+                            exa_client=_client,
+                            cache=_cache,
+                            max_concurrency=settings.search_engine_max_concurrency,
+                            limit=_limit,
+                        )
+                    finally:
+                        await _client.aclose()
 
                 selected.append(_run_with_search)
             else:

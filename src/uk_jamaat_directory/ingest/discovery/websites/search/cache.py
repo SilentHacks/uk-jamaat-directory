@@ -25,6 +25,10 @@ class SearchCache:
 
     Keys are ``"provider:query"`` strings. Values are lists of
     :class:`ExaResult` with a timestamp.
+
+    Writes are batched: call :meth:`commit` once after all inserts to flush
+    to disk.  This avoids rewriting the entire JSON file on every individual
+    ``set``.
     """
 
     def __init__(
@@ -36,6 +40,7 @@ class SearchCache:
         self._path = cache_file or _DEFAULT_CACHE_FILE
         self._ttl = ttl_seconds
         self._data: dict[str, Any] = {}
+        self._dirty = False
         self._load()
 
     # ------------------------------------------------------------------
@@ -50,21 +55,42 @@ class SearchCache:
             return None
         timestamp = entry.get("timestamp", 0)
         if time.time() - timestamp > self._ttl:
-            # expired — purge and return None
+            # expired — purge
             del self._data[key]
-            self._save()
+            self._dirty = True
             return None
         results = entry.get("results", [])
         return [ExaResult(**item) for item in results]
 
     def set(self, provider: str, query: str, results: list[ExaResult]) -> None:
-        """Store results for a query."""
+        """Store results for a single query (marks dirty; does not write)."""
         key = _key(provider, query)
         self._data[key] = {
             "timestamp": int(time.time()),
             "results": [asdict(r) for r in results],
         }
-        self._save()
+        self._dirty = True
+
+    def set_many(
+        self,
+        provider: str,
+        items: dict[str, list[ExaResult]],
+    ) -> None:
+        """Store results for many queries at once (marks dirty)."""
+        now = int(time.time())
+        for query, results in items.items():
+            key = _key(provider, query)
+            self._data[key] = {
+                "timestamp": now,
+                "results": [asdict(r) for r in results],
+            }
+        self._dirty = True
+
+    def commit(self) -> None:
+        """Flush in-memory changes to disk if dirty."""
+        if self._dirty:
+            self._save()
+            self._dirty = False
 
     # ------------------------------------------------------------------
     # Persistence

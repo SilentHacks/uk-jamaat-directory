@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     osm_overpass_timeout_seconds: float = 180.0
 
     exa_search_api_key: str | None = None
-    search_engine_delay_seconds: float = 1.0
+    search_engine_max_concurrency: int = 8
 
     export_base_url: str | None = None
     export_s3_prefix: str = "exports"

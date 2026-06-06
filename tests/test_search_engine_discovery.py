@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import httpx
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,6 +66,9 @@ class _FakeExaClient:
         self.calls.append(query)
         return self.results
 
+    async def aclose(self) -> None:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # ExaClient unit tests
@@ -73,8 +77,6 @@ class _FakeExaClient:
 
 @pytest.mark.asyncio
 async def test_exa_client_parses_results() -> None:
-    client = ExaClient(api_key="dummy")
-
     async def _post(self_, url, *, json, **kwargs):
         class _Resp:
             status_code = 200
@@ -92,12 +94,12 @@ async def test_exa_client_parses_results() -> None:
 
         return _Resp()
 
-    import httpx
-
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
+        client = ExaClient(api_key="dummy")
         results = await client.search("test query")
+        await client.aclose()
     finally:
         httpx.AsyncClient.post = original_post  # type: ignore[method-assign]
 
@@ -108,7 +110,6 @@ async def test_exa_client_parses_results() -> None:
 
 @pytest.mark.asyncio
 async def test_exa_client_retries_on_429() -> None:
-    client = ExaClient(api_key="dummy")
     call_count = 0
 
     async def _post(self_, url, *, json, **kwargs):
@@ -127,12 +128,12 @@ async def test_exa_client_retries_on_429() -> None:
 
         return _Resp()
 
-    import httpx
-
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
+        client = ExaClient(api_key="dummy")
         results = await client.search("test")
+        await client.aclose()
     finally:
         httpx.AsyncClient.post = original_post  # type: ignore[method-assign]
 
@@ -142,8 +143,6 @@ async def test_exa_client_retries_on_429() -> None:
 
 @pytest.mark.asyncio
 async def test_exa_client_raises_after_max_retries() -> None:
-    client = ExaClient(api_key="dummy")
-
     async def _post(self_, url, *, json, **kwargs):
         class _Resp:
             status_code = 503
@@ -153,13 +152,13 @@ async def test_exa_client_raises_after_max_retries() -> None:
 
         return _Resp()
 
-    import httpx
-
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
+        client = ExaClient(api_key="dummy")
         with pytest.raises(ExaSearchError):
             await client.search("test")
+        await client.aclose()
     finally:
         httpx.AsyncClient.post = original_post  # type: ignore[method-assign]
 
@@ -174,6 +173,7 @@ def test_cache_roundtrip(tmp_path: Path) -> None:
     cache = SearchCache(cache_file=cache_file, ttl_seconds=3600)
     results = [ExaResult(title="A Mosque", url="https://a.example/")]
     cache.set("exa", '"Test Mosque" E1 1AA', results)
+    cache.commit()
 
     loaded = SearchCache(cache_file=cache_file, ttl_seconds=3600)
     cached = loaded.get("exa", '"Test Mosque" E1 1AA')
@@ -186,8 +186,26 @@ def test_cache_expires_after_ttl(tmp_path: Path) -> None:
     cache_file = tmp_path / "cache.json"
     cache = SearchCache(cache_file=cache_file, ttl_seconds=1)
     cache.set("exa", "old query", [ExaResult(title="Old", url="https://old.example/")])
+    cache.commit()
     time.sleep(1.1)
     assert cache.get("exa", "old query") is None
+
+
+def test_cache_set_many_and_commit(tmp_path: Path) -> None:
+    cache_file = tmp_path / "cache.json"
+    cache = SearchCache(cache_file=cache_file, ttl_seconds=3600)
+    cache.set_many(
+        "exa",
+        {
+            "query1": [ExaResult(title="A", url="https://a.example/")],
+            "query2": [ExaResult(title="B", url="https://b.example/")],
+        },
+    )
+    cache.commit()
+
+    loaded = SearchCache(cache_file=cache_file, ttl_seconds=3600)
+    assert loaded.get("exa", "query1") is not None
+    assert loaded.get("exa", "query2") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +230,7 @@ async def test_provider_proposes_leads_for_missing_website(
     )
     cache = SearchCache(cache_file=tmp_path / "cache.json", ttl_seconds=3600)
     leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client, cache=cache, delay_seconds=0.0
+        db_session, exa_client=fake_client, cache=cache
     )
     assert result.candidates_proposed == 2
     assert len(leads) == 2
@@ -239,7 +257,7 @@ async def test_provider_filters_deny_list(
     )
     cache = SearchCache(cache_file=tmp_path / "cache.json", ttl_seconds=3600)
     leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client, cache=cache, delay_seconds=0.0
+        db_session, exa_client=fake_client, cache=cache
     )
     assert len(leads) == 1
     assert leads[0].url == "https://www.test-mosque.org.uk/"
@@ -260,7 +278,7 @@ async def test_provider_uses_cache_and_skips_api(db_session: AsyncSession) -> No
 
     fake_client = _FakeExaClient([])
     leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client, cache=cache, delay_seconds=0.0
+        db_session, exa_client=fake_client, cache=cache
     )
     assert len(leads) == 1
     assert leads[0].url == "https://cached.example/"
@@ -275,7 +293,7 @@ async def test_provider_skips_mosques_without_postcode(db_session: AsyncSession)
 
     fake_client = _FakeExaClient([ExaResult(title="X", url="https://x.example/")])
     leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client, delay_seconds=0.0
+        db_session, exa_client=fake_client
     )
     assert leads == []
     assert fake_client.calls == []
@@ -289,10 +307,51 @@ async def test_provider_skips_mosques_with_website(db_session: AsyncSession) -> 
 
     fake_client = _FakeExaClient([ExaResult(title="X", url="https://x.example/")])
     leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client, delay_seconds=0.0
+        db_session, exa_client=fake_client
     )
     assert leads == []
     assert fake_client.calls == []
+
+
+@pytest.mark.asyncio
+async def test_provider_deduplicates_identical_queries(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """Two mosques with the same name+postcode should trigger only one API call."""
+    mosque1 = _make_mosque(name="Duplicate Mosque", postcode="E1 1AA")
+    mosque2 = _make_mosque(name="Duplicate Mosque", postcode="E1 1AA")
+    db_session.add_all([mosque1, mosque2])
+    await db_session.commit()
+
+    fake_client = _FakeExaClient([ExaResult(title="Dup", url="https://dup.example/")])
+    cache = SearchCache(cache_file=tmp_path / "cache.json", ttl_seconds=3600)
+    leads, result = await propose_search_engine_leads(
+        db_session, exa_client=fake_client, cache=cache
+    )
+    # One API call for the deduplicated query
+    assert len(fake_client.calls) == 1
+    # But leads for both mosques
+    assert len(leads) == 2
+    assert {lead.mosque_id for lead in leads} == {mosque1.id, mosque2.id}
+
+
+@pytest.mark.asyncio
+async def test_provider_respects_limit(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """With limit=1, only one mosque is searched even when more are missing."""
+    mosque1 = _make_mosque(name="First Mosque", postcode="E1 1AA")
+    mosque2 = _make_mosque(name="Second Mosque", postcode="W1 1AA")
+    db_session.add_all([mosque1, mosque2])
+    await db_session.commit()
+
+    fake_client = _FakeExaClient([ExaResult(title="X", url="https://x.example/")])
+    cache = SearchCache(cache_file=tmp_path / "cache.json", ttl_seconds=3600)
+    leads, result = await propose_search_engine_leads(
+        db_session, exa_client=fake_client, cache=cache, limit=1
+    )
+    assert len(fake_client.calls) == 1
+    assert len(leads) == 1
 
 
 def test_build_query_quoted_name_plus_postcode() -> None:
@@ -339,7 +398,6 @@ async def test_search_engine_promotes_via_orchestrator(db_session: AsyncSession)
             "East London Mosque & London Muslim Centre",
             "Welcome to the East London Mosque. Visit us at E1 1AA, London.",
         )
-
 
     # Patch verify_website to use our fake fetcher so the test stays offline.
     # We call run_website_discovery which calls verify_website internally.

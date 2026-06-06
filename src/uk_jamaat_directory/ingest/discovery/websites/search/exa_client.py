@@ -34,17 +34,32 @@ class ExaClient:
         Exa API key (from dashboard.exa.ai).
     timeout:
         Per-request timeout in seconds.
+    max_concurrency:
+        Maximum concurrent requests. Exa's rate limit is 10 QPS; the default
+        of 8 keeps a safe margin.
     """
 
-    def __init__(self, *, api_key: str, timeout: float = 15.0) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        timeout: float = 15.0,
+        max_concurrency: int = 8,
+    ) -> None:
         self._api_key = api_key
         self._timeout = timeout
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._client = httpx.AsyncClient(timeout=timeout)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     async def search(self, query: str, *, num_results: int = 3) -> list[ExaResult]:
         """Run an Exa search and return the top *num_results* items.
 
         Retries up to ``_MAX_RETRIES`` times with exponential backoff on
-        429/5xx. Non-retryable 4xx responses are raised as-is.
+        429/5xx. Non-retryable 4xx responses are raised as-is.  Concurrency
+        is throttled by the semaphore passed at construction time.
         """
         headers = {
             "x-api-key": self._api_key,
@@ -56,34 +71,32 @@ class ExaClient:
             "numResults": num_results,
         }
 
-        last_exception: Exception | None = None
-        for attempt in range(_MAX_RETRIES + 1):
-            try:
-                async with httpx.AsyncClient(timeout=self._timeout) as client:
-                    response = await client.post(
+        async with self._semaphore:
+            last_exception: Exception | None = None
+            for attempt in range(_MAX_RETRIES + 1):
+                try:
+                    response = await self._client.post(
                         _EXA_API_URL,
                         headers=headers,
                         json=payload,
                     )
                     if response.status_code == 429:
-                        # rate limited — back off and retry
                         wait = _RETRY_BACKOFF_BASE**attempt
                         await asyncio.sleep(wait)
                         continue
                     if 500 <= response.status_code < 600:
-                        # transient server error — back off and retry
                         wait = _RETRY_BACKOFF_BASE**attempt
                         await asyncio.sleep(wait)
                         continue
                     response.raise_for_status()
                     data = response.json()
                     return _parse_results(data)
-            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
-                last_exception = exc
-                if attempt < _MAX_RETRIES:
-                    wait = _RETRY_BACKOFF_BASE**attempt
-                    await asyncio.sleep(wait)
-                continue
+                except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                    last_exception = exc
+                    if attempt < _MAX_RETRIES:
+                        wait = _RETRY_BACKOFF_BASE**attempt
+                        await asyncio.sleep(wait)
+                    continue
 
         raise ExaSearchError(
             f"Exa search failed after {_MAX_RETRIES} retries: {last_exception}"
