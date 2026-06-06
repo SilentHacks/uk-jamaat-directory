@@ -29,7 +29,7 @@ async def test_fetch_returns_304_unchanged() -> None:
         return httpx.Response(200, text='{"times": []}', headers={"ETag": '"abc"'})
 
     transport = httpx.MockTransport(handler)
-    settings = Settings(environment="test", crawl_user_agent="TestBot", allowed_hosts=["test"])
+    settings = Settings(environment="test", crawl_user_agent="TestBot", allowed_hosts=["test"], crawl_per_domain_delay_seconds=0)
     prior = SourceArtifact(
         id=uuid.uuid4(),
         source_id=uuid.uuid4(),

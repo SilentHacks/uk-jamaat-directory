@@ -97,7 +97,7 @@ async def test_exa_client_parses_results() -> None:
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
-        client = ExaClient(api_key="dummy")
+        client = ExaClient(api_key="dummy", retry_backoff_base=0)
         results = await client.search("test query")
         await client.aclose()
     finally:
@@ -131,7 +131,7 @@ async def test_exa_client_retries_on_429() -> None:
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
-        client = ExaClient(api_key="dummy")
+        client = ExaClient(api_key="dummy", retry_backoff_base=0)
         results = await client.search("test")
         await client.aclose()
     finally:
@@ -155,7 +155,7 @@ async def test_exa_client_raises_after_max_retries() -> None:
     original_post = httpx.AsyncClient.post
     httpx.AsyncClient.post = _post  # type: ignore[method-assign]
     try:
-        client = ExaClient(api_key="dummy")
+        client = ExaClient(api_key="dummy", retry_backoff_base=0)
         with pytest.raises(ExaSearchError):
             await client.search("test")
         await client.aclose()
@@ -187,8 +187,14 @@ def test_cache_expires_after_ttl(tmp_path: Path) -> None:
     cache = SearchCache(cache_file=cache_file, ttl_seconds=1)
     cache.set("exa", "old query", [ExaResult(title="Old", url="https://old.example/")])
     cache.commit()
-    time.sleep(1.1)
-    assert cache.get("exa", "old query") is None
+    # Fast-forward past TTL without real sleep.
+    _real_time = time.time
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "uk_jamaat_directory.ingest.discovery.websites.search.cache.time.time",
+            lambda: _real_time() + 2,
+        )
+        assert cache.get("exa", "old query") is None
 
 
 def test_cache_set_many_and_commit(tmp_path: Path) -> None:
