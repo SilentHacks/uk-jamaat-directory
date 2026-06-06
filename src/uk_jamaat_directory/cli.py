@@ -9,15 +9,18 @@ from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from uk_jamaat_directory import __version__
 from uk_jamaat_directory.config import Environment, Settings, get_settings
 from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.db.session import create_engine
+from uk_jamaat_directory.domain import SourceType
 from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
 from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
+from uk_jamaat_directory.ingest.extract.ai.profiler import profile_mosque_website
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
@@ -369,6 +372,38 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Re-run extraction for a stored source artifact",
     )
     extract_artifact.add_argument("--artifact-id", required=True, type=uuid.UUID)
+
+    profile_source = subparsers.add_parser(
+        "profile-source",
+        help="Run AI reconnaissance profiling on a single mosque website source",
+    )
+    profile_source.add_argument("--source-id", required=True, type=uuid.UUID)
+    profile_source.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch pages and call Groq but do not write to the database",
+    )
+
+    profile_sources = subparsers.add_parser(
+        "profile-sources",
+        help="Bulk AI reconnaissance for mosque website sources",
+    )
+    profile_sources.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Only profile the first N eligible sources",
+    )
+    profile_sources.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch pages and call Groq but do not write to the database",
+    )
+    profile_sources.add_argument(
+        "--force",
+        action="store_true",
+        help="Profile even sources that already have a ready profile",
+    )
 
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
@@ -738,6 +773,12 @@ def main() -> None:
 
     if args.command == "extract-artifact":
         raise SystemExit(asyncio.run(_run_extract_artifact(args, settings)))
+
+    if args.command == "profile-source":
+        raise SystemExit(asyncio.run(_run_profile_source(args, settings)))
+
+    if args.command == "profile-sources":
+        raise SystemExit(asyncio.run(_run_profile_sources(args, settings)))
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
@@ -1381,4 +1422,80 @@ async def _run_analyse_discovery_leads(args: argparse.Namespace, settings: Setti
     print("  Top location clusters:")
     for loc, count in report.location_cluster.most_common(10):
         print(f"    {loc}: {count}")
+    return 0
+
+
+async def _run_profile_source(args: argparse.Namespace, settings: Settings) -> int:
+    if not settings.groq_api_key:
+        print("error: groq_api_key is not configured", file=sys.stderr)
+        return 1
+
+    async with cli_db_session(settings) as session:
+        result = await profile_mosque_website(session, args.source_id, settings)
+        if not args.dry_run:
+            await session.commit()
+
+    profile = result.profile
+    if profile is None:
+        print(f"Profiling failed for {args.source_id}")
+        for error in result.errors:
+            print(f"  error: {error}", file=sys.stderr)
+        return 1
+
+    print(f"Profiled {args.source_id}")
+    print(f"  asset_type: {profile.asset_type}")
+    print(f"  timetable_url: {profile.timetable_url}")
+    print(f"  confidence: {profile.confidence}")
+    if profile.review_notes:
+        print(f"  notes: {profile.review_notes}")
+    if result.warnings:
+        for warning in result.warnings:
+            print(f"  warning: {warning}", file=sys.stderr)
+    return 0
+
+
+async def _run_profile_sources(args: argparse.Namespace, settings: Settings) -> int:
+    if not settings.groq_api_key:
+        print("error: groq_api_key is not configured", file=sys.stderr)
+        return 1
+
+    async with cli_db_session(settings) as session:
+        stmt = (
+            sa_select(MosqueSource)
+            .where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
+            .where(MosqueSource.source_url.is_not(None))
+        )
+        if not args.force:
+            # Default: skip sources that already have a ready profile
+            stmt = stmt.where(MosqueSource.metadata_["profile_status"].astext != "ready")
+        if args.limit is not None:
+            stmt = stmt.limit(args.limit)
+
+        sources = (await session.execute(stmt)).scalars().all()
+
+        attempted = 0
+        succeeded = 0
+        review_needed = 0
+        errors = 0
+
+        for source in sources:
+            attempted += 1
+            result = await profile_mosque_website(session, source.id, settings)
+            if not args.dry_run:
+                await session.commit()
+
+            if result.profile is None:
+                errors += 1
+                continue
+
+            if result.profile.confidence >= 0.8 and result.profile.asset_type != "unknown":
+                succeeded += 1
+            else:
+                review_needed += 1
+
+    mode = "DRY RUN" if args.dry_run else "profiled"
+    print(
+        f"Bulk profiling ({mode}): attempted={attempted}, "
+        f"ready={succeeded}, review_needed={review_needed}, errors={errors}"
+    )
     return 0
