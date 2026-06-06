@@ -1191,6 +1191,100 @@
         }
       }
     },
+    "/v1/admin/sources/{source_id}/profile": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Source Profile",
+        "operationId": "get_source_profile_v1_admin_sources__source_id__profile_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Trigger Source Profile",
+        "operationId": "trigger_source_profile_v1_admin_sources__source_id__profile_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminProfileTriggerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/contributions/mosques": {
       "post": {
         "tags": [
@@ -2384,6 +2478,12 @@
               }
             ],
             "title": "Location Hint"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "description": "Signal source of the lead (e.g. 'google', 'mib_metadata', 'osm_tag_recheck', 'charity_commission', 'wikidata', 'duckduckgo').",
+            "default": "google"
           }
         },
         "type": "object",
@@ -3175,6 +3275,165 @@
         },
         "type": "object",
         "title": "AdminMosqueUpdate"
+      },
+      "AdminProfileResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "profile_status": {
+            "type": "string",
+            "title": "Profile Status"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "timetable_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timetable Url"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "review_notes": {
+            "type": "string",
+            "title": "Review Notes"
+          },
+          "extraction_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Run Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "profiled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profiled At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "profile_status",
+          "asset_type",
+          "timetable_url",
+          "confidence",
+          "review_notes",
+          "extraction_run_id",
+          "model",
+          "profiled_at"
+        ],
+        "title": "AdminProfileResponse"
+      },
+      "AdminProfileTriggerResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "profile_status": {
+            "type": "string",
+            "title": "Profile Status"
+          },
+          "asset_type": {
+            "type": "string",
+            "title": "Asset Type"
+          },
+          "timetable_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timetable Url"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "review_notes": {
+            "type": "string",
+            "title": "Review Notes"
+          },
+          "extraction_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Run Id"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "profile_status",
+          "asset_type",
+          "timetable_url",
+          "confidence",
+          "review_notes",
+          "extraction_run_id",
+          "warnings",
+          "errors"
+        ],
+        "title": "AdminProfileTriggerResponse"
       },
       "AdminSourceAttach": {
         "properties": {
