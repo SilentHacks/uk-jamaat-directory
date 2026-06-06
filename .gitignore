@@ -33,6 +33,8 @@ data/artifacts/
 data/cache/
 data/exports/
 data/private/
+data/profiling_batches/
+data/profiling_progress.json
 minio-data/
 postgres-data/
 redis-data/
