@@ -389,3 +389,60 @@ def test_parse_lead_notes_unknown_provider_defaults() -> None:
     lead = _parse_lead_notes("")
     assert lead.provider == "unknown"
     assert lead.domain == ""
+
+
+# ---------------------------------------------------------------------------
+# Postcode / address whitespace regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_postcode_appears_with_regular_space() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _postcode_appears,
+    )
+
+    assert _postcode_appears("W1F 0PH", "Our address is W1F 0PH, London") is True
+
+
+def test_postcode_appears_with_nonbreaking_space() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _postcode_appears,
+    )
+
+    # &nbsp; -> \xa0 after HTMLParser conversion
+    assert _postcode_appears("W1F 0PH", "Our address is W1F\xa00PH, London") is True
+
+
+def test_postcode_appears_with_nbsp_entity() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _postcode_appears,
+    )
+
+    assert _postcode_appears("W1F 0PH", "Our address is W1F&nbsp;0PH, London") is True
+
+
+def test_postcode_appears_with_numeric_entity() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _postcode_appears,
+    )
+
+    assert _postcode_appears("W1F 0PH", "Our address is W1F&#160;0PH, London") is True
+
+
+def test_postcode_appears_with_tab_and_newline() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _postcode_appears,
+    )
+
+    assert _postcode_appears("G64 1NQ", "Address:\nG64\t1NQ") is True
+
+
+def test_address_appears_with_nonbreaking_space() -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.verify import (
+        _address_appears,
+    )
+
+    assert (
+        _address_appears("10 Test Street", "Visit us at 10\xa0Test\xa0Street")
+        is True
+    )

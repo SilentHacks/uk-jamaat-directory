@@ -16,6 +16,7 @@ source or verify live.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -187,8 +188,17 @@ def _postcode_appears(postcode: str | None, haystack: str) -> bool:
     normalized = normalize_postcode(postcode)
     if not normalized:
         return False
-    compact = normalized.replace(" ", "")
-    return compact.lower() in haystack.lower().replace(" ", "")
+    compact = normalized.replace(" ", "").lower()
+    # Remove ALL whitespace (including non-breaking spaces, tabs, newlines)
+    # and common HTML space entities so postcodes like "W1F&nbsp;0PH" or
+    # "W1F\xa00PH" still match the compact form "W1F0PH".
+    cleaned = re.sub(
+        r"\s+|&nbsp;|&#160;|&#xA0;",
+        "",
+        haystack.lower(),
+        flags=re.IGNORECASE,
+    )
+    return compact in cleaned
 
 
 def _address_appears(address: str | None, haystack: str) -> bool:
@@ -197,7 +207,17 @@ def _address_appears(address: str | None, haystack: str) -> bool:
     needle = address.strip()
     if len(needle) < 6:
         return False
-    return needle.lower() in haystack.lower()
+    # Same whitespace-normalisation as postcode so that addresses split by
+    # &nbsp;, tabs, or newlines are still matched.  We also normalise the
+    # needle so "10 Test Street" still matches "10\xa0Test\xa0Street".
+    cleaned = re.sub(
+        r"\s+|&nbsp;|&#160;|&#xA0;",
+        "",
+        haystack.lower(),
+        flags=re.IGNORECASE,
+    )
+    needle_clean = re.sub(r"\s+", "", needle.lower())
+    return needle_clean in cleaned
 
 
 def name_ratio(mosque_name: str, haystack: str) -> float:
