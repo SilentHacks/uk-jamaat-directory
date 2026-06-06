@@ -28,9 +28,7 @@ async def test_fetch_url_blocks_loopback_without_network() -> None:
     settings = Settings(
         environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0
     )
-    result = await fetch_url(
-        "http://127.0.0.1/prayer-times.json", settings=settings
-    )
+    result = await fetch_url("http://127.0.0.1/prayer-times.json", settings=settings)
     assert result.error == "blocked host address"
     assert not result.ok
 
@@ -150,8 +148,6 @@ async def test_ensure_resolvable_public_host_blocks_private_dns() -> None:
                 (2, 1, 6, "", ("127.0.0.1", 0))
             ],
         )
-        blocked = await ensure_resolvable_public_host(
-            "https://example.org/prayer-times.html"
-        )
+        blocked = await ensure_resolvable_public_host("https://example.org/prayer-times.html")
 
     assert blocked == "blocked host address"

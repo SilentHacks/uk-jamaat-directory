@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Amended by [ADR 0014](0014-retire-standard-feed.md). Decisions #1 and standard_feed-specific
+references in #5 and #6 are superseded.
 
 ## Context
 
@@ -10,7 +11,7 @@ Most UK mosques are expected to come from MyLocalMasjid or other partner feeds w
 
 ## Decision
 
-1. **Feed-first** — prefer `/.well-known/uk-jamaat-directory.json` on the mosque domain before HTML/PDF scraping (HTML scraping deferred to slice 9.2).
+1. **Mosque website first** — register `mosque_website` sources from `mosque.website_url`; fetch homepage HTML. The well-known JSON feed (`/.well-known/uk-jamaat-directory.json`) was considered but deemed not viable (ADR 0014).
 
 2. **MyLocalMasjid excluded** — Phase 9 does not crawl MLM. MLM remains the Phase 5 import adapter (`import-mlm`).
 
@@ -18,11 +19,11 @@ Most UK mosques are expected to come from MyLocalMasjid or other partner feeds w
 
 4. **Respectful fetch** — robots.txt checks, conditional GET (ETag/Last-Modified), response size limits, per-source backoff, and opt-in `CRAWL_ENABLED`.
 
-5. **Default source policy** — auto-created `standard_feed` sources use `publication_policy=unknown` until an admin sets redistribution terms.
+5. **Default source policy** — auto-created `mosque_website` sources use `publication_policy=unknown` until an admin sets redistribution terms.
 
-6. **Manual approval for website-derived candidates** — `standard_feed` and `mosque_website` candidates stay `pending` after validation until explicitly approved, even when validation passes.
+6. **Manual approval for website-derived candidates** — `mosque_website` candidates stay `pending` after validation until explicitly approved, even when validation passes.
 
-7. **Deferred extractors** — HTML table parsing, PDF/OCR, Playwright, and AI extraction are later slices within Phase 9.
+7. **Deferred extractors** — HTML table parsing, PDF/OCR, Playwright, and AI extraction are later phases (Phase 7/8).
 
 ## Consequences
 

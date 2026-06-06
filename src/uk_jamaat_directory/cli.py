@@ -1096,7 +1096,6 @@ async def _run_extract_artifact(args: argparse.Namespace, settings: Settings) ->
     return 0
 
 
-
 async def _run_generate_exports(args: argparse.Namespace, settings: Settings) -> int:
     async with cli_db_session(settings) as session:
         result = await generate_dataset_exports(

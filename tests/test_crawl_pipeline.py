@@ -29,7 +29,9 @@ FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/crawl"
 
 
 @pytest.mark.asyncio
-async def test_process_mosque_website_stores_artifact_no_candidates(db_session, test_settings) -> None:
+async def test_process_mosque_website_stores_artifact_no_candidates(
+    db_session, test_settings
+) -> None:
     mosque = Mosque(
         id=uuid.uuid4(),
         name="Website Masjid",

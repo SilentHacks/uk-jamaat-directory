@@ -256,39 +256,24 @@ Bulk exports:
 - Checksums and version metadata.
 - Public attribution file.
 
-## Standard Mosque Feed
+## ~~Standard Mosque Feed~~ (retired)
 
-Create a public standard so mosques can publish their own feed:
+The well-known JSON feed was considered but is not viable: most mosque websites will not
+publish a machine-readable timetable at `/.well-known/uk-jamaat-directory.json`. The
+crawl strategy is now **mosque_website** → AI profile (Phase 7) → deterministic
+extraction (Phase 8). See ADR 0014.
 
-Path:
+<details>
+<summary>Previous design (archived)</summary>
 
-```text
-/.well-known/uk-jamaat-directory.json
-```
+A public standard so mosques can publish their own feed:
 
-Minimum schema:
+- Path: `/.well-known/uk-jamaat-directory.json`
+- Schema: mosque metadata + timezone + date-range + per-date prayer rows.
+- The Directory would prefer this feed over scraping when present.
 
-```json
-{
-  "schema_version": "1.0",
-  "mosque_name": "Example Masjid",
-  "timezone": "Europe/London",
-  "updated_at": "2026-06-04T12:00:00Z",
-  "valid_from": "2026-06-01",
-  "valid_to": "2026-06-30",
-  "times": [
-    {
-      "date": "2026-06-05",
-      "prayer": "fajr",
-      "start_time": "02:48",
-      "jamaat_time": "03:45",
-      "session_number": 1
-    }
-  ]
-}
-```
-
-The Directory should prefer this feed over scraping when present.
+The feed schema definition was removed in Phase 12 of the remaining pipeline.
+</details>
 
 ## Directory Pipeline
 
@@ -304,9 +289,8 @@ The Directory should prefer this feed over scraping when present.
    - Queue ambiguous matches for moderation.
 
 3. **Find schedule sources**
-   - Prefer standard feed.
+   - Official mosque website (crawl + AI profile).
    - Then partner API/feed.
-   - Then official mosque website.
    - Then PDF/image timetable.
    - Then community submissions.
 

@@ -183,23 +183,18 @@ Imports create `schedule_candidates` only. To expose times on the public API, ru
 
 Filters for validate/publish: `--source-id`, `--mosque-id`, `--from`, `--to`. Use `validate-candidates --dry-run` to inspect without status updates. Filtered publish merges into the latest snapshot: occurrences outside the filter are carried forward from the previous published dataset; only rows in scope are replaced or removed.
 
-## Standard feed crawl (Phase 9)
+## Website crawl (Phase 9)
 
-Mosques can publish [`/.well-known/uk-jamaat-directory.json`](docs/feeds/standard-feed-v1.md). The Directory registers `standard_feed` sources from active mosque `website_url` values (skipping mosques with recent MyLocalMasjid data), fetches feeds respectfully, stores raw JSON in MinIO, and creates pending `schedule_candidates`.
+Mosque websites are fetched respectfully via `mosque_website` sources. The Directory registers crawl sources from active mosque `website_url` values (skipping mosques with recent MyLocalMasjid data), fetches homepage HTML, stores raw artifacts in MinIO, and awaits Phase 7/8 for AI profiling and deterministic extraction.
 
 Crawl is **opt-in** (`CRAWL_ENABLED=false` by default). Requires MinIO/S3 for artifact bytes.
 
 ```bash
-# Register standard_feed sources for mosques with website_url
+# Register mosque_website sources for mosques with website_url
 .venv/bin/uk-jamaat-directory register-crawl-sources
 
-# Fetch and extract one source end-to-end (set CRAWL_ENABLED=true in .env)
+# Fetch one source and store artifact (set CRAWL_ENABLED=true in .env)
 .venv/bin/uk-jamaat-directory process-source --source-id <uuid> --force
-
-# Debug a feed URL without database writes
-.venv/bin/uk-jamaat-directory fetch-feed \
-  --url https://example.org/.well-known/uk-jamaat-directory.json \
-  --dry-run
 ```
 
 Celery beat (when worker/beat containers run) registers sources daily and enqueues hourly due fetches. MyLocalMasjid is **not** crawled in Phase 9.
