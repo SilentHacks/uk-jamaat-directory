@@ -274,3 +274,27 @@ class AdminSourceHealthItem(BaseModel):
 class AdminSourceHealthResponse(BaseModel):
     items: list[AdminSourceHealthItem]
     count: int
+
+
+class AdminProfileResponse(BaseModel):
+    source_id: uuid.UUID
+    profile_status: str
+    asset_type: str
+    timetable_url: str | None
+    confidence: float
+    review_notes: str
+    extraction_run_id: uuid.UUID | None
+    model: str | None
+    profiled_at: datetime | None
+
+
+class AdminProfileTriggerResponse(BaseModel):
+    source_id: uuid.UUID
+    profile_status: str
+    asset_type: str
+    timetable_url: str | None
+    confidence: float
+    review_notes: str
+    extraction_run_id: uuid.UUID | None
+    warnings: list[str]
+    errors: list[str]

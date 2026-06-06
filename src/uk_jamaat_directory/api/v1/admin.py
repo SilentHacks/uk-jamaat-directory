@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uk_jamaat_directory.api.deps import require_admin_key
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.domain import CandidateStatus
+from uk_jamaat_directory.ingest.extract.ai.profiler import profile_mosque_website
+from uk_jamaat_directory.models.core import MosqueSource
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
     AdminBulkIdentityReviewAccept,
@@ -32,6 +34,8 @@ from uk_jamaat_directory.schemas.admin import (
     AdminMosqueMerge,
     AdminMosqueResponse,
     AdminMosqueUpdate,
+    AdminProfileResponse,
+    AdminProfileTriggerResponse,
     AdminSourceAttach,
     AdminSourceHealthItem,
     AdminSourceHealthResponse,
@@ -570,3 +574,65 @@ async def get_source_health(
         for health, source in rows
     ]
     return AdminSourceHealthResponse(items=items, count=total)
+
+
+@router.get("/sources/{source_id}/profile", response_model=AdminProfileResponse)
+async def get_source_profile(
+    source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminProfileResponse:
+    source = await session.get(MosqueSource, source_id)
+    if source is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
+
+    profile = (source.metadata_ or {}).get("extraction_profile", {})
+    return AdminProfileResponse(
+        source_id=source.id,
+        profile_status=(source.metadata_ or {}).get("profile_status", "pending"),
+        asset_type=profile.get("asset_type", "unknown"),
+        timetable_url=profile.get("timetable_url"),
+        confidence=profile.get("confidence", 0.0),
+        review_notes=profile.get("review_notes", ""),
+        extraction_run_id=None,
+        model=(source.metadata_ or {}).get("profile_model"),
+        profiled_at=None,
+    )
+
+
+@router.post("/sources/{source_id}/profile", response_model=AdminProfileTriggerResponse)
+async def trigger_source_profile(
+    source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminProfileTriggerResponse:
+    from uk_jamaat_directory.config import get_settings
+
+    settings = get_settings()
+    result = await profile_mosque_website(session, source_id, settings)
+    await session.commit()
+
+    source = await session.get(MosqueSource, source_id)
+    profile = result.profile
+    if profile is None:
+        return AdminProfileTriggerResponse(
+            source_id=source_id,
+            profile_status="failed",
+            asset_type="unknown",
+            timetable_url=None,
+            confidence=0.0,
+            review_notes="; ".join(result.errors) if result.errors else "",
+            extraction_run_id=result.extraction_run_id,
+            warnings=result.warnings,
+            errors=result.errors,
+        )
+
+    return AdminProfileTriggerResponse(
+        source_id=source_id,
+        profile_status=(source.metadata_ or {}).get("profile_status", "review_needed"),
+        asset_type=profile.asset_type,
+        timetable_url=profile.timetable_url,
+        confidence=profile.confidence,
+        review_notes=profile.review_notes,
+        extraction_run_id=result.extraction_run_id,
+        warnings=result.warnings,
+        errors=result.errors,
+    )
