@@ -414,11 +414,21 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
     discover_websites.add_argument(
         "--provider",
         action="append",
-        choices=("mib_metadata", "osm_tag_recheck"),
+        choices=("mib_metadata", "osm_tag_recheck", "charity_commission"),
         help=(
             "Lead source(s) to include. May be passed multiple times. "
-            "Currently only mib_metadata is implemented; osm_tag_recheck and "
-            "duckduckgo are reserved for future use."
+            "``charity_commission`` requires ``--charity-file`` pointing at "
+            "the daily extract TSV."
+        ),
+    )
+    discover_websites.add_argument(
+        "--charity-file",
+        type=Path,
+        default=None,
+        help=(
+            "Path to the Charity Commission for England and Wales daily "
+            "TSV extract (publicextract.charity.txt). Required for "
+            "``--provider charity_commission``."
         ),
     )
     discover_websites.add_argument(
@@ -1184,6 +1194,12 @@ async def _run_backfill_mib_websites(args: argparse.Namespace, settings: Setting
 
 
 async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -> int:
+    from uk_jamaat_directory.ingest.discovery.websites.providers.charity_commission import (
+        propose_charity_commission_leads,
+    )
+    from uk_jamaat_directory.ingest.discovery.websites.providers.charity_index import (
+        load_charity_index,
+    )
     from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import (
         propose_mib_metadata_leads,
     )
@@ -1197,8 +1213,26 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
         "osm_tag_recheck": propose_osm_tag_leads,
     }
     selected: list[object] | None = None
+    charity_index: dict | None = None
     if getattr(args, "provider", None):
-        selected = [available[name] for name in args.provider]
+        selected = []
+        for name in args.provider:
+            if name == "charity_commission":
+                if not args.charity_file:
+                    print(
+                        "error: --provider charity_commission requires --charity-file <path>",
+                        file=sys.stderr,
+                    )
+                    return 2
+                if charity_index is None:
+                    charity_index = load_charity_index(args.charity_file)
+
+                async def _run_with_index(session, _index=charity_index):
+                    return await propose_charity_commission_leads(session, charity_index=_index)
+
+                selected.append(_run_with_index)
+            else:
+                selected.append(available[name])
 
     async with cli_db_session(settings) as session:
         result = await run_website_discovery(

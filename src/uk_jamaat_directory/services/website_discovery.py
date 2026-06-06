@@ -73,6 +73,52 @@ def _mosque_cache(mosques: Iterable[Mosque]) -> dict[uuid.UUID, Mosque]:
     return {m.id: m for m in mosques}
 
 
+@dataclass(frozen=True)
+class MosqueSnapshot:
+    """A pre-flush snapshot of the columns downstream code needs.
+
+    Providers that write auxiliary source rows (e.g. Charity Commission)
+    trigger a SQLAlchemy flush which expires cached ``Mosque`` instances.
+    Downstream code that reads ``mosque.name`` would then trigger a
+    lazy reload, which fails in strict-async mode. We capture the
+    columns we need into an immutable snapshot before each provider
+    runs and use it instead of the live instance.
+    """
+
+    mosque_id: uuid.UUID
+    name: str
+    postcode: str | None
+    website_url: str | None
+
+
+def _snapshot_mosque(mosque: Mosque) -> MosqueSnapshot:
+    return MosqueSnapshot(
+        mosque_id=mosque.id,
+        name=mosque.name,
+        postcode=mosque.postcode,
+        website_url=mosque.website_url,
+    )
+
+
+def _snapshot_map(mosques: Iterable[Mosque]) -> dict[uuid.UUID, MosqueSnapshot]:
+    return {m.id: _snapshot_mosque(m) for m in mosques}
+
+
+def _view_mosque(snapshot: MosqueSnapshot) -> Mosque:
+    """Build a non-persisted Mosque stub for verify_website.
+
+    The verification gate only reads ``mosque.name``, ``mosque.postcode``,
+    and ``mosque.address_line1``. Constructing a fresh ORM instance
+    avoids the lazy-reload path on the cached row.
+    """
+    return Mosque(
+        name=snapshot.name,
+        normalized_name=snapshot.name.lower(),
+        postcode=snapshot.postcode,
+        address_line1=None,
+    )
+
+
 async def _select_mosques_missing_website(
     session: AsyncSession,
 ) -> list[Mosque]:
@@ -85,7 +131,7 @@ async def _record_lead(
     *,
     lead: WebsiteLead,
     outcome: VerificationOutcome,
-    mosque: Mosque,
+    snapshot: MosqueSnapshot,
     actor: str,
 ) -> None:
     notes = (
@@ -95,9 +141,9 @@ async def _record_lead(
     )
     await record_discovery_lead(
         session,
-        query=f"mosque_id={mosque.id}",
+        query=f"mosque_id={snapshot.mosque_id}",
         notes=notes,
-        location_hint=mosque.postcode,
+        location_hint=snapshot.postcode,
         actor=actor,
     )
 
@@ -120,27 +166,28 @@ async def _promote_website(
     session: AsyncSession,
     *,
     lead: WebsiteLead,
-    mosque: Mosque,
+    snapshot: MosqueSnapshot,
     outcome: VerificationOutcome,
 ) -> bool:
     """Write a new manual source row and set ``mosque.website_url``.
 
     Idempotency: a source is keyed by ``(source_type, external_id)``; the
     external_id we synthesise is ``f"website-{provider}-{mosque.id}"``. A
-    re-run produces a duplicate-key error which we catch and treat as
-    "already promoted".
+    re-run produces a duplicate-key error which we catch inside a nested
+    SAVEPOINT so the rest of the session's pending writes (e.g. the
+    Charity Commission's auxiliary source rows) are not rolled back.
     """
     from sqlalchemy.exc import IntegrityError
 
-    external_id = f"website-{lead.provider.value}-{mosque.id}"
+    external_id = f"website-{lead.provider.value}-{snapshot.mosque_id}"
     attribution = _attribution_for(lead.provider)
     source = MosqueSource(
         id=uuid.uuid4(),
-        mosque_id=mosque.id,
+        mosque_id=snapshot.mosque_id,
         source_type=SourceType.MANUAL,
         external_id=external_id,
         source_url=lead.url,
-        display_name=mosque.name,
+        display_name=snapshot.name,
         publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
         confidence=Confidence.VERIFIED,
         attribution=attribution,
@@ -152,15 +199,20 @@ async def _promote_website(
             "discovery_extra": lead.extra,
         },
     )
-    session.add(source)
     try:
-        await session.flush()
+        async with session.begin_nested():
+            session.add(source)
     except IntegrityError:
-        # already promoted on a previous run; treat as success
-        await session.rollback()
+        # already promoted on a previous run; treat as success without
+        # rolling back the rest of the session.
         return False
 
-    mosque.website_url = lead.url
+    # Update the live mosque row's website_url. We re-query here so we
+    # work against a fresh, non-expired instance regardless of any
+    # earlier provider flushes on the same session.
+    live = await session.get(Mosque, snapshot.mosque_id)
+    if live is not None:
+        live.website_url = lead.url
     return True
 
 
@@ -182,7 +234,7 @@ async def run_website_discovery(
 
     result = DiscoveryRunResult()
     mosques = await _select_mosques_missing_website(session)
-    cache = _mosque_cache(mosques)
+    snapshots = _snapshot_map(mosques)
 
     outcomes: list[VerificationOutcome] = []
     for provider in selected:
@@ -197,9 +249,14 @@ async def run_website_discovery(
             continue
         result.providers[provider_name] = provider_result
         for lead in leads:
-            mosque = cache.get(lead.mosque_id)
-            if mosque is None:
+            snap = snapshots.get(lead.mosque_id)
+            if snap is None:
                 continue
+            # Build a minimal Mosque view for verify_website: name and
+            # postcode only. We avoid touching the live instance because
+            # a provider's flush may have expired its columns, and a
+            # lazy reload fails in strict-async mode.
+            verify_mosque = _view_mosque(snap)
             try:
                 if public_linked_provider(lead.provider) and lead.linked_source_id is not None:
                     outcome = VerificationOutcome(
@@ -212,7 +269,9 @@ async def run_website_discovery(
                         notes="public linked source (MiB/OSM/charity/wikidata)",
                     )
                 else:
-                    outcome = await verify_website(lead, mosque, user_agent=user_agent)
+                    outcome = await verify_website(
+                        lead, verify_mosque, user_agent=user_agent
+                    )
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(f"{lead.url}: {exc}")
                 continue
@@ -224,7 +283,7 @@ async def run_website_discovery(
             if outcome.verified:
                 result.verified += 1
                 promoted = await _promote_website(
-                    session, lead=lead, mosque=mosque, outcome=outcome
+                    session, lead=lead, snapshot=snap, outcome=outcome
                 )
                 if promoted:
                     result.promoted += 1
@@ -237,7 +296,7 @@ async def run_website_discovery(
                     session,
                     lead=lead,
                     outcome=outcome,
-                    mosque=mosque,
+                    snapshot=snap,
                     actor=actor,
                 )
                 result.leads_recorded += 1
