@@ -414,11 +414,12 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
     discover_websites.add_argument(
         "--provider",
         action="append",
-        choices=("mib_metadata", "osm_tag_recheck", "charity_commission", "oscr"),
+        choices=("mib_metadata", "osm_tag_recheck", "charity_commission", "oscr", "search_engine"),
         help=(
             "Lead source(s) to include. May be passed multiple times. "
             "``charity_commission`` requires ``--charity-file`` pointing at "
-            "the daily extract TSV; ``oscr`` requires ``--oscr-file``."
+            "the daily extract TSV; ``oscr`` requires ``--oscr-file``. "
+            "``search_engine`` requires ``--exa-api-key`` or ``EXA_SEARCH_API_KEY``."
         ),
     )
     discover_websites.add_argument(
@@ -440,6 +441,11 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
             "CSV export (CharityExport-<date>.csv). Required for "
             "``--provider oscr``."
         ),
+    )
+    discover_websites.add_argument(
+        "--exa-api-key",
+        default=None,
+        help="Exa Search API key (overrides EXA_SEARCH_API_KEY from .env)",
     )
     discover_websites.add_argument(
         "--dry-run",
@@ -1243,9 +1249,7 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
                     charity_index = load_charity_index(args.charity_file)
 
                 async def _run_with_cc_index(session, _index=charity_index):
-                    return await propose_charity_commission_leads(
-                        session, charity_index=_index
-                    )
+                    return await propose_charity_commission_leads(session, charity_index=_index)
 
                 selected.append(_run_with_cc_index)
             elif name == "oscr":
@@ -1259,11 +1263,45 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
                     oscr_index = load_oscr_index(args.oscr_file)
 
                 async def _run_with_oscr_index(session, _index=oscr_index):
-                    return await propose_oscr_leads(
-                        session, charity_index=_index
-                    )
+                    return await propose_oscr_leads(session, charity_index=_index)
 
                 selected.append(_run_with_oscr_index)
+            elif name == "search_engine":
+                from uk_jamaat_directory.ingest.discovery.websites.providers.search_engine import (
+                    propose_search_engine_leads,
+                )
+                from uk_jamaat_directory.ingest.discovery.websites.search.cache import (
+                    SearchCache,
+                )
+                from uk_jamaat_directory.ingest.discovery.websites.search.exa_client import (
+                    ExaClient,
+                )
+
+                api_key = args.exa_api_key or settings.exa_search_api_key
+                if not api_key:
+                    print(
+                        "error: --provider search_engine requires --exa-api-key "
+                        "or EXA_SEARCH_API_KEY in .env",
+                        file=sys.stderr,
+                    )
+                    return 2
+                client = ExaClient(api_key=api_key)
+                cache = SearchCache()
+
+                async def _run_with_search(
+                    session,
+                    _client=client,
+                    _cache=cache,
+                    _delay=settings.search_engine_delay_seconds,
+                ):
+                    return await propose_search_engine_leads(
+                        session,
+                        exa_client=_client,
+                        cache=_cache,
+                        delay_seconds=_delay,
+                    )
+
+                selected.append(_run_with_search)
             else:
                 selected.append(available[name])
 

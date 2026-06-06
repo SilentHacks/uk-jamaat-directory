@@ -14,6 +14,7 @@ inherit that URL as a low-risk discovery lead.
 This provider is England-and-Wales only. Scottish mosques are handled
 by :mod:`uk_jamaat_directory.ingest.discovery.websites.providers.oscr`.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -36,10 +37,7 @@ from uk_jamaat_directory.ingest.discovery.websites.types import (
 
 CC_CONFIG = CharityRegisterConfig(
     source_type=SourceType.CHARITY_REGISTER,
-    attribution=(
-        "Charity Commission for England and Wales "
-        "(Open Government Licence v3.0)"
-    ),
+    attribution=("Charity Commission for England and Wales (Open Government Licence v3.0)"),
     provider=WebsiteProvider.CHARITY_COMMISSION,
     reason_prefix="charity_number_match",
 )

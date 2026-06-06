@@ -17,6 +17,7 @@ This module exposes :func:`propose_charity_register_leads` which the
 two provider wrappers (``charity_commission``, ``oscr``) call with
 their own (source type, attribution, provider enum, charity index).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -134,10 +135,7 @@ def _matches(mosque: Mosque, charity: CharityRecord) -> float:
         return 0.0
     if mosque_pc.replace(" ", "").upper() != charity_pc.replace(" ", "").upper():
         return 0.0
-    if (
-        _shared_significant_token_count(mosque.name, charity.name)
-        < _MIN_SHARED_SIGNIFICANT_TOKENS
-    ):
+    if _shared_significant_token_count(mosque.name, charity.name) < _MIN_SHARED_SIGNIFICANT_TOKENS:
         return 0.0
     return float(
         fuzz.token_set_ratio(

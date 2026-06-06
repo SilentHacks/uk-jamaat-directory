@@ -16,6 +16,7 @@ this module is a thin wrapper around the shared
 :mod:`uk_jamaat_directory.ingest.discovery.websites.providers.charity_register`
 helper.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -40,10 +41,7 @@ from uk_jamaat_directory.ingest.discovery.websites.types import (
 # can disambiguate Scottish-register matches from England-and-Wales ones.
 OSCR_CONFIG = CharityRegisterConfig(
     source_type=SourceType.OSCR_REGISTER,
-    attribution=(
-        "Office of the Scottish Charity Regulator "
-        "(Open Government Licence v3.0)"
-    ),
+    attribution=("Office of the Scottish Charity Regulator (Open Government Licence v3.0)"),
     provider=WebsiteProvider.OSCR,
     reason_prefix="oscr_number_match",
 )

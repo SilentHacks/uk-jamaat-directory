@@ -12,6 +12,7 @@ The full CC extract is ~200K rows and ~50MB; the OSCR extract is ~25K
 rows and ~8MB. Both fit comfortably in memory for a one-shot discovery
 CLI.
 """
+
 from __future__ import annotations
 
 import csv
@@ -73,12 +74,7 @@ def load_register(
                 name=_clean(row.get(column_name)),
                 postcode=normalized,
                 website=web,
-                status=(
-                    _clean(row.get(column_status))
-                    if column_status
-                    else None
-                )
-                or None,
+                status=(_clean(row.get(column_status)) if column_status else None) or None,
             )
             by_postcode.setdefault(key, []).append(record)
     return by_postcode

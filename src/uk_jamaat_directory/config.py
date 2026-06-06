@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
     osm_overpass_timeout_seconds: float = 180.0
 
+    exa_search_api_key: str | None = None
+    search_engine_delay_seconds: float = 1.0
+
     export_base_url: str | None = None
     export_s3_prefix: str = "exports"
     export_enabled: bool = False

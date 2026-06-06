@@ -30,6 +30,7 @@ docker-compose.local.yml
 
 # Local runtime data
 data/artifacts/
+data/cache/
 data/exports/
 data/private/
 minio-data/

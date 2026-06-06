@@ -4,6 +4,7 @@ website discovery provider.
 Mirrors :mod:`tests.test_charity_commission_discovery` but uses the OSCR
 CSV header / quoting convention and the OSCR enum / source type.
 """
+
 from __future__ import annotations
 
 import csv
@@ -40,9 +41,7 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         "Website",
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(
-            handle, fieldnames=fields, delimiter=",", quoting=csv.QUOTE_MINIMAL
-        )
+        writer = csv.DictWriter(handle, fieldnames=fields, delimiter=",", quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -110,9 +109,7 @@ async def test_load_oscr_index_postcode_keys(oscr_csv: Path) -> None:
 async def test_propose_oscr_leads_matches_by_name_and_postcode(
     db_session: AsyncSession, oscr_csv: Path
 ) -> None:
-    mosque = _make_mosque(
-        name="Glasgow Central Mosque & Islamic Centre", postcode="G1 1AA"
-    )
+    mosque = _make_mosque(name="Glasgow Central Mosque & Islamic Centre", postcode="G1 1AA")
     db_session.add(mosque)
     await db_session.commit()
 
@@ -143,9 +140,7 @@ async def test_propose_oscr_leads_writes_oscr_source_row(
     rows = list(
         (
             await db_session.execute(
-                select(MosqueSource).where(
-                    MosqueSource.source_type == SourceType.OSCR_REGISTER
-                )
+                select(MosqueSource).where(MosqueSource.source_type == SourceType.OSCR_REGISTER)
             )
         )
         .scalars()
@@ -233,9 +228,7 @@ async def test_propose_oscr_leads_promotes_via_orchestrator(
         run_website_discovery,
     )
 
-    mosque = _make_mosque(
-        name="Edinburgh Central Mosque Trust", postcode="EH8 9BT"
-    )
+    mosque = _make_mosque(name="Edinburgh Central Mosque Trust", postcode="EH8 9BT")
     db_session.add(mosque)
     await db_session.commit()
 
@@ -244,9 +237,7 @@ async def test_propose_oscr_leads_promotes_via_orchestrator(
     async def _with_index(session):
         return await propose_oscr_leads(session, charity_index=index)
 
-    result = await run_website_discovery(
-        db_session, providers=[_with_index]
-    )
+    result = await run_website_discovery(db_session, providers=[_with_index])
     await db_session.commit()
     await db_session.refresh(mosque)
     assert mosque.website_url == "https://edinburghcentralmosque.org"

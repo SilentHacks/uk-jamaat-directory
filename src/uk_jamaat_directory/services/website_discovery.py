@@ -161,6 +161,8 @@ def _attribution_for(provider: WebsiteProvider) -> str:
         return "Wikidata contributors (CC0)"
     if provider == WebsiteProvider.DUCKDUCKGO:
         return "DuckDuckGo search results"
+    if provider == WebsiteProvider.SEARCH_ENGINE:
+        return "Exa search results"
     return f"Phase 5 website discovery ({provider.value})"
 
 
@@ -271,9 +273,7 @@ async def run_website_discovery(
                         notes="public linked source (MiB/OSM/charity/wikidata)",
                     )
                 else:
-                    outcome = await verify_website(
-                        lead, verify_mosque, user_agent=user_agent
-                    )
+                    outcome = await verify_website(lead, verify_mosque, user_agent=user_agent)
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(f"{lead.url}: {exc}")
                 continue

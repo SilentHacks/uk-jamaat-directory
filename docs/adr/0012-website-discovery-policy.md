@@ -28,27 +28,31 @@ Phase 5 uses a **provider-and-gate** model:
    - `charity_commission` — bulk-download the daily Charity Commission
      register extract (England & Wales) and the OSCR Scottish register, and
      join by name + postcode (Tier 1c, free public dataset, planned).
-   - `wikidata` — single SPARQL query for UK mosques with `P856` (official
-     website) (Tier 1d, free, planned).
-2. The verification gate promotes a candidate to `mosque.website_url` only
-   if **either**:
-   - the URL was found in a public, redistributable source already linked to
-     the mosque (`mib_metadata`, `osm_tag_recheck`, `charity_commission`,
-     `wikidata`); **or**
-   - a live HTTP fetch returns 200/text-html, the page `<title>` / first H1
-     contains the normalised mosque name (token-set fuzzy match ≥ 60), and at
-     least one of postcode or address appears in the visible text.
-3. Failed candidates are recorded as `AdminDiscoveryLead` audit rows (the
-   existing admin-only mechanism), never promoted.
-4. Promotions are written through the existing `SourceType.MANUAL` source
-   path with a per-provider attribution string. The new manual source row
-   has `publication_policy=public_redistribution_allowed` so the website
-   reaches the public export.
-5. DuckDuckGo HTML scraping is **opt-in** (`--provider duckduckgo`, off by
-   default) and rate-limited. The default run is purely public sources.
-6. Companies House lookups are out of scope for v1.
-7. No URL found via a search engine, scraping, or non-public directory is
-   ever written as a public fact without operator sign-off.
+    - `wikidata` — single SPARQL query for UK mosques with `P856` (official
+      website) (Tier 1d, free, planned — dropped due to sparse coverage).
+    - `search_engine` — Exa.ai search API, quoted-name + postcode query per
+      mosque (Tier 2, free tier 1,000 req/month). Leads are **not**
+      public-linked and must pass live HTTP + name + postcode verification.
+ 2. The verification gate promotes a candidate to `mosque.website_url` only
+    if **either**:
+    - the URL was found in a public, redistributable source already linked to
+      the mosque (`mib_metadata`, `osm_tag_recheck`, `charity_commission`,
+      `oscr`); **or**
+    - a live HTTP fetch returns 200/text-html, the page `<title>` / first H1
+      contains the normalised mosque name (token-set fuzzy match ≥ 60), and at
+      least one of postcode or address appears in the visible text.
+ 3. Failed candidates are recorded as `AdminDiscoveryLead` audit rows (the
+    existing admin-only mechanism), never promoted.
+ 4. Promotions are written through the existing `SourceType.MANUAL` source
+    path with a per-provider attribution string. The new manual source row
+    has `publication_policy=public_redistribution_allowed` so the website
+    reaches the public export.
+ 5. Search-engine discovery is **opt-in** (`--provider search_engine`, off by
+    default) and rate-limited (`search_engine_delay_seconds`, default 1.0 s).
+    Results are cached locally for 30 days to avoid burning API quota.
+ 6. Companies House lookups are out of scope for v1.
+ 7. No URL found via a search engine, scraping, or non-public directory is
+    ever written as a public fact without operator sign-off.
 
 ## Consequences
 

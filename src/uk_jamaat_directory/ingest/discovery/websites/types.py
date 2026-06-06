@@ -20,6 +20,7 @@ class WebsiteProvider(StrEnum):
     OSCR = "oscr"
     WIKIDATA = "wikidata"
     DUCKDUCKGO = "duckduckgo"
+    SEARCH_ENGINE = "search_engine"
 
 
 @dataclass(frozen=True)

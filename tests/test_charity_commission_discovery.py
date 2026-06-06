@@ -140,16 +140,12 @@ async def test_propose_charity_commission_leads_matches_by_name_and_postcode(
 async def test_propose_charity_commission_leads_skips_deny_list(
     db_session: AsyncSession, charity_tsv: Path
 ) -> None:
-    mosque = _make_mosque(
-        name="East London Mosque Trust", postcode="E1 1AA"
-    )
+    mosque = _make_mosque(name="East London Mosque Trust", postcode="E1 1AA")
     db_session.add(mosque)
     await db_session.commit()
 
     index = load_charity_index(charity_tsv)
-    leads, _ = await propose_charity_commission_leads(
-        db_session, charity_index=index
-    )
+    leads, _ = await propose_charity_commission_leads(db_session, charity_index=index)
     # Two charities match the postcode + "East London Mosque Trust" name.
     # One (charity 100103) is on the deny-list (facebook.com), so only the
     # other should be proposed.
@@ -274,9 +270,7 @@ async def test_propose_charity_commission_leads_rejects_single_token_overlap(
     await db_session.commit()
 
     index = load_charity_index(path)
-    leads, result = await propose_charity_commission_leads(
-        db_session, charity_index=index
-    )
+    leads, result = await propose_charity_commission_leads(db_session, charity_index=index)
     assert leads == []
     assert result.candidates_proposed == 0
 

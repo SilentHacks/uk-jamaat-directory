@@ -4,3 +4,6 @@ from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import
     HOMEPAGE_KEYS,
     propose_mib_metadata_leads,
 )
+from uk_jamaat_directory.ingest.discovery.websites.providers.search_engine import (  # noqa: F401
+    propose_search_engine_leads,
+)
