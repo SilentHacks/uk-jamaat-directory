@@ -101,9 +101,7 @@ async def propose_search_engine_leads(
 
     # 3. Fire parallel API calls for everything that was not cached.
     if uncached_queries and exa_client is not None:
-        api_results = await _search_many(
-            exa_client, uncached_queries, num_results=_NUM_RESULTS
-        )
+        api_results = await _search_many(exa_client, uncached_queries, num_results=_NUM_RESULTS)
         # Persist successes to the in-memory cache (flushed later).
         cache_obj.set_many(_SEARCH_PROVIDER, api_results)
         all_results.update(api_results)

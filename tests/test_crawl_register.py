@@ -244,9 +244,7 @@ async def test_list_due_includes_mosque_website(db_session, test_settings) -> No
     db_session.add_all([mosque, source])
     await db_session.flush()
 
-    settings = Settings(
-        **{**test_settings.model_dump(), "crawl_enabled": True}
-    )
+    settings = Settings(**{**test_settings.model_dump(), "crawl_enabled": True})
     due_ids = await list_due_source_ids(db_session, settings=settings)
 
     assert source.id in due_ids

@@ -253,9 +253,7 @@ async def _verify_lead(
 
     verify_mosque = _view_mosque(snap)
     async with sem:
-        return await verify_website(
-            lead, verify_mosque, user_agent=user_agent, page_cache=cache
-        )
+        return await verify_website(lead, verify_mosque, user_agent=user_agent, page_cache=cache)
 
 
 async def run_website_discovery(

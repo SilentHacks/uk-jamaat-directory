@@ -348,11 +348,7 @@ async def verify_website(
     if cached_page is not None:
         title, body = cached_page
         ratio, pc, addr, verified = _evaluate_page(title, body, mosque)
-        notes = (
-            f"name_ratio={ratio:.0f} "
-            f"postcode={pc} "
-            f"address={addr} (cached)"
-        )
+        notes = f"name_ratio={ratio:.0f} postcode={pc} address={addr} (cached)"
         if verified:
             return VerificationOutcome(
                 lead=lead,
@@ -412,9 +408,7 @@ async def verify_website(
                 r_title, r_body = resolved_page
                 if page_cache is not None:
                     page_cache.set(resolved, r_title, r_body)
-                r_ratio, r_pc, r_addr, r_verified = _evaluate_page(
-                    r_title, r_body, mosque
-                )
+                r_ratio, r_pc, r_addr, r_verified = _evaluate_page(r_title, r_body, mosque)
                 if r_verified:
                     # We return a success for the *original* lead so the
                     # orchestrator promotes lead.url, but the notes tell the
@@ -452,9 +446,7 @@ async def verify_website(
             if page_cache is not None:
                 page_cache.set(contact_url, cp_title, cp_body)
 
-        cp_ratio, cp_pc, cp_addr, cp_verified = _evaluate_page(
-            cp_title, cp_body, mosque
-        )
+        cp_ratio, cp_pc, cp_addr, cp_verified = _evaluate_page(cp_title, cp_body, mosque)
         if cp_verified:
             return VerificationOutcome(
                 lead=lead,
@@ -475,11 +467,7 @@ async def verify_website(
     # ------------------------------------------------------------------
     if cached_page is not None:
         ratio, pc, addr, _ = _evaluate_page(*cached_page, mosque)
-        notes = (
-            f"name_ratio={ratio:.0f} "
-            f"postcode={pc} "
-            f"address={addr} (cached)"
-        )
+        notes = f"name_ratio={ratio:.0f} postcode={pc} address={addr} (cached)"
     else:
         notes = f"name_ratio={ratio:.0f} postcode={pc} address={addr}"  # type: ignore[possibly-unbound]
     return VerificationOutcome(

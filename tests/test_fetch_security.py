@@ -25,7 +25,9 @@ def test_validate_fetch_url_blocks_loopback_literal() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_url_blocks_loopback_without_network() -> None:
-    settings = Settings(environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0)
+    settings = Settings(
+        environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0
+    )
     result = await fetch_url(
         "http://127.0.0.1/.well-known/uk-jamaat-directory.json", settings=settings
     )
@@ -46,7 +48,9 @@ async def test_fetch_url_blocks_redirect_to_private_host() -> None:
         return httpx.Response(200, text='{"times": []}')
 
     transport = httpx.MockTransport(handler)
-    settings = Settings(environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0)
+    settings = Settings(
+        environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0
+    )
 
     import uk_jamaat_directory.ingest.fetch.client as client_module
     import uk_jamaat_directory.ingest.fetch.robots as robots_module

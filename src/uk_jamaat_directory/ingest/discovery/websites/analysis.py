@@ -175,9 +175,7 @@ async def analyse_discovery_leads(session: AsyncSession) -> DiscoveryAnalysisRep
 
     for row in rows:
         lead = _parse_lead_notes(row.reason)
-        lead.location_hint = (
-            row.metadata_.get("location_hint") if row.metadata_ else None
-        )
+        lead.location_hint = row.metadata_.get("location_hint") if row.metadata_ else None
         report.provider_counts[lead.provider] += 1
         report.domain_counts[lead.domain] += 1
 

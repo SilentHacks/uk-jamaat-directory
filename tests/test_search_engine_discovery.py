@@ -248,9 +248,7 @@ async def test_provider_proposes_leads_for_missing_website(
 
 
 @pytest.mark.asyncio
-async def test_provider_filters_deny_list(
-    db_session: AsyncSession, tmp_path: Path
-) -> None:
+async def test_provider_filters_deny_list(db_session: AsyncSession, tmp_path: Path) -> None:
     mosque = _make_mosque(name="Test Mosque", postcode="E1 1AA")
     db_session.add(mosque)
     await db_session.commit()
@@ -299,9 +297,7 @@ async def test_provider_skips_mosques_without_postcode(db_session: AsyncSession)
     await db_session.commit()
 
     fake_client = _FakeExaClient([ExaResult(title="X", url="https://x.example/")])
-    leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client
-    )
+    leads, result = await propose_search_engine_leads(db_session, exa_client=fake_client)
     assert not any(lead.mosque_id == mosque.id for lead in leads)
 
 
@@ -312,9 +308,7 @@ async def test_provider_skips_mosques_with_website(db_session: AsyncSession) -> 
     await db_session.commit()
 
     fake_client = _FakeExaClient([ExaResult(title="X", url="https://x.example/")])
-    leads, result = await propose_search_engine_leads(
-        db_session, exa_client=fake_client
-    )
+    leads, result = await propose_search_engine_leads(db_session, exa_client=fake_client)
     assert not any(lead.mosque_id == mosque.id for lead in leads)
 
 
@@ -341,9 +335,7 @@ async def test_provider_deduplicates_identical_queries(
 
 
 @pytest.mark.asyncio
-async def test_provider_respects_limit(
-    db_session: AsyncSession, tmp_path: Path
-) -> None:
+async def test_provider_respects_limit(db_session: AsyncSession, tmp_path: Path) -> None:
     """With limit=1, only one mosque is searched even when more are missing."""
     mosque1 = _make_mosque(name="First Mosque", postcode="E1 1AA")
     mosque2 = _make_mosque(name="Second Mosque", postcode="W1 1AA")
@@ -528,7 +520,9 @@ async def test_verify_website_uses_page_cache(db_session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_website_stores_in_page_cache(db_session: AsyncSession, tmp_path: Path) -> None:
+async def test_verify_website_stores_in_page_cache(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
     from uk_jamaat_directory.ingest.discovery.websites.verify import verify_website
     from uk_jamaat_directory.ingest.discovery.websites.verify_cache import (
         VerificationPageCache,

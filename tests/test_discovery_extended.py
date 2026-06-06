@@ -442,7 +442,4 @@ def test_address_appears_with_nonbreaking_space() -> None:
         _address_appears,
     )
 
-    assert (
-        _address_appears("10 Test Street", "Visit us at 10\xa0Test\xa0Street")
-        is True
-    )
+    assert _address_appears("10 Test Street", "Visit us at 10\xa0Test\xa0Street") is True

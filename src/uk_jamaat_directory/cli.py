@@ -1376,9 +1376,7 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
     return 0
 
 
-async def _run_analyse_discovery_leads(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_analyse_discovery_leads(args: argparse.Namespace, settings: Settings) -> int:
     from uk_jamaat_directory.ingest.discovery.websites.analysis import (
         analyse_discovery_leads,
     )
