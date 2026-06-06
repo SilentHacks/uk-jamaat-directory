@@ -9,7 +9,6 @@ from sqlalchemy import select
 
 from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.domain import (
-    CandidateStatus,
     Confidence,
     ExtractionKind,
     MosqueStatus,
@@ -30,20 +29,20 @@ FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/crawl"
 
 
 @pytest.mark.asyncio
-async def test_process_source_creates_candidates(db_session, test_settings) -> None:
+async def test_process_mosque_website_stores_artifact_no_candidates(db_session, test_settings) -> None:
     mosque = Mosque(
         id=uuid.uuid4(),
-        name="Pipeline Masjid",
-        normalized_name="pipeline masjid",
-        website_url="https://pipeline.example.org",
+        name="Website Masjid",
+        normalized_name="website masjid",
+        website_url="https://mosque-website.example.org",
         status=MosqueStatus.ACTIVE,
     )
     source = MosqueSource(
         id=uuid.uuid4(),
         mosque_id=mosque.id,
-        source_type=SourceType.STANDARD_FEED,
-        external_id="pipeline.example.org",
-        source_url="https://pipeline.example.org/.well-known/uk-jamaat-directory.json",
+        source_type=SourceType.MOSQUE_WEBSITE,
+        external_id=f"web-{mosque.id}",
+        source_url="https://mosque-website.example.org",
         publication_policy=SourcePublicationPolicy.UNKNOWN,
         confidence=Confidence.OFFICIAL_IMPORT,
         metadata_={"crawl_enabled": True},
@@ -52,20 +51,19 @@ async def test_process_source_creates_candidates(db_session, test_settings) -> N
     db_session.add(source)
     await db_session.flush()
 
-    feed_body = (FIXTURES / "standard_feed_valid.json").read_bytes()
+    html_body = b"<html><body><h1>Mosque Website</h1></body></html>"
     settings = Settings(
         **{
             **test_settings.model_dump(),
             "crawl_enabled": True,
-            "crawl_validate_after_extract": True,
         }
     )
 
     fetch_result = FetchResult(
         status_code=200,
-        body=feed_body,
-        content_type="application/json",
-        etag='"fixture"',
+        body=html_body,
+        content_type="text/html",
+        etag=None,
         last_modified=None,
         unchanged=False,
     )
@@ -88,8 +86,8 @@ async def test_process_source_creates_candidates(db_session, test_settings) -> N
 
     assert result.fetched is True
     assert result.artifact_created is True
-    assert result.extracted is True
-    assert result.candidates_created > 0
+    assert result.extracted is False
+    assert result.candidates_created == 0
 
     candidates = (
         (
@@ -100,27 +98,26 @@ async def test_process_source_creates_candidates(db_session, test_settings) -> N
         .scalars()
         .all()
     )
-    assert candidates
-    assert all(candidate.status == CandidateStatus.PENDING for candidate in candidates)
+    assert len(candidates) == 0
 
 
 @pytest.mark.asyncio
-async def test_process_source_reruns_extraction_on_unchanged_after_failure(
+async def test_process_mosque_website_reruns_extraction_on_unchanged_after_failure(
     db_session, test_settings
 ) -> None:
     mosque = Mosque(
         id=uuid.uuid4(),
-        name="Retry Masjid",
-        normalized_name="retry masjid",
-        website_url="https://retry.example.org",
+        name="Retry Website Masjid",
+        normalized_name="retry website masjid",
+        website_url="https://retry-website.example.org",
         status=MosqueStatus.ACTIVE,
     )
     source = MosqueSource(
         id=uuid.uuid4(),
         mosque_id=mosque.id,
-        source_type=SourceType.STANDARD_FEED,
-        external_id="retry.example.org",
-        source_url="https://retry.example.org/.well-known/uk-jamaat-directory.json",
+        source_type=SourceType.MOSQUE_WEBSITE,
+        external_id=f"web-{mosque.id}",
+        source_url="https://retry-website.example.org",
         publication_policy=SourcePublicationPolicy.UNKNOWN,
         confidence=Confidence.OFFICIAL_IMPORT,
         metadata_={"crawl_enabled": True},
@@ -129,8 +126,8 @@ async def test_process_source_reruns_extraction_on_unchanged_after_failure(
         id=uuid.uuid4(),
         source_id=source.id,
         fetched_url=source.source_url,
-        object_key="artifacts/test/artifact.json",
-        content_type="application/json",
+        object_key="artifacts/test/website.html",
+        content_type="text/html",
         content_hash="abc123",
         etag='"fixture"',
     )
@@ -139,7 +136,7 @@ async def test_process_source_reruns_extraction_on_unchanged_after_failure(
         artifact_id=artifact.id,
         source_id=source.id,
         kind=ExtractionKind.DETERMINISTIC,
-        extractor_version="standard-feed-v1",
+        extractor_version="none",
         status="failed",
     )
     db_session.add(mosque)
@@ -150,12 +147,11 @@ async def test_process_source_reruns_extraction_on_unchanged_after_failure(
     db_session.add(failed_run)
     await db_session.flush()
 
-    feed_body = (FIXTURES / "standard_feed_valid.json").read_bytes()
+    html_body = b"<html><body><h1>Mosque Website</h1></body></html>"
     settings = Settings(
         **{
             **test_settings.model_dump(),
             "crawl_enabled": True,
-            "crawl_validate_after_extract": True,
         }
     )
     fetch_result = FetchResult(
@@ -174,12 +170,12 @@ async def test_process_source_reruns_extraction_on_unchanged_after_failure(
         ),
         patch(
             "uk_jamaat_directory.ingest.extract.runner.S3Storage.get_bytes",
-            new=AsyncMock(return_value=feed_body),
+            new=AsyncMock(return_value=html_body),
         ),
     ):
         result = await process_source(db_session, source.id, settings=settings, force=True)
 
     assert result.unchanged is True
-    assert result.extracted is True
-    assert result.candidates_created > 0
-    assert result.error is None
+    assert result.extracted is False
+    assert result.candidates_created == 0
+    assert result.error is not None  # no extractor → extraction fails

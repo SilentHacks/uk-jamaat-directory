@@ -38,7 +38,7 @@ async def test_fetch_returns_304_unchanged() -> None:
     prior = SourceArtifact(
         id=uuid.uuid4(),
         source_id=uuid.uuid4(),
-        fetched_url="https://example.org/.well-known/uk-jamaat-directory.json",
+        fetched_url="https://example.org/prayer-times.json",
         etag='"abc"',
         fetched_at=datetime.now(UTC),
     )

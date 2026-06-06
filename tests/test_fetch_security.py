@@ -29,7 +29,7 @@ async def test_fetch_url_blocks_loopback_without_network() -> None:
         environment="test", crawl_user_agent="TestBot", crawl_per_domain_delay_seconds=0
     )
     result = await fetch_url(
-        "http://127.0.0.1/.well-known/uk-jamaat-directory.json", settings=settings
+        "http://127.0.0.1/prayer-times.json", settings=settings
     )
     assert result.error == "blocked host address"
     assert not result.ok
@@ -76,7 +76,7 @@ async def test_fetch_url_blocks_redirect_to_private_host() -> None:
     service_module.build_http_client = patched_build
     try:
         result = await fetch_url(
-            "https://example.org/.well-known/uk-jamaat-directory.json",
+            "https://example.org/prayer-times.html",
             settings=settings,
         )
     finally:
@@ -129,7 +129,7 @@ async def test_fetch_url_rejects_oversized_response() -> None:
     service_module.build_http_client = patched_build
     try:
         result = await fetch_url(
-            "https://example.org/.well-known/uk-jamaat-directory.json",
+            "https://example.org/prayer-times.html",
             settings=settings,
         )
     finally:
@@ -151,7 +151,7 @@ async def test_ensure_resolvable_public_host_blocks_private_dns() -> None:
             ],
         )
         blocked = await ensure_resolvable_public_host(
-            "https://example.org/.well-known/uk-jamaat-directory.json"
+            "https://example.org/prayer-times.html"
         )
 
     assert blocked == "blocked host address"

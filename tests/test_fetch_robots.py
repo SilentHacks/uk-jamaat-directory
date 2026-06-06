@@ -59,7 +59,7 @@ async def test_fetch_url_reports_robots_error() -> None:
     service_module.build_http_client = patched_build
     try:
         result = await fetch_url(
-            "https://example.org/.well-known/uk-jamaat-directory.json",
+            "https://example.org/prayer-times.html",
             settings=settings,
         )
     finally:

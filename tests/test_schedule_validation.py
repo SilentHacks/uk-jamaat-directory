@@ -98,10 +98,10 @@ def test_warns_jamaat_far_from_start() -> None:
     assert any(issue.code == "jamaat_far_from_start" for issue in result.warnings)
 
 
-def test_standard_feed_requires_manual_approval() -> None:
+def test_mosque_website_requires_manual_approval() -> None:
     candidate = _candidate()
     source = _source()
-    source.source_type = SourceType.STANDARD_FEED
+    source.source_type = SourceType.MOSQUE_WEBSITE
     result = validate_candidate(candidate, mosque=_mosque(), source=source)
     assert result.is_valid
     assert (
