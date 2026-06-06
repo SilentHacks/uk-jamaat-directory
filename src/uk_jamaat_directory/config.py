@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     muslimsinbritain_enabled: bool = False
     muslimsinbritain_publication_policy: str = "public_redistribution_allowed"
     openai_api_key: str | None = None
+    groq_api_key: str | None = None
+    ai_model: str = "llama-3.1-8b-instant"
+    ai_max_tokens: int = 4096
+    ai_profiling_enabled: bool = True
+    ai_profiling_max_pages: int = 6
+    ai_profiling_max_chars_per_page: int = 50_000
+    ai_profiling_timeout_seconds: float = 30.0
 
     community_submission_rate_limit: int = 10
     community_submission_rate_window_seconds: int = 60
