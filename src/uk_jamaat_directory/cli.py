@@ -414,7 +414,7 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
     discover_websites.add_argument(
         "--provider",
         action="append",
-        choices=("mib_metadata", "osm_tag_recheck", "duckduckgo"),
+        choices=("mib_metadata", "osm_tag_recheck"),
         help=(
             "Lead source(s) to include. May be passed multiple times. "
             "Currently only mib_metadata is implemented; osm_tag_recheck and "
@@ -1183,14 +1183,27 @@ async def _run_backfill_mib_websites(args: argparse.Namespace, settings: Setting
     return 0
 
 
-async def _run_discover_websites(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -> int:
+    from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import (
+        propose_mib_metadata_leads,
+    )
+    from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
+        propose_osm_tag_leads,
+    )
     from uk_jamaat_directory.services.website_discovery import run_website_discovery
+
+    available = {
+        "mib_metadata": propose_mib_metadata_leads,
+        "osm_tag_recheck": propose_osm_tag_leads,
+    }
+    selected: list[object] | None = None
+    if getattr(args, "provider", None):
+        selected = [available[name] for name in args.provider]
 
     async with cli_db_session(settings) as session:
         result = await run_website_discovery(
             session,
+            providers=selected,
             actor="discover_websites_cli",
         )
         if not args.dry_run:
@@ -1206,9 +1219,7 @@ async def _run_discover_websites(
         f"leads_recorded={result.leads_recorded}"
     )
     for name, provider_result in result.providers.items():
-        print(
-            f"  provider {name}: proposed={provider_result.candidates_proposed}"
-        )
+        print(f"  provider {name}: proposed={provider_result.candidates_proposed}")
     if result.errors:
         print("Errors:", file=sys.stderr)
         for error in result.errors[:20]:

@@ -88,5 +88,6 @@ def osm_to_discovery_record(record: OsmPlaceRecord) -> DiscoveryRecord:
             "osm_changeset": record.osm_changeset,
             "osm_user": record.osm_user,
             "license": "ODbL-1.0",
+            "website_tags": list(record.website_tags),
         },
     )

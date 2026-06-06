@@ -7,7 +7,7 @@ MiB detail-page enrichment records several fields that are not the canonical
 promotes ``website_url`` — this provider catches the rest without any
 network call.
 
-Leads produced here are flagged with ``mib_source_id`` so the verification
+Leads produced here are flagged with ``linked_source_id`` so the verification
 gate accepts them as MiB-linked public provenance.
 """
 
@@ -105,7 +105,7 @@ async def propose_mib_metadata_leads(
                         provider=WebsiteProvider.MIB_METADATA,
                         reason=f"mib_metadata_{key}",
                         matched_postcode=mosque.postcode,
-                        mib_source_id=source.id,
+                        linked_source_id=source.id,
                         extra={"mib_external_id": source.external_id},
                     )
                 )

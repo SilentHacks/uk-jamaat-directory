@@ -92,6 +92,7 @@ def map_overpass_element(
         osm_changeset=_int_value(element.get("changeset")),
         osm_user=_tag_value(element, "user"),
     )
+    record.website_tags = _pick_website_tags(tags)
 
     if not is_muslim_place(record):
         return None, "non_muslim"
@@ -201,6 +202,29 @@ def _pick_website(tags: dict[str, Any]) -> str | None:
             return value
         return f"https://{value}"
     return None
+
+
+def _pick_website_tags(tags: dict[str, Any]) -> list[str]:
+    """Collect every website-shaped OSM tag, normalised to a full URL.
+
+    Captures ``website``, ``contact:website``, and ``url``. The single
+    canonical :func:`_pick_website` value is added to the schema's
+    ``website_url`` field; this list preserves the alternates so a later
+    re-check pass can re-discover websites that the original import did
+    not promote.
+    """
+    seen: set[str] = set()
+    collected: list[str] = []
+    for key in ("website", "contact:website", "url"):
+        raw = _tag(tags, key)
+        if not raw:
+            continue
+        value = raw if "://" in raw else f"https://{raw}"
+        if value in seen:
+            continue
+        seen.add(value)
+        collected.append(value)
+    return collected
 
 
 def _pick_country(tags: dict[str, Any], *, default_country: str) -> str:

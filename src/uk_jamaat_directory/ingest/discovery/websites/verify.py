@@ -4,9 +4,10 @@ Moderate strictness: a candidate is promoted to ``mosques.website_url`` when
 **either**:
 
 1. the URL was extracted from a public, redistributable source already linked
-   to the mosque (MiB, OSM, Charity Commission, Wikidata) — the ``mib_source_id``
-   flag or a matching ``provider`` short-circuits the network check; or
-2. the live page passes an HTTP + name + (postcode|address|phone) match.
+   to the mosque (MiB, OSM, Charity Commission, Wikidata) — the
+   ``linked_source_id`` flag or a matching ``provider`` short-circuits the
+   network check; or
+2. the live page passes an HTTP + name + (postcode|address) match.
 
 Anything else is returned as an :class:`AdminDiscoveryLead` candidate for an
 operator to triage. We never write a URL we did not either find in a public
@@ -257,7 +258,7 @@ async def verify_website(
             notes="deny-list domain (directory/aggregator/social)",
         )
 
-    if public_linked_provider(lead.provider) and lead.mib_source_id is not None:
+    if public_linked_provider(lead.provider) and lead.linked_source_id is not None:
         return VerificationOutcome(
             lead=lead,
             verified=True,
@@ -291,11 +292,7 @@ async def verify_website(
     any_contact_match = matched_postcode or matched_address
     verified = ratio >= _NAME_RATIO_THRESHOLD and any_contact_match
 
-    notes = (
-        f"name_ratio={ratio:.0f}"
-        f" postcode={matched_postcode}"
-        f" address={matched_address}"
-    )
+    notes = f"name_ratio={ratio:.0f} postcode={matched_postcode} address={matched_address}"
     return VerificationOutcome(
         lead=lead,
         verified=verified,

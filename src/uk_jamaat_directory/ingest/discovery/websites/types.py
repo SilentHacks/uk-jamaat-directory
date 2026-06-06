@@ -27,7 +27,8 @@ class WebsiteLead:
 
     The ``provider`` is the signal source; the URL is what was found. The
     ``reason`` carries why this provider suggested it (e.g. "charity_number_match").
-    The optional ``mib_source_id`` flags the lead as MiB-linked, which is a
+    The optional ``linked_source_id`` flags the lead as coming from a public,
+    redistributable source row already linked to the mosque, which is a
     pass-through under the moderate strictness policy.
     """
 
@@ -36,7 +37,7 @@ class WebsiteLead:
     provider: WebsiteProvider
     reason: str
     matched_postcode: str | None = None
-    mib_source_id: uuid.UUID | None = None
+    linked_source_id: uuid.UUID | None = None
     extra: dict[str, str] = field(default_factory=dict)
 
 

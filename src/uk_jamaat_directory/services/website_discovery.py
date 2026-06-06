@@ -27,6 +27,9 @@ from uk_jamaat_directory.domain import (
 from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import (
     propose_mib_metadata_leads,
 )
+from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
+    propose_osm_tag_leads,
+)
 from uk_jamaat_directory.ingest.discovery.websites.types import (
     WebsiteLead,
     WebsiteLeadProvider,
@@ -175,7 +178,7 @@ async def run_website_discovery(
     """
     settings = get_settings()
     user_agent = user_agent or settings.crawl_user_agent
-    selected = providers or [propose_mib_metadata_leads]
+    selected = providers or [propose_mib_metadata_leads, propose_osm_tag_leads]
 
     result = DiscoveryRunResult()
     mosques = await _select_mosques_missing_website(session)
@@ -198,7 +201,7 @@ async def run_website_discovery(
             if mosque is None:
                 continue
             try:
-                if public_linked_provider(lead.provider) and lead.mib_source_id is not None:
+                if public_linked_provider(lead.provider) and lead.linked_source_id is not None:
                     outcome = VerificationOutcome(
                         lead=lead,
                         verified=True,

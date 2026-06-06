@@ -25,6 +25,7 @@ class OsmPlaceRecord(BaseModel):
     osm_version: int | None = None
     osm_changeset: int | None = None
     osm_user: str | None = None
+    website_tags: list[str] = Field(default_factory=list)
 
     @property
     def external_id(self) -> str:

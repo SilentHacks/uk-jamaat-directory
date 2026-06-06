@@ -2,6 +2,7 @@
 orchestrator. The HTTP fetch is injected in unit tests so the suite runs
 without network.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -14,6 +15,9 @@ from uk_jamaat_directory.geo.location import set_mosque_point
 from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import (
     HOMEPAGE_KEYS,
     propose_mib_metadata_leads,
+)
+from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
+    propose_osm_tag_leads,
 )
 from uk_jamaat_directory.ingest.discovery.websites.types import (
     WebsiteLead,
@@ -106,7 +110,7 @@ async def test_verify_website_short_circuits_for_mib_linked_lead(
         url="https://www.test-mosque.org.uk/",
         provider=WebsiteProvider.MIB_METADATA,
         reason="mib_metadata_homepage",
-        mib_source_id=source.id,
+        linked_source_id=source.id,
     )
     outcome = await verify_website(lead, mosque, user_agent="test")
     assert outcome.verified is True
@@ -218,7 +222,6 @@ def test_summarize_counts_outcomes() -> None:
             verified=True,
             name_ratio=80.0,
             matched_postcode=True,
-            
             matched_address=False,
             domain_denied=False,
             notes="ok",
@@ -233,7 +236,6 @@ def test_summarize_counts_outcomes() -> None:
             verified=False,
             name_ratio=None,
             matched_postcode=False,
-            
             matched_address=False,
             domain_denied=True,
             notes="denied",
@@ -248,7 +250,6 @@ def test_summarize_counts_outcomes() -> None:
             verified=False,
             name_ratio=80.0,
             matched_postcode=False,
-            
             matched_address=False,
             domain_denied=False,
             notes="no match",
@@ -263,7 +264,6 @@ def test_summarize_counts_outcomes() -> None:
             verified=False,
             name_ratio=None,
             matched_postcode=False,
-            
             matched_address=False,
             domain_denied=False,
             notes="fetch failed",
@@ -324,11 +324,9 @@ async def test_mib_metadata_walk_finds_homepage_keys(
     assert "https://www.test-mosque.org.uk/" in urls
     assert result.candidates_proposed == 1
     # Non-homepage keys must be skipped
-    assert all(
-        "muslimsinbritain.org" not in lead.url for lead in leads
-    )
+    assert all("muslimsinbritain.org" not in lead.url for lead in leads)
     # The lead is MiB-linked
-    assert all(lead.mib_source_id == source.id for lead in leads)
+    assert all(lead.linked_source_id == source.id for lead in leads)
 
 
 @pytest.mark.asyncio
@@ -491,3 +489,93 @@ async def test_orchestrator_skips_mosques_that_already_have_website(
     await db_session.refresh(mosque)
     assert result.promoted == 0
     assert mosque.website_url == "https://existing.example.org/"
+
+
+async def test_osm_tag_recheck_proposes_alternate_website(
+    db_session: AsyncSession,
+) -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
+        propose_osm_tag_leads,
+    )
+
+    mosque = _make_mosque()
+    db_session.add(mosque)
+    await db_session.commit()
+    source = MosqueSource(
+        source_type=SourceType.OPENSTREETMAP,
+        external_id="node/12345",
+        mosque_id=mosque.id,
+        source_url="https://www.openstreetmap.org/node/12345",
+        attribution="OpenStreetMap contributors",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        metadata_={
+            "website_tags": [
+                "https://www.mosque-alt.example.org/",
+                "https://www.mosque-alt.example.org/contact",
+            ],
+        },
+    )
+    db_session.add(source)
+    await db_session.commit()
+
+    leads, result = await propose_osm_tag_leads(db_session)
+    assert {lead.url for lead in leads} == {
+        "https://www.mosque-alt.example.org/",
+        "https://www.mosque-alt.example.org/contact",
+    }
+    assert all(lead.provider == WebsiteProvider.OSM_TAG_RECHECK for lead in leads)
+    assert all(lead.linked_source_id == source.id for lead in leads)
+    assert result.candidates_proposed == 2
+
+
+async def test_osm_tag_recheck_skips_existing_website(
+    db_session: AsyncSession,
+) -> None:
+    from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
+        propose_osm_tag_leads,
+    )
+
+    mosque = _make_mosque(website_url="https://www.mosque.example.org/")
+    db_session.add(mosque)
+    await db_session.commit()
+    source = MosqueSource(
+        source_type=SourceType.OPENSTREETMAP,
+        external_id="node/22222",
+        mosque_id=mosque.id,
+        metadata_={
+            "website_tags": [
+                "https://www.mosque.example.org/",
+                "https://www.mosque.example.org/about",
+            ],
+        },
+    )
+    db_session.add(source)
+    await db_session.commit()
+
+    leads, _ = await propose_osm_tag_leads(db_session)
+    assert {lead.url for lead in leads} == {"https://www.mosque.example.org/about"}
+
+
+async def test_osm_tag_recheck_promotes_via_orchestrator(
+    db_session: AsyncSession,
+) -> None:
+    mosque = _make_mosque()
+    db_session.add(mosque)
+    await db_session.commit()
+    source = MosqueSource(
+        source_type=SourceType.OPENSTREETMAP,
+        external_id="node/33333",
+        mosque_id=mosque.id,
+        metadata_={"website_tags": ["https://www.osm-discovered.example.org/"]},
+    )
+    db_session.add(source)
+    await db_session.commit()
+
+    result = await run_website_discovery(
+        db_session,
+        providers=[propose_osm_tag_leads],
+    )
+    await db_session.commit()
+    await db_session.refresh(mosque)
+    assert mosque.website_url == "https://www.osm-discovered.example.org/"
+    assert result.promoted >= 1

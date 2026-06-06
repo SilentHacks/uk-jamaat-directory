@@ -93,6 +93,7 @@ def test_map_overpass_element_website_and_address_normalization() -> None:
     assert place.osm_version == 7
     assert place.osm_changeset == 12345
     assert place.osm_user == "fixture_mapper"
+    assert place.website_tags == ["https://example.org/central-masjid"]
 
 
 def test_map_overpass_element_irish_country_and_eircode_normalization() -> None:
@@ -234,3 +235,52 @@ def test_export_roundtrip_parse_osm_file(tmp_path: Path) -> None:
     parsed = parse_osm_file(output_path)
     assert len(parsed.places) == len(bundle.places)
     assert parsed.places[0].external_id == "node/910001"
+
+
+def test_map_overpass_element_collects_all_website_tags() -> None:
+    element = {
+        "type": "node",
+        "id": 910077,
+        "lat": 51.5,
+        "lon": -0.1,
+        "tags": {
+            "amenity": "place_of_worship",
+            "religion": "muslim",
+            "name": "Multi-Tag Masjid",
+            "website": "https://www.primary.example.org/",
+            "contact:website": "https://www.contact.example.org/",
+            "url": "https://www.alt.example.org/",
+        },
+        "timestamp": "2026-01-01T00:00:00Z",
+        "version": 1,
+    }
+    place, skip_reason = map_overpass_element(element)
+    assert skip_reason is None
+    assert place is not None
+    assert place.website_url == "https://www.primary.example.org/"
+    assert place.website_tags == [
+        "https://www.primary.example.org/",
+        "https://www.contact.example.org/",
+        "https://www.alt.example.org/",
+    ]
+
+
+def test_map_overpass_element_normalises_website_tags_without_scheme() -> None:
+    element = {
+        "type": "node",
+        "id": 910078,
+        "lat": 51.5,
+        "lon": -0.1,
+        "tags": {
+            "amenity": "place_of_worship",
+            "religion": "muslim",
+            "name": "Bare-URL Masjid",
+            "website": "www.bare.example.org",
+        },
+        "timestamp": "2026-01-01T00:00:00Z",
+        "version": 1,
+    }
+    place, _ = map_overpass_element(element)
+    assert place is not None
+    assert place.website_url == "https://www.bare.example.org"
+    assert place.website_tags == ["https://www.bare.example.org"]
