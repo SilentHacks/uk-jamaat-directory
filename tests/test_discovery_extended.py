@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.geo.location import set_mosque_point
 from uk_jamaat_directory.ingest.discovery.websites.analysis import (
     _parse_lead_notes,
 )
@@ -21,12 +22,10 @@ from uk_jamaat_directory.ingest.discovery.websites.types import (
     WebsiteProvider,
 )
 from uk_jamaat_directory.ingest.discovery.websites.verify import (
-    VerificationOutcome,
     verify_website,
 )
 from uk_jamaat_directory.ingest.normalize import normalize_mosque_name
 from uk_jamaat_directory.models.core import Mosque
-from uk_jamaat_directory.geo.location import set_mosque_point
 
 
 def _make_mosque(
