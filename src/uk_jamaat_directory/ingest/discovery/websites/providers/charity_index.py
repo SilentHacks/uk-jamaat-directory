@@ -1,18 +1,17 @@
-"""Charity Commission for England and Wales bulk register index.
+"""UK charity register index loader.
 
-The Charity Commission publishes a daily TSV extract of every registered
-charity (https://register-of-charities.charitycommission.gov.uk/en/register/full-register-download).
-We use it as a public, OGL v3.0-licensed source of UK mosque websites:
-charities that look like mosque/masjid/islamic organisations carry a
-contact website on their row, and our mosques with matching postcodes
-+ fuzzy name match can inherit that URL as a low-risk discovery lead.
+Both the Charity Commission for England and Wales and the Office of the
+Scottish Charity Regulator (OSCR) publish daily bulk extracts of their
+registers under the Open Government Licence v3.0. The two extracts
+share a common shape (charity number, name, postcode, website) but
+differ in file format (TSV vs CSV with quoted fields) and column
+headings. :func:`load_register` takes a column map and a delimiter and
+returns a postcode-indexed list of :class:`CharityRecord` entries.
 
-This module loads the extract into a postcode-indexed in-memory list.
-The full extract is ~200K rows and ~50MB, well within memory budget
-for a one-shot discovery CLI. A second-tier cache keyed by
-``(charity_number)`` deduplicates repeated matches.
+The full CC extract is ~200K rows and ~50MB; the OSCR extract is ~25K
+rows and ~8MB. Both fit comfortably in memory for a one-shot discovery
+CLI.
 """
-
 from __future__ import annotations
 
 import csv
@@ -22,7 +21,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class CharityRecord:
-    """One row from the Charity Commission ``charity`` table."""
+    """One row from a UK charity register."""
 
     charity_number: str
     name: str
@@ -31,40 +30,38 @@ class CharityRecord:
     status: str | None
 
 
-# Columns by 1-based index in the daily extract.
-# Header is tab-delimited and matches the spec; we use named column
-# positions from the data definition to keep the parser robust to header
-# re-ordering.
-_COL_NUMBER = "registered_charity_number"
-_COL_NAME = "charity_name"
-_COL_STATUS = "charity_registration_status"
-_COL_POSTCODE = "charity_contact_postcode"
-_COL_WEB = "charity_contact_web"
-
-
 def _clean(value: str | None) -> str:
     return (value or "").strip()
 
 
-def load_charity_index(path: Path) -> dict[str, list[CharityRecord]]:
-    """Load the charity extract and return a postcode-indexed dict.
+def load_register(
+    path: Path,
+    *,
+    column_number: str,
+    column_name: str,
+    column_status: str | None,
+    column_postcode: str,
+    column_web: str,
+    delimiter: str = ",",
+) -> dict[str, list[CharityRecord]]:
+    """Load a charity register and return a postcode-indexed dict.
 
     The postcode key is the canonical UK form (no spaces, upper-cased).
-    Charities with a blank postcode are dropped — they cannot be joined
-    against a mosque on postcode.
+    Rows with a blank postcode or a blank website are dropped — they
+    cannot be joined against a mosque.
     """
     from uk_jamaat_directory.ingest.normalize import normalize_postcode
 
-    # The charity activities column can run to 100K+ characters; the
+    # Charity activities / objectives can run to 100K+ characters; the
     # default csv field limit truncates silently otherwise.
     csv.field_size_limit(2**20)
 
     by_postcode: dict[str, list[CharityRecord]] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
+        reader = csv.DictReader(handle, delimiter=delimiter)
         for row in reader:
-            web = _clean(row.get(_COL_WEB))
-            postcode = _clean(row.get(_COL_POSTCODE))
+            web = _clean(row.get(column_web))
+            postcode = _clean(row.get(column_postcode))
             if not web or not postcode:
                 continue
             normalized = normalize_postcode(postcode)
@@ -72,11 +69,65 @@ def load_charity_index(path: Path) -> dict[str, list[CharityRecord]]:
                 continue
             key = normalized.replace(" ", "").upper()
             record = CharityRecord(
-                charity_number=_clean(row.get(_COL_NUMBER)),
-                name=_clean(row.get(_COL_NAME)),
+                charity_number=_clean(row.get(column_number)),
+                name=_clean(row.get(column_name)),
                 postcode=normalized,
                 website=web,
-                status=_clean(row.get(_COL_STATUS)) or None,
+                status=(
+                    _clean(row.get(column_status))
+                    if column_status
+                    else None
+                )
+                or None,
             )
             by_postcode.setdefault(key, []).append(record)
     return by_postcode
+
+
+# Convenience: the Charity Commission for England and Wales daily
+# extract column names. Kept here so callers don't repeat the spec.
+CC_COLUMNS = {
+    "number": "registered_charity_number",
+    "name": "charity_name",
+    "status": "charity_registration_status",
+    "postcode": "charity_contact_postcode",
+    "web": "charity_contact_web",
+}
+
+
+def load_charity_index(path: Path) -> dict[str, list[CharityRecord]]:
+    """Load the Charity Commission for England and Wales daily TSV."""
+    return load_register(
+        path,
+        column_number=CC_COLUMNS["number"],
+        column_name=CC_COLUMNS["name"],
+        column_status=CC_COLUMNS["status"],
+        column_postcode=CC_COLUMNS["postcode"],
+        column_web=CC_COLUMNS["web"],
+        delimiter="\t",
+    )
+
+
+# Convenience: the Office of the Scottish Charity Regulator daily
+# export column names. OSCR's header is unquoted; the values are
+# quoted, so the standard csv module handles both.
+OSCR_COLUMNS = {
+    "number": "Charity Number",
+    "name": "Charity Name",
+    "status": "Charity Status",
+    "postcode": "Postcode",
+    "web": "Website",
+}
+
+
+def load_oscr_index(path: Path) -> dict[str, list[CharityRecord]]:
+    """Load the Office of the Scottish Charity Regulator daily CSV."""
+    return load_register(
+        path,
+        column_number=OSCR_COLUMNS["number"],
+        column_name=OSCR_COLUMNS["name"],
+        column_status=OSCR_COLUMNS["status"],
+        column_postcode=OSCR_COLUMNS["postcode"],
+        column_web=OSCR_COLUMNS["web"],
+        delimiter=",",
+    )

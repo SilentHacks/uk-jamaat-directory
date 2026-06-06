@@ -37,6 +37,7 @@ PUBLIC_LINKED_PROVIDERS: frozenset[WebsiteProvider] = frozenset(
         WebsiteProvider.MIB_METADATA,
         WebsiteProvider.OSM_TAG_RECHECK,
         WebsiteProvider.CHARITY_COMMISSION,
+        WebsiteProvider.OSCR,
         WebsiteProvider.WIKIDATA,
     }
 )

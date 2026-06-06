@@ -17,6 +17,7 @@ class WebsiteProvider(StrEnum):
     MIB_METADATA = "mib_metadata"
     OSM_TAG_RECHECK = "osm_tag_recheck"
     CHARITY_COMMISSION = "charity_commission"
+    OSCR = "oscr"
     WIKIDATA = "wikidata"
     DUCKDUCKGO = "duckduckgo"
 

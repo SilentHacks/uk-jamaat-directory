@@ -414,11 +414,11 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
     discover_websites.add_argument(
         "--provider",
         action="append",
-        choices=("mib_metadata", "osm_tag_recheck", "charity_commission"),
+        choices=("mib_metadata", "osm_tag_recheck", "charity_commission", "oscr"),
         help=(
             "Lead source(s) to include. May be passed multiple times. "
             "``charity_commission`` requires ``--charity-file`` pointing at "
-            "the daily extract TSV."
+            "the daily extract TSV; ``oscr`` requires ``--oscr-file``."
         ),
     )
     discover_websites.add_argument(
@@ -429,6 +429,16 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
             "Path to the Charity Commission for England and Wales daily "
             "TSV extract (publicextract.charity.txt). Required for "
             "``--provider charity_commission``."
+        ),
+    )
+    discover_websites.add_argument(
+        "--oscr-file",
+        type=Path,
+        default=None,
+        help=(
+            "Path to the Office of the Scottish Charity Regulator daily "
+            "CSV export (CharityExport-<date>.csv). Required for "
+            "``--provider oscr``."
         ),
     )
     discover_websites.add_argument(
@@ -1199,9 +1209,13 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
     )
     from uk_jamaat_directory.ingest.discovery.websites.providers.charity_index import (
         load_charity_index,
+        load_oscr_index,
     )
     from uk_jamaat_directory.ingest.discovery.websites.providers.mib_metadata import (
         propose_mib_metadata_leads,
+    )
+    from uk_jamaat_directory.ingest.discovery.websites.providers.oscr import (
+        propose_oscr_leads,
     )
     from uk_jamaat_directory.ingest.discovery.websites.providers.osm_tag_recheck import (
         propose_osm_tag_leads,
@@ -1214,6 +1228,7 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
     }
     selected: list[object] | None = None
     charity_index: dict | None = None
+    oscr_index: dict | None = None
     if getattr(args, "provider", None):
         selected = []
         for name in args.provider:
@@ -1227,10 +1242,28 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
                 if charity_index is None:
                     charity_index = load_charity_index(args.charity_file)
 
-                async def _run_with_index(session, _index=charity_index):
-                    return await propose_charity_commission_leads(session, charity_index=_index)
+                async def _run_with_cc_index(session, _index=charity_index):
+                    return await propose_charity_commission_leads(
+                        session, charity_index=_index
+                    )
 
-                selected.append(_run_with_index)
+                selected.append(_run_with_cc_index)
+            elif name == "oscr":
+                if not args.oscr_file:
+                    print(
+                        "error: --provider oscr requires --oscr-file <path>",
+                        file=sys.stderr,
+                    )
+                    return 2
+                if oscr_index is None:
+                    oscr_index = load_oscr_index(args.oscr_file)
+
+                async def _run_with_oscr_index(session, _index=oscr_index):
+                    return await propose_oscr_leads(
+                        session, charity_index=_index
+                    )
+
+                selected.append(_run_with_oscr_index)
             else:
                 selected.append(available[name])
 

@@ -17,6 +17,7 @@ class SourceType(StrEnum):
     OPENSTREETMAP = "openstreetmap"
     MUSLIMSINBRITAIN = "muslimsinbritain"
     CHARITY_REGISTER = "charity_register"
+    OSCR_REGISTER = "oscr_register"
     COMMUNITY = "community"
     MANUAL = "manual"
     PARTNER_FEED = "partner_feed"

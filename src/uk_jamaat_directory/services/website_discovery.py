@@ -155,6 +155,8 @@ def _attribution_for(provider: WebsiteProvider) -> str:
         return "OpenStreetMap contributors"
     if provider == WebsiteProvider.CHARITY_COMMISSION:
         return "Charity Commission for England and Wales"
+    if provider == WebsiteProvider.OSCR:
+        return "Office of the Scottish Charity Regulator"
     if provider == WebsiteProvider.WIKIDATA:
         return "Wikidata contributors (CC0)"
     if provider == WebsiteProvider.DUCKDUCKGO:

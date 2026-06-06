@@ -281,6 +281,7 @@ def test_summarize_counts_outcomes() -> None:
 def test_public_linked_provider_includes_tier1() -> None:
     assert public_linked_provider(WebsiteProvider.MIB_METADATA)
     assert public_linked_provider(WebsiteProvider.CHARITY_COMMISSION)
+    assert public_linked_provider(WebsiteProvider.OSCR)
     assert public_linked_provider(WebsiteProvider.WIKIDATA)
     assert not public_linked_provider(WebsiteProvider.DUCKDUCKGO)
     assert PUBLIC_LINKED_PROVIDERS == frozenset(
@@ -288,6 +289,7 @@ def test_public_linked_provider_includes_tier1() -> None:
             WebsiteProvider.MIB_METADATA,
             WebsiteProvider.OSM_TAG_RECHECK,
             WebsiteProvider.CHARITY_COMMISSION,
+            WebsiteProvider.OSCR,
             WebsiteProvider.WIKIDATA,
         }
     )

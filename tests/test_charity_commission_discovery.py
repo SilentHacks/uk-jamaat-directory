@@ -252,6 +252,35 @@ async def test_propose_charity_commission_leads_already_have_website(
     assert result.candidates_proposed == 0
 
 
+async def test_propose_charity_commission_leads_rejects_single_token_overlap(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """Same-postcode charities sharing only one location token must not match."""
+    path = tmp_path / "charity.tsv"
+    _write_tsv(
+        path,
+        [
+            {
+                "registered_charity_number": "200200",
+                "charity_name": "Space @The Broomhouse Hub",
+                "charity_registration_status": "Registered",
+                "charity_contact_postcode": "EH11 3RH",
+                "charity_contact_web": "www.spacescot.org",
+            },
+        ],
+    )
+    mosque = _make_mosque(name="Broomhouse Mosque", postcode="EH11 3RH")
+    db_session.add(mosque)
+    await db_session.commit()
+
+    index = load_charity_index(path)
+    leads, result = await propose_charity_commission_leads(
+        db_session, charity_index=index
+    )
+    assert leads == []
+    assert result.candidates_proposed == 0
+
+
 async def test_propose_charity_commission_leads_promotes_via_orchestrator(
     db_session: AsyncSession, charity_tsv: Path
 ) -> None:
