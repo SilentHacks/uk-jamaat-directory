@@ -27,8 +27,30 @@ facts until the source policy is explicitly upgraded to
 `public_redistribution_allowed`.
 
 The importer uses the MiB CSV/POI download as the acquisition source and records
-per-row source URLs using MiB IDs. Fetching must be single-threaded with the
-project crawl user agent. Raw live downloads must not be committed.
+per-row source URLs using MiB IDs. Acquisition has two stages:
+
+1. The CSV download (`gps-csv.php?includecomment=1`) is fetched with retry
+   on transient transport errors (3 attempts, 1 s sleep). 4xx responses fail
+   loudly so a broken upstream surfaces in CI.
+2. An opt-in detail-page enrichment pass (`export-mib --enrich-details`)
+   follows each record to its `show-mosque.php?id=…&map` page to capture
+   `Last Updated`, `Phone`, `Website`, `Capacity`, `Theme`, `Data Accuracy`
+   (with `A`–`F` code), and `Source(s)`. The pass is rate-limited:
+   `DETAIL_CONCURRENCY=3` concurrent requests with a
+   `DETAIL_REQUEST_DELAY_SECONDS=0.35` per-request sleep, using the project
+   crawl user agent. This is intentionally polite to avoid triggering
+   upstream rate-limits; a higher-concurrency fetch caused upstream
+   `connection refused` responses during development and was rolled back.
+
+Per-row MiB records carry `detail_page_url`, `source_record_created_at`,
+`source_record_updated_at`, `data_accuracy`, `data_accuracy_code`, and
+`data_sources` on the source row. `source_record_updated_at` is the field
+that drives the date-driven name-precedence rule in
+[`docs/data/import-order.md`](../data/import-order.md); the bundle
+`exported_at` is intentionally not used for that purpose.
+
+Raw live downloads must not be committed. Synthetic fixtures live under
+`data/fixtures/muslimsinbritain/` and are used for tests only.
 
 ## Consequences
 

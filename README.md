@@ -121,8 +121,12 @@ Export UK and Ireland Muslim places of worship from Overpass, import into Postgr
 .venv/bin/uk-jamaat-directory import-osm \
   --input data/fixtures/openstreetmap/sample_places.json
 
-# Import MiB after OSM so matching can link to existing mosques
-.venv/bin/uk-jamaat-directory export-mib --output data/exports/mib_uk_ie_mosques.json
+# Import MiB after OSM so matching can link to existing mosques.
+# Use --enrich-details for the full refresh (per-record Last Updated,
+# phone, website, capacity, theme, data accuracy, source list); a CSV-only
+# fetch is faster but leaves those fields empty.
+.venv/bin/uk-jamaat-directory export-mib --enrich-details \
+    --output data/exports/mib_uk_ie_mosques.json
 .venv/bin/uk-jamaat-directory import-mib --input data/exports/mib_uk_ie_mosques.json
 .venv/bin/uk-jamaat-directory report-mib
 

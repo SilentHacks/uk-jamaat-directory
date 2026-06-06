@@ -1,6 +1,6 @@
 # Public API Contracts
 
-Generated contract artifacts for the UK Jamaat Directory public read API (Phase 4).
+Generated contract artifacts for the UK Jamaat Directory public read API.
 
 Regenerate after changing routes or public response models in `src/uk_jamaat_directory/schemas/public.py`:
 
