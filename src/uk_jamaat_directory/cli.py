@@ -217,6 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_identity_parsers(subparsers)
     _add_crawl_parsers(subparsers)
     _add_export_parsers(subparsers)
+    _add_backfill_parsers(subparsers)
 
     return parser
 
@@ -386,6 +387,21 @@ def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
         type=uuid.UUID,
         default=None,
         help="Dataset version UUID (overrides --version)",
+    )
+
+
+def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
+    backfill_mib = subparsers.add_parser(
+        "backfill-mib-websites",
+        help=(
+            "Promote MiB metadata_.website_url onto linked mosques. "
+            "Honours the same only_empty rule as the import path."
+        ),
+    )
+    backfill_mib.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report counts without writing to the database",
     )
 
 
@@ -664,6 +680,8 @@ def main() -> None:
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
+    if args.command == "backfill-mib-websites":
+        raise SystemExit(asyncio.run(_run_backfill_mib_websites(args, settings)))
 
     parser.print_help()
 
@@ -1109,6 +1127,34 @@ async def _run_import_osm(args: argparse.Namespace, settings: Settings) -> int:
     if result.errors:
         print("Errors:", file=sys.stderr)
         for error in result.errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+async def _run_backfill_mib_websites(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from uk_jamaat_directory.services.mib_backfill import backfill_mib_websites
+
+    async with cli_db_session(settings) as session:
+        result = await backfill_mib_websites(session, dry_run=args.dry_run)
+        if not args.dry_run:
+            await session.commit()
+
+    mode = "DRY RUN" if args.dry_run else "applied"
+    print(
+        f"MiB website backfill {mode}: "
+        f"candidates={result.candidates} "
+        f"updated={result.updated} "
+        f"skipped_already_set={result.skipped_already_set} "
+        f"skipped_no_mosque={result.skipped_no_mosque} "
+        f"skipped_no_website_in_metadata={result.skipped_no_website_in_metadata} "
+        f"errors={len(result.errors)}"
+    )
+    if result.errors:
+        print("Errors:", file=sys.stderr)
+        for error in result.errors[:20]:
             print(f"  - {error}", file=sys.stderr)
         return 1
     return 0
