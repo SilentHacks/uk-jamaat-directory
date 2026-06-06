@@ -103,11 +103,7 @@ def score_mosque_candidate(
         reasons.extend(geo_reasons)
 
     best_name_ratio = max(
-        [
-            ratio
-            for reason in reasons
-            if (ratio := _fuzzy_ratio_from_reason(reason)) is not None
-        ],
+        [ratio for reason in reasons if (ratio := _fuzzy_ratio_from_reason(reason)) is not None],
         default=0,
     )
     if _is_parent_org_name(record.name) and best_name_ratio < NAME_OVERRIDE_RATIO:

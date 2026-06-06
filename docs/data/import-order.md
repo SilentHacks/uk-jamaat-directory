@@ -57,10 +57,41 @@ uk-jamaat-directory import-mib --input data/exports/mib_uk_ie_mosques.json
 uk-jamaat-directory report-mib
 ```
 
-MiB rows default to `publication_policy=unknown` under
-[ADR 0011](../adr/0011-muslimsinbritain-import-policy.md). They are available
-for private identity review and source overlap, but do not enter public APIs
-or exports unless their source policy is explicitly upgraded.
+MiB rows default to `publication_policy=public_redistribution_allowed` under
+[ADR 0011](../adr/0011-muslimsinbritain-import-policy.md) (decision recorded
+2026-06-06). Name, address, postcode, city, country, website, phone, capacity,
+theme, management, and data accuracy may flow into the public `mosques` row
+and into the public API / bulk exports under the standard
+`public_redistribution_allowed` gate. Public consumers must credit
+`MuslimsInBritain.org` and link to the per-row `source_url` when redistributing.
+
+The existing field-level overwrite rules still apply: when an MiB record
+auto-links to an OSM-created mosque, fields are written with
+`only_empty=True` (see `src/uk_jamaat_directory/ingest/discovery/resolve.py`),
+so an OSM website is never overwritten by an MiB website.
+
+For historical data already in the database, run the one-shot backfill:
+
+```
+uk-jamaat-directory backfill-mib-websites [--dry-run]
+```
+
+This walks MiB sources with `metadata_.website_url`, joins to their linked
+mosque, and sets `mosques.website_url` only where it is currently null or empty.
+
+The backfill promotes websites only; it does not change the source's
+`publication_policy`. Historical MiB sources imported before ADR 0011 still
+have `publication_policy=unknown`, so their mosques stay out of the public
+export even after the backfill. To make the new websites visible, also flip
+the existing MiB source policies (e.g. with a one-shot SQL update, after
+auditing the source list).
+It honours the same `only_empty` rule as the import path and reports a count
+of `updated` / `skipped_already_set` / `skipped_no_mosque` / `errors`.
+
+Operators that prefer a conservative read-only posture can override the default
+with `MUSLIMSINBRITAIN_PUBLICATION_POLICY=unknown` (or the per-CLI
+`--publication-policy unknown` flag) and MiB data will stay in
+`mosque_sources.metadata_` without flowing into the public mosque row.
 
 ### MiB record classes and expected gaps
 

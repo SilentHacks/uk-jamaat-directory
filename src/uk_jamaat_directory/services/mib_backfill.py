@@ -11,6 +11,7 @@ path: a mosque that already has a website (typically sourced from OSM) is
 never overwritten. See ``src/uk_jamaat_directory/ingest/discovery/resolve.py``
 for the in-line equivalent.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

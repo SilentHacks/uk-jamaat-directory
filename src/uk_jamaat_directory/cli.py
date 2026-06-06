@@ -1132,9 +1132,7 @@ async def _run_import_osm(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
-async def _run_backfill_mib_websites(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_backfill_mib_websites(args: argparse.Namespace, settings: Settings) -> int:
     from uk_jamaat_directory.services.mib_backfill import backfill_mib_websites
 
     async with cli_db_session(settings) as session:
