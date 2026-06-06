@@ -22,6 +22,10 @@ from html.parser import HTMLParser
 
 from rapidfuzz import fuzz
 
+from uk_jamaat_directory.ingest.discovery.websites.directory_resolver import (
+    is_aggregator_domain,
+    resolve_directory_url,
+)
 from uk_jamaat_directory.ingest.discovery.websites.types import (
     WebsiteLead,
     WebsiteProvider,
@@ -85,6 +89,23 @@ _DIRECTORY_DENY_DOMAINS: frozenset[str] = frozenset(
 _NAME_RATIO_THRESHOLD = 60.0
 _PAGE_FETCH_TIMEOUT = 8.0
 _PAGE_MAX_BYTES = 1_500_000
+
+_CONTACT_PAGE_PATHS = [
+    "contact",
+    "contact-us",
+    "about",
+    "about-us",
+    "find-us",
+    "visit-us",
+]
+
+
+def _contact_page_urls(base_url: str) -> list[str]:
+    from urllib.parse import urljoin, urlparse
+
+    parsed = urlparse(base_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    return [urljoin(root + "/", path) for path in _CONTACT_PAGE_PATHS]
 
 
 @dataclass(frozen=True)
@@ -224,6 +245,20 @@ def public_linked_provider(provider: WebsiteProvider) -> bool:
     return provider in PUBLIC_LINKED_PROVIDERS
 
 
+def _evaluate_page(
+    title: str,
+    body: str,
+    mosque: Mosque,
+) -> tuple[float, bool, bool, bool]:
+    """Evaluate a single page against the gate. Returns (ratio, pc, addr, verified)."""
+    haystack = f"{title}\n{body[:50000]}"
+    ratio = name_ratio(mosque.name, haystack)
+    matched_postcode = _postcode_appears(mosque.postcode, haystack)
+    matched_address = _address_appears(mosque.address_line1, haystack)
+    verified = ratio >= _NAME_RATIO_THRESHOLD and (matched_postcode or matched_address)
+    return ratio, matched_postcode, matched_address, verified
+
+
 async def verify_website(
     lead: WebsiteLead,
     mosque: Mosque,
@@ -275,64 +310,157 @@ async def verify_website(
             notes="public linked source (MiB/OSM/charity/wikidata)",
         )
 
-    # Try cache first
-    cached_page = page_cache.get(lead.url) if page_cache else None
-    if cached_page is not None:
-        title, body = cached_page
-        haystack = f"{title}\n{body[:50000]}"
-        ratio = name_ratio(mosque.name, haystack)
-        matched_postcode = _postcode_appears(mosque.postcode, haystack)
-        matched_address = _address_appears(mosque.address_line1, haystack)
-        any_contact_match = matched_postcode or matched_address
-        verified = ratio >= _NAME_RATIO_THRESHOLD and any_contact_match
-        notes = (
-            f"name_ratio={ratio:.0f} "
-            f"postcode={matched_postcode} "
-            f"address={matched_address} (cached)"
-        )
-        return VerificationOutcome(
-            lead=lead,
-            verified=verified,
-            name_ratio=ratio,
-            matched_postcode=matched_postcode,
-            matched_address=matched_address,
-            domain_denied=False,
-            notes=notes,
-        )
-
     fetch = fetcher or (
         lambda u: _fetch_for_verification(u, user_agent=user_agent, timeout=timeout)
     )
-    page = await fetch(lead.url)
-    if page is None:
-        return VerificationOutcome(
-            lead=lead,
-            verified=False,
-            name_ratio=None,
-            matched_postcode=False,
-            matched_address=False,
-            domain_denied=False,
-            notes="fetch failed or non-html response",
+
+    # ------------------------------------------------------------------
+    # 1. Primary verification (cache or fetch)
+    # ------------------------------------------------------------------
+    cached_page = page_cache.get(lead.url) if page_cache else None
+    if cached_page is not None:
+        title, body = cached_page
+        ratio, pc, addr, verified = _evaluate_page(title, body, mosque)
+        notes = (
+            f"name_ratio={ratio:.0f} "
+            f"postcode={pc} "
+            f"address={addr} (cached)"
         )
+        if verified:
+            return VerificationOutcome(
+                lead=lead,
+                verified=True,
+                name_ratio=ratio,
+                matched_postcode=pc,
+                matched_address=addr,
+                domain_denied=False,
+                notes=notes,
+            )
+        # cached but not verified -> fall through to directory / contact fallback
+    else:
+        page = await fetch(lead.url)
+        if page is None:
+            return VerificationOutcome(
+                lead=lead,
+                verified=False,
+                name_ratio=None,
+                matched_postcode=False,
+                matched_address=False,
+                domain_denied=False,
+                notes="fetch failed or non-html response",
+            )
+        title, body = page
+        if page_cache is not None:
+            page_cache.set(lead.url, title, body)
 
-    title, body = page
-    if page_cache is not None:
-        page_cache.set(lead.url, title, body)
+        ratio, pc, addr, verified = _evaluate_page(title, body, mosque)
+        if verified:
+            notes = f"name_ratio={ratio:.0f} postcode={pc} address={addr}"
+            return VerificationOutcome(
+                lead=lead,
+                verified=True,
+                name_ratio=ratio,
+                matched_postcode=pc,
+                matched_address=addr,
+                domain_denied=False,
+                notes=notes,
+            )
 
-    haystack = f"{title}\n{body[:50000]}"
-    ratio = name_ratio(mosque.name, haystack)
-    matched_postcode = _postcode_appears(mosque.postcode, haystack)
-    matched_address = _address_appears(mosque.address_line1, haystack)
-    any_contact_match = matched_postcode or matched_address
-    verified = ratio >= _NAME_RATIO_THRESHOLD and any_contact_match
+    # ------------------------------------------------------------------
+    # 2. Directory resolver: if the page is an aggregator, extract the
+    #    real mosque URL and verify *that*.
+    # ------------------------------------------------------------------
+    if cached_page is not None:
+        _title, _body = cached_page
+    else:
+        _title, _body = title, body  # type: ignore[possibly-unbound]
 
-    notes = f"name_ratio={ratio:.0f} postcode={matched_postcode} address={matched_address}"
+    if is_aggregator_domain(lead.url):
+        resolved = resolve_directory_url(lead.url, _body)
+        if resolved:
+            # Verify the resolved URL through the same gate.
+            # Do NOT recurse into directory resolution again (depth = 1).
+            resolved_page = await fetch(resolved)
+            if resolved_page is not None:
+                r_title, r_body = resolved_page
+                if page_cache is not None:
+                    page_cache.set(resolved, r_title, r_body)
+                r_ratio, r_pc, r_addr, r_verified = _evaluate_page(
+                    r_title, r_body, mosque
+                )
+                if r_verified:
+                    # We return a success for the *original* lead so the
+                    # orchestrator promotes lead.url, but the notes tell the
+                    # operator the real URL came from the directory page.
+                    return VerificationOutcome(
+                        lead=lead,
+                        verified=True,
+                        name_ratio=r_ratio,
+                        matched_postcode=r_pc,
+                        matched_address=r_addr,
+                        domain_denied=False,
+                        notes=(
+                            f"resolved_from_directory={resolved} "
+                            f"name_ratio={r_ratio:.0f} "
+                            f"postcode={r_pc} address={r_addr}"
+                        ),
+                    )
+
+    # ------------------------------------------------------------------
+    # 3. Contact-page fallback: homepage returned 200 but failed the gate.
+    #    Try known contact / about / find-us paths.
+    # ------------------------------------------------------------------
+    # Only try fallback when the primary page was fetched successfully
+    # (i.e. not a fetch failure). The cached-page path already proved
+    # the page exists (it was in the cache).
+    for contact_url in _contact_page_urls(lead.url):
+        cp_cached = page_cache.get(contact_url) if page_cache else None
+        if cp_cached is not None:
+            cp_title, cp_body = cp_cached
+        else:
+            cp_page = await fetch(contact_url)
+            if cp_page is None:
+                continue
+            cp_title, cp_body = cp_page
+            if page_cache is not None:
+                page_cache.set(contact_url, cp_title, cp_body)
+
+        cp_ratio, cp_pc, cp_addr, cp_verified = _evaluate_page(
+            cp_title, cp_body, mosque
+        )
+        if cp_verified:
+            return VerificationOutcome(
+                lead=lead,
+                verified=True,
+                name_ratio=cp_ratio,
+                matched_postcode=cp_pc,
+                matched_address=cp_addr,
+                domain_denied=False,
+                notes=(
+                    f"verified_via_contact_page={contact_url} "
+                    f"name_ratio={cp_ratio:.0f} "
+                    f"postcode={cp_pc} address={cp_addr}"
+                ),
+            )
+
+    # ------------------------------------------------------------------
+    # 4. Nothing worked — return the primary-page failure.
+    # ------------------------------------------------------------------
+    if cached_page is not None:
+        ratio, pc, addr, _ = _evaluate_page(*cached_page, mosque)
+        notes = (
+            f"name_ratio={ratio:.0f} "
+            f"postcode={pc} "
+            f"address={addr} (cached)"
+        )
+    else:
+        notes = f"name_ratio={ratio:.0f} postcode={pc} address={addr}"  # type: ignore[possibly-unbound]
     return VerificationOutcome(
         lead=lead,
-        verified=verified,
-        name_ratio=ratio,
-        matched_postcode=matched_postcode,
-        matched_address=matched_address,
+        verified=False,
+        name_ratio=ratio,  # type: ignore[possibly-unbound]
+        matched_postcode=pc,  # type: ignore[possibly-unbound]
+        matched_address=addr,  # type: ignore[possibly-unbound]
         domain_denied=False,
         notes=notes,
     )

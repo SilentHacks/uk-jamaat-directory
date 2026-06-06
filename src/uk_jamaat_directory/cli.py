@@ -459,6 +459,16 @@ def _add_backfill_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Run the providers and verification but do not write promotions",
     )
 
+    analyse_leads = subparsers.add_parser(
+        "analyse-discovery-leads",
+        help="Analyse AdminDiscoveryLead audit rows to find patterns in failures",
+    )
+    analyse_leads.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of a human summary",
+    )
+
 
 def _resolve_mlm_policy(args: argparse.Namespace, settings: Settings):
     raw = args.publication_policy or settings.mylocalmasjid_publication_policy
@@ -739,6 +749,8 @@ def main() -> None:
         raise SystemExit(asyncio.run(_run_backfill_mib_websites(args, settings)))
     if args.command == "discover-websites":
         raise SystemExit(asyncio.run(_run_discover_websites(args, settings)))
+    if args.command == "analyse-discovery-leads":
+        raise SystemExit(asyncio.run(_run_analyse_discovery_leads(args, settings)))
 
     parser.print_help()
 
@@ -1343,4 +1355,47 @@ async def _run_discover_websites(args: argparse.Namespace, settings: Settings) -
         for error in result.errors[:20]:
             print(f"  - {error}", file=sys.stderr)
         return 1
+    return 0
+
+
+async def _run_analyse_discovery_leads(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from uk_jamaat_directory.ingest.discovery.websites.analysis import (
+        analyse_discovery_leads,
+    )
+
+    async with cli_db_session(settings) as session:
+        report = await analyse_discovery_leads(session)
+
+    if args.json:
+        print(json.dumps(report.as_dict(), indent=2, default=str))
+        return 0
+
+    print(f"Discovery lead analysis ({report.total_leads} total)")
+    print(f"  Fetch failed:  {report.fetch_failed}")
+    print(f"  No match:      {report.no_match}")
+    print(f"  Denied:        {report.denied}")
+    print()
+    print("  Name-ratio distribution (no-match only):")
+    for bucket, count in report.name_ratio_buckets.items():
+        print(f"    {bucket}: {count}")
+    print()
+    print(f"  Prime contact-page candidates (40-59): {len(report.leads_with_name_ratio_40_59)}")
+    print()
+    print("  Top providers:")
+    for provider, count in report.provider_counts.most_common(10):
+        print(f"    {provider}: {count}")
+    print()
+    print("  Top no-match domains:")
+    for domain, count in report.top_no_match_domains[:20]:
+        print(f"    {domain}: {count}")
+    print()
+    print("  Fetch failure breakdown:")
+    for status, count in report.fetch_failures_by_status.most_common(10):
+        print(f"    {status}: {count}")
+    print()
+    print("  Top location clusters:")
+    for loc, count in report.location_cluster.most_common(10):
+        print(f"    {loc}: {count}")
     return 0
