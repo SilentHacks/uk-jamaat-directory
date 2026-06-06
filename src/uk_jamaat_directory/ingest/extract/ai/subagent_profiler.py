@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -180,6 +181,14 @@ def parse_subagent_response(text: str) -> ExtractionProfile | None:
             cleaned = cleaned[:-3].strip()
         elif cleaned.endswith("```"):
             cleaned = cleaned[:-3].strip()
+
+    # Subagents sometimes emit Python bool/None literals instead of JSON ones.
+    # Use word-boundary replacement to avoid corrupting string contents.
+    _py_json_fix = re.compile(r"\b(True|False|None)\b")
+    cleaned = _py_json_fix.sub(
+        lambda m: {"True": "true", "False": "false", "None": "null"}[m.group(1)],
+        cleaned,
+    )
 
     try:
         raw = json.loads(cleaned)
