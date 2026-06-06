@@ -19,7 +19,6 @@ from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
 from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
-from uk_jamaat_directory.ingest.extract.standard_feed import extract_standard_feed
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
 from uk_jamaat_directory.ingest.sources.muslimsinbritain import (
@@ -370,17 +369,6 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Re-run extraction for a stored source artifact",
     )
     extract_artifact.add_argument("--artifact-id", required=True, type=uuid.UUID)
-
-    fetch_feed = subparsers.add_parser(
-        "fetch-feed",
-        help="Fetch a standard feed URL without writing to the database",
-    )
-    fetch_feed.add_argument("--url", required=True)
-    fetch_feed.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Parse feed body and print row count only",
-    )
 
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
@@ -751,9 +739,6 @@ def main() -> None:
     if args.command == "extract-artifact":
         raise SystemExit(asyncio.run(_run_extract_artifact(args, settings)))
 
-    if args.command == "fetch-feed":
-        raise SystemExit(asyncio.run(_run_fetch_feed(args, settings)))
-
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
     if args.command == "backfill-mib-websites":
@@ -1110,23 +1095,6 @@ async def _run_extract_artifact(args: argparse.Namespace, settings: Settings) ->
         return 1
     return 0
 
-
-async def _run_fetch_feed(args: argparse.Namespace, settings: Settings) -> int:
-    fetch = await fetch_url(args.url, settings=settings)
-    if not fetch.ok:
-        print(f"Fetch failed: {fetch.error}", file=sys.stderr)
-        return 1
-
-    if args.dry_run:
-        result = extract_standard_feed(fetch.body)
-        print(
-            f"Dry run OK: rows={len(result.rows)}, warnings={len(result.warnings)}, "
-            f"extractor={result.extractor_version}"
-        )
-        return 0
-
-    print(fetch.body.decode("utf-8", errors="replace"))
-    return 0
 
 
 async def _run_generate_exports(args: argparse.Namespace, settings: Settings) -> int:

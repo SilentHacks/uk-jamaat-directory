@@ -76,9 +76,8 @@ class Settings(BaseSettings):
     crawl_timeout_seconds: float = 20.0
     crawl_max_bytes: int = 5_000_000
     crawl_per_domain_delay_seconds: float = 2.0
-    crawl_feed_interval_hours: int = 24
+    crawl_interval_hours: int = 24
     crawl_validate_after_extract: bool = True
-    standard_feed_path: str = "/.well-known/uk-jamaat-directory.json"
 
     osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
     osm_overpass_timeout_seconds: float = 180.0

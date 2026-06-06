@@ -17,7 +17,7 @@ from uk_jamaat_directory.domain import (
 from uk_jamaat_directory.ingest.normalize import canonical_homepage, normalize_domain
 from uk_jamaat_directory.models.core import Mosque, MosqueSource, SourceHealth
 
-_CRAWL_SOURCE_TYPES = (SourceType.STANDARD_FEED, SourceType.MOSQUE_WEBSITE)
+_CRAWL_SOURCE_TYPES = (SourceType.MOSQUE_WEBSITE,)
 
 
 @dataclass
@@ -138,11 +138,3 @@ async def ensure_crawl_sources(
     if not dry_run:
         await session.flush()
     return result
-
-
-async def ensure_standard_feed_sources(
-    session: AsyncSession,
-    *,
-    settings: Settings | None = None,
-) -> RegisterResult:
-    return await ensure_crawl_sources(session, settings=settings)

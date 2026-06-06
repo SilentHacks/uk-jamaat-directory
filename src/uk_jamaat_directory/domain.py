@@ -12,7 +12,6 @@ class SourcePublicationPolicy(StrEnum):
 
 class SourceType(StrEnum):
     MYLOCALMASJID = "mylocalmasjid"
-    STANDARD_FEED = "standard_feed"
     MOSQUE_WEBSITE = "mosque_website"
     OPENSTREETMAP = "openstreetmap"
     MUSLIMSINBRITAIN = "muslimsinbritain"

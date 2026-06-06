@@ -7,8 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.config import Settings, get_settings
-from uk_jamaat_directory.domain import ExtractionKind, SourceType
-from uk_jamaat_directory.ingest.extract.standard_feed import extract_standard_feed
+from uk_jamaat_directory.domain import ExtractionKind
 from uk_jamaat_directory.ingest.extract.types import ExtractResult
 from uk_jamaat_directory.models.core import ExtractionRun, Mosque, MosqueSource, SourceArtifact
 from uk_jamaat_directory.schedules.candidates import upsert_schedule_candidate
@@ -29,13 +28,10 @@ class ExtractionRunResult:
 
 def _route_extraction(
     *,
-    body: bytes,
-    content_type: str | None,
+    body: bytes,  # noqa: ARG001
+    content_type: str | None,  # noqa: ARG001
     source: MosqueSource,
 ) -> ExtractResult:
-    if source.source_type == SourceType.STANDARD_FEED or (content_type and "json" in content_type):
-        return extract_standard_feed(body)
-
     return ExtractResult(
         warnings=[f"no extractor for source_type={source.source_type.value}"],
     )

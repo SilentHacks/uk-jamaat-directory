@@ -31,7 +31,7 @@ class ProcessSourceResult:
 def _crawl_enabled_for_source(source: MosqueSource, settings: Settings) -> bool:
     if not settings.crawl_enabled:
         return False
-    if source.source_type not in (SourceType.STANDARD_FEED, SourceType.MOSQUE_WEBSITE):
+    if source.source_type != SourceType.MOSQUE_WEBSITE:
         return False
     return source.metadata_.get("crawl_enabled", True) is not False
 
@@ -58,7 +58,7 @@ def _schedule_next_fetch(
 ) -> None:
     now = datetime.now(UTC)
     if success:
-        delta = timedelta(hours=settings.crawl_feed_interval_hours)
+        delta = timedelta(hours=settings.crawl_interval_hours)
     else:
         hours = min(24, 2 ** min(failures, 4))
         delta = timedelta(hours=hours)
@@ -161,11 +161,7 @@ async def list_due_source_ids(
         (
             await session.execute(
                 select(MosqueSource.id)
-                .where(
-                    MosqueSource.source_type.in_(
-                        [SourceType.STANDARD_FEED, SourceType.MOSQUE_WEBSITE]
-                    )
-                )
+                .where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
                 .where(MosqueSource.source_url.is_not(None))
             )
         )
