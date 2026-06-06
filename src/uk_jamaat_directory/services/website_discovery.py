@@ -10,6 +10,7 @@ shows up in the public source filter), and route the rest to
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -46,6 +47,8 @@ from uk_jamaat_directory.ingest.discovery.websites.verify_cache import (
 )
 from uk_jamaat_directory.models.core import Mosque, MosqueSource
 from uk_jamaat_directory.services.admin_identity import record_discovery_lead
+
+_VERIFICATION_CONCURRENCY = 20
 
 
 @dataclass
@@ -223,6 +226,38 @@ async def _promote_website(
     return True
 
 
+# ---------------------------------------------------------------------------
+# Parallel verification helper
+# ---------------------------------------------------------------------------
+
+
+async def _verify_lead(
+    lead: WebsiteLead,
+    snap: MosqueSnapshot,
+    *,
+    sem: asyncio.Semaphore,
+    user_agent: str,
+    cache: VerificationPageCache,
+) -> VerificationOutcome:
+    """Verify a single lead under a concurrency semaphore."""
+    if public_linked_provider(lead.provider) and lead.linked_source_id is not None:
+        return VerificationOutcome(
+            lead=lead,
+            verified=True,
+            name_ratio=None,
+            matched_postcode=False,
+            matched_address=False,
+            domain_denied=False,
+            notes="public linked source (MiB/OSM/charity/wikidata)",
+        )
+
+    verify_mosque = _view_mosque(snap)
+    async with sem:
+        return await verify_website(
+            lead, verify_mosque, user_agent=user_agent, page_cache=cache
+        )
+
+
 async def run_website_discovery(
     session: AsyncSession,
     *,
@@ -240,12 +275,12 @@ async def run_website_discovery(
     user_agent = user_agent or settings.crawl_user_agent
     selected = providers or [propose_mib_metadata_leads, propose_osm_tag_leads]
     cache = page_cache or VerificationPageCache()
+    sem = asyncio.Semaphore(_VERIFICATION_CONCURRENCY)
 
     result = DiscoveryRunResult()
     mosques = await _select_mosques_missing_website(session)
     snapshots = _snapshot_map(mosques)
 
-    outcomes: list[VerificationOutcome] = []
     for provider in selected:
         provider_name = getattr(provider, "__name__", str(provider))
         try:
@@ -257,35 +292,34 @@ async def run_website_discovery(
             result.errors.append(f"{provider_name}: {exc}")
             continue
         result.providers[provider_name] = provider_result
+
+        # 1. Fire all verifications in parallel (HTTP fetches are the
+        #    bottleneck; DB writes stay sequential below).
+        tasks = []
+        task_meta: list[tuple[MosqueSnapshot, WebsiteLead]] = []
         for lead in leads:
             snap = snapshots.get(lead.mosque_id)
             if snap is None:
                 continue
-            # Build a minimal Mosque view for verify_website: name and
-            # postcode only. We avoid touching the live instance because
-            # a provider's flush may have expired its columns, and a
-            # lazy reload fails in strict-async mode.
-            verify_mosque = _view_mosque(snap)
-            try:
-                if public_linked_provider(lead.provider) and lead.linked_source_id is not None:
-                    outcome = VerificationOutcome(
-                        lead=lead,
-                        verified=True,
-                        name_ratio=None,
-                        matched_postcode=False,
-                        matched_address=False,
-                        domain_denied=False,
-                        notes="public linked source (MiB/OSM/charity/wikidata)",
-                    )
-                else:
-                    outcome = await verify_website(
-                        lead, verify_mosque, user_agent=user_agent, page_cache=cache
-                    )
-            except Exception as exc:  # noqa: BLE001
-                result.errors.append(f"{lead.url}: {exc}")
+            tasks.append(
+                _verify_lead(
+                    lead,
+                    snap,
+                    sem=sem,
+                    user_agent=user_agent,
+                    cache=cache,
+                )
+            )
+            task_meta.append((snap, lead))
+
+        raw_outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 2. Process outcomes sequentially (DB writes must be ordered).
+        for (snap, lead), outcome in zip(task_meta, raw_outcomes, strict=True):
+            if isinstance(outcome, Exception):
+                result.errors.append(f"{lead.url}: {outcome}")
                 continue
 
-            outcomes.append(outcome)
             if outcome.domain_denied:
                 result.denied += 1
                 continue
