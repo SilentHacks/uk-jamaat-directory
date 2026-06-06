@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     mylocalmasjid_enabled: bool = False
     mylocalmasjid_publication_policy: str = "unknown"
     muslimsinbritain_enabled: bool = False
-    muslimsinbritain_publication_policy: str = "unknown"
+    muslimsinbritain_publication_policy: str = "public_redistribution_allowed"
     openai_api_key: str | None = None
 
     community_submission_rate_limit: int = 10
