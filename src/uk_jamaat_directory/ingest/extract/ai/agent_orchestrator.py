@@ -13,6 +13,7 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from uk_jamaat_directory.config import Settings
+from uk_jamaat_directory.db.cli_session import cli_db_session
 from uk_jamaat_directory.domain import ExtractionKind, SourceType
 from uk_jamaat_directory.ingest.extract.ai.agent_prompt import build_agent_prompt
 from uk_jamaat_directory.ingest.extract.ai.agent_result import AgentResult, parse_agent_result
@@ -422,10 +423,11 @@ async def run_agent_profiling(
                 result.failed += 1
                 return
 
-            profile_status = await _commit_profile(
-                session, job.source_id, agent_result, settings
-            )
-            await session.commit()
+            async with cli_db_session(settings) as commit_session:
+                profile_status = await _commit_profile(
+                    commit_session, job.source_id, agent_result, settings
+                )
+                await commit_session.commit()
 
             state["completed"].append(str(job.source_id))
             _save_state(output_dir, state)
