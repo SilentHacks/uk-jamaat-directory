@@ -57,13 +57,11 @@ class Settings(BaseSettings):
     muslimsinbritain_enabled: bool = False
     muslimsinbritain_publication_policy: str = "public_redistribution_allowed"
     openai_api_key: str | None = None
-    groq_api_key: str | None = None
-    ai_model: str = "llama-3.1-8b-instant"
-    ai_max_tokens: int = 4096
     ai_profiling_enabled: bool = True
-    ai_profiling_max_pages: int = 2
-    ai_profiling_max_chars_per_page: int = 4_000
-    ai_profiling_timeout_seconds: float = 30.0
+    ai_agent_model: str = "opencode-go/deepseek-v4-flash"
+    ai_agent_timeout: float = 120.0
+    ai_agent_max_pages: int = 10
+    ai_agent_concurrency: int = 3
 
     community_submission_rate_limit: int = 10
     community_submission_rate_window_seconds: int = 60
