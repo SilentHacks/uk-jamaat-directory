@@ -43,8 +43,8 @@ def build_agent_prompt(
         "(HTML table, HTML list, PDF, image, JSON feed).\n"
         "5. Write the result and STOP immediately.\n\n"
         "IMPORTANT DEFINITIONS:\n"
-        '"found" must ONLY be true if a dedicated timetable page or asset "
-        "exists ON the assigned domain.\n'
+        "'found' must ONLY be true if a dedicated timetable page or asset "
+        "exists ON the assigned domain.\n"
         "- Embedded third-party widgets (IslamicFinder, MasjidWorld, etc.) "
         "do NOT count as 'found'.\n"
         "- If prayer times are only visible via an external iframe/widget, "
