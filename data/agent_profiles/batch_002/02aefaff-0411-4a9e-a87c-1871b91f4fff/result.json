@@ -1,0 +1,20 @@
+{
+  "found": true,
+  "timetable_url": "https://yourjannah.com/mosque/fountain-of-knowledge-islamic-centre/prayers/",
+  "asset_type": "html_table",
+  "extraction_strategy": "css_selector",
+  "css_selector": ".ynj-tt-table",
+  "confidence": 0.7,
+  "urls_explored": [
+    "https://yourjannah.com/mosque/fountain-of-knowledge-islamic-centre",
+    "https://yourjannah.com/mosque/fountain-of-knowledge-islamic-centre/prayers",
+    "https://yourjannah.com/wp-json/ynj/v1/mosque/fountain-of-knowledge-islamic-centre/prayers",
+    "https://yourjannah.com/wp-json/ynj/v1/prayers/fountain-of-knowledge-islamic-centre",
+    "https://yourjannah.com/wp-json/ynj/v1/prayer-times/fountain-of-knowledge-islamic-centre",
+    "https://yourjannah.com/mosque/fountain-of-knowledge-islamic-centre/prayers?month=2026-05",
+    "https://yourjannah.com/wp-json/ynj/v1/mosque/1520"
+  ],
+  "pages_fetched": 7,
+  "navigation_log": "Fetched mosque homepage (found prayer_times=null in JS, discovered /prayers/ link). Fetched /prayers/ page — dedicated timetable page exists with month navigation and CSS for .ynj-tt-table table, but mosque has no prayer times imported (empty table, 'No prayer times imported for this month' for both June and May 2026). Checked 4 REST API endpoints (all 404). The page is part of YourJannah platform, not a third-party widget.",
+  "review_notes": "Dedicated timetable page exists on-domain at /prayers/ with HTML table structure (.ynj-tt-table), month navigation, and print button. However, the mosque has not imported any prayer times (prayer_times=null, all months show empty table). The 'Next Prayer' hero on the homepage uses Aladhan API (external) but only shows placeholder dashes. Once the admin imports times, the table will populate with rows for each day showing adhan/iqamah times."
+}

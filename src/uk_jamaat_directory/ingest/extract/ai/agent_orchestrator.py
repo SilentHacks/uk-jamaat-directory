@@ -89,15 +89,11 @@ async def _spawn_agent(
         "opencode",
         "-m",
         settings.ai_agent_model,
-        "--prompt",
-        prompt,
         "run",
         "--dangerously-skip-permissions",
-        "--format",
-        "json",
         "--dir",
         str(job.output_dir),
-        f"Profile {job.mosque_name} at {job.website_url}",
+        prompt,
     ]
 
     # Ensure output directory exists before the agent starts
