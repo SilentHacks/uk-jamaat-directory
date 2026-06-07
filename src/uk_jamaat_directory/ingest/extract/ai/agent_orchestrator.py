@@ -15,6 +15,7 @@ from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.domain import ExtractionKind, SourceType
 from uk_jamaat_directory.ingest.extract.ai.agent_prompt import build_agent_prompt
 from uk_jamaat_directory.ingest.extract.ai.agent_result import AgentResult, parse_agent_result
+from uk_jamaat_directory.ingest.extract.ai.profile import ExtractionProfile
 from uk_jamaat_directory.models.core import ExtractionRun, Mosque, MosqueSource
 
 
@@ -336,3 +337,69 @@ async def run_agent_profiling(
     await asyncio.gather(*[_run_one(job) for job in jobs])
 
     return result
+
+
+async def profile_single_source(
+    session: AsyncSession,
+    source_id: uuid.UUID,
+    settings: Settings,
+) -> AgentResult:
+    """Profile a single mosque website source with an autonomous agent.
+
+    Convenience wrapper around ``_spawn_agent`` and ``_commit_profile`` for
+    the admin API trigger endpoint.
+
+    Args:
+        session: Async SQLAlchemy session.
+        source_id: UUID of the ``MOSQUE_WEBSITE`` source to profile.
+        settings: Project settings.
+
+    Returns:
+        ``AgentResult`` with the parsed profile or parse errors.
+    """
+    source = await session.get(MosqueSource, source_id)
+    if source is None:
+        return AgentResult(
+            profile=ExtractionProfile(review_notes="Source not found"),
+            parse_errors=["Source not found"],
+        )
+
+    mosque = await session.get(Mosque, source.mosque_id) if source.mosque_id else None
+    if mosque is None:
+        return AgentResult(
+            profile=ExtractionProfile(review_notes="Source is not linked to a mosque"),
+            parse_errors=["Source is not linked to a mosque"],
+        )
+
+    output_dir = Path("data/agent_profiles") / "single" / str(source_id)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    job = _SourceJob(
+        source_id=source_id,
+        mosque_name=mosque.name,
+        website_url=source.source_url or "",
+        output_dir=output_dir,
+        result_path=output_dir / "result.json",
+        session_log_path=output_dir / "session.log",
+    )
+
+    agent_result = await _spawn_agent(
+        job,
+        settings,
+        max_pages=settings.ai_agent_max_pages,
+        timeout=settings.ai_agent_timeout,
+    )
+
+    if agent_result is None:
+        return AgentResult(
+            profile=ExtractionProfile(review_notes="Agent timed out or did not write result"),
+            parse_errors=["Agent timed out or did not write result"],
+        )
+
+    if agent_result.parse_errors:
+        return agent_result
+
+    await _commit_profile(session, source_id, agent_result, settings)
+    await session.commit()
+
+    return agent_result

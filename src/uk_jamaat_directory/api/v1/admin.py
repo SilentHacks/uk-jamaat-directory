@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uk_jamaat_directory.api.deps import require_admin_key
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.domain import CandidateStatus
-from uk_jamaat_directory.ingest.extract.ai.profiler import profile_mosque_website
+from uk_jamaat_directory.ingest.extract.ai.agent_orchestrator import profile_single_source
 from uk_jamaat_directory.models.core import MosqueSource
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
@@ -607,22 +607,22 @@ async def trigger_source_profile(
     from uk_jamaat_directory.config import get_settings
 
     settings = get_settings()
-    result = await profile_mosque_website(session, source_id, settings)
-    await session.commit()
+    result = await profile_single_source(session, source_id, settings)
 
     source = await session.get(MosqueSource, source_id)
     profile = result.profile
-    if profile is None:
+
+    if result.parse_errors:
         return AdminProfileTriggerResponse(
             source_id=source_id,
             profile_status="failed",
             asset_type="unknown",
             timetable_url=None,
             confidence=0.0,
-            review_notes="; ".join(result.errors) if result.errors else "",
-            extraction_run_id=result.extraction_run_id,
-            warnings=result.warnings,
-            errors=result.errors,
+            review_notes="; ".join(result.parse_errors),
+            extraction_run_id=None,
+            warnings=[],
+            errors=result.parse_errors,
         )
 
     return AdminProfileTriggerResponse(
@@ -632,7 +632,7 @@ async def trigger_source_profile(
         timetable_url=profile.timetable_url,
         confidence=profile.confidence,
         review_notes=profile.review_notes,
-        extraction_run_id=result.extraction_run_id,
-        warnings=result.warnings,
-        errors=result.errors,
+        extraction_run_id=None,
+        warnings=[],
+        errors=[],
     )
