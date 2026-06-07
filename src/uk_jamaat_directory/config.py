@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     crawl_interval_hours: int = 24
     crawl_validate_after_extract: bool = True
 
+    repo_extractor_timeout_seconds: float = 30.0
+    repo_extractor_ocr_timeout_seconds: float = 120.0
+    repo_extractor_auto_approve_candidates: bool = True
+
     osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
     osm_overpass_timeout_seconds: float = 180.0
 
