@@ -310,6 +310,29 @@ async def run_agent_profiling(
                 result.failed += 1
                 return
 
+            # Post-hoc domain escape validation
+            target_domain = _extract_domain(job.website_url)
+            banned_domains = {"web.archive.org", "archive.org", "webcache.googleusercontent.com"}
+            escaped = [
+                url
+                for url in agent_result.profile.urls_explored
+                if not _url_matches_domain(url, target_domain)
+            ]
+            banned_hits = {
+                url for url in escaped if any(bd in url for bd in banned_domains)
+            }
+            if banned_hits:
+                agent_result.profile.found = False
+                agent_result.profile.review_notes = (
+                    "[AGENT VIOLATION] Agent accessed banned archive sites: "
+                    f"{', '.join(sorted(banned_hits))}. "
+                    + agent_result.profile.review_notes
+                )
+                if not agent_result.parse_errors:
+                    agent_result.parse_errors.append(
+                        f"Agent violated domain jail by fetching {len(banned_hits)} banned URL(s)"
+                    )
+
             if agent_result.parse_errors:
                 state["failed"][str(job.source_id)] = "; ".join(agent_result.parse_errors)
                 _save_state(output_dir, state)
@@ -399,3 +422,19 @@ async def profile_single_source(
     await session.commit()
 
     return agent_result
+
+
+def _extract_domain(url: str) -> str:
+    """Extract the domain from a URL for domain-jail checks."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    return parsed.netloc or url
+
+
+def _url_matches_domain(url: str, domain: str) -> bool:
+    """Check whether a URL belongs to the given domain (or a subdomain of it)."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    host = parsed.netloc or ""
+    # Exact match or subdomain match
+    return host == domain or host.endswith(f".{domain}")
