@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Superseded by [ADR 0016](0016-repo-owned-extractor-scripts.md).
 
 ## Context
 

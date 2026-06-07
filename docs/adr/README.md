@@ -18,3 +18,4 @@ This directory records project decisions that are expensive to rediscover later.
 - [0012: Website Discovery Policy](0012-website-discovery-policy.md)
 - [0014: Retire Standard Feed](0014-retire-standard-feed.md)
 - [0015: AI Extraction Profiles](0015-ai-extraction-profiles.md)
+- [0016: Repo-Owned Extractor Scripts](0016-repo-owned-extractor-scripts.md)

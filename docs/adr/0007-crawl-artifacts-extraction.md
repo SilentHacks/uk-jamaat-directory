@@ -2,8 +2,11 @@
 
 ## Status
 
-Amended by [ADR 0014](0014-retire-standard-feed.md). Decisions #1 and standard_feed-specific
-references in #5 and #6 are superseded.
+Amended by [ADR 0014](0014-retire-standard-feed.md) and
+[ADR 0016](0016-repo-owned-extractor-scripts.md). Decisions #1 and
+standard_feed-specific references in #5 and #6 are superseded. Decision #6 is amended so
+gate-passed repo-owned deterministic website extractors may auto-approve candidates when
+configured.
 
 ## Context
 
