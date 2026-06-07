@@ -29,3 +29,9 @@ class ExtractionProfile(BaseModel):
     prayers_observed: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     review_notes: str = ""
+
+    # Agent-era fields (optional, default-empty for backward compat with Groq-era profiles)
+    found: bool = False
+    urls_explored: list[str] = Field(default_factory=list)
+    pages_fetched: int = 0
+    navigation_log: str = ""
