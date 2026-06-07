@@ -16,13 +16,6 @@ from uk_jamaat_directory.ingest.extract.ai.profiler import (
     ProfileResult,
     profile_mosque_website,
 )
-from uk_jamaat_directory.ingest.extract.ai.subagent_profiler import (
-    SubagentBatchItem,
-    SubagentResult,
-    commit_result,
-    parse_subagent_response,
-    prepare_batch,
-)
 
 __all__ = [
     "ExtractionProfile",
@@ -35,9 +28,4 @@ __all__ = [
     "GroqRateLimiter",
     "GroqError",
     "GroqRateLimitError",
-    "SubagentBatchItem",
-    "SubagentResult",
-    "commit_result",
-    "parse_subagent_response",
-    "prepare_batch",
 ]

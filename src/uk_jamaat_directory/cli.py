@@ -21,11 +21,6 @@ from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
 from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
 from uk_jamaat_directory.ingest.extract.ai.profiler import profile_mosque_website
-from uk_jamaat_directory.ingest.extract.ai.progress_tracker import init_run, load_run, save_run
-from uk_jamaat_directory.ingest.extract.ai.subagent_profiler import (
-    commit_result,
-    prepare_batch,
-)
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
@@ -410,50 +405,6 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Profile even sources that already have a ready profile",
     )
 
-    prepare_batch = subparsers.add_parser(
-        "prepare-profiling-batch",
-        help=(
-            "Fetch bounded pages for the next batch of unprofiled sources "
-            "and write context files for subagent analysis"
-        ),
-    )
-    prepare_batch.add_argument(
-        "--limit",
-        type=int,
-        default=10,
-        help="Number of sources to include in the batch (default 10)",
-    )
-    prepare_batch.add_argument(
-        "--force",
-        action="store_true",
-        help="Include sources that already have a profile",
-    )
-    prepare_batch.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Prepare the batch but do not write to the database",
-    )
-
-    commit_batch = subparsers.add_parser(
-        "commit-profiling-batch",
-        help="Write subagent analysis results for a batch into the database",
-    )
-    commit_batch.add_argument(
-        "--batch-dir",
-        required=True,
-        type=Path,
-        help="Path to the batch directory (e.g. data/profiling_batches/<run>/batch_0001)",
-    )
-    commit_batch.add_argument(
-        "--result-file",
-        type=Path,
-        default=None,
-        help=(
-            "JSON file containing subagent results keyed by source_id. "
-            "If omitted, reads *.result.json files from the batch directory."
-        ),
-    )
-
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
     generate_exports = subparsers.add_parser(
@@ -828,12 +779,6 @@ def main() -> None:
 
     if args.command == "profile-sources":
         raise SystemExit(asyncio.run(_run_profile_sources(args, settings)))
-
-    if args.command == "prepare-profiling-batch":
-        raise SystemExit(asyncio.run(_run_prepare_profiling_batch(args, settings)))
-
-    if args.command == "commit-profiling-batch":
-        raise SystemExit(asyncio.run(_run_commit_profiling_batch(args, settings)))
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
@@ -1558,88 +1503,4 @@ async def _run_profile_sources(args: argparse.Namespace, settings: Settings) -> 
         f"Bulk profiling ({mode}): attempted={attempted}, "
         f"ready={succeeded}, review_needed={review_needed}, errors={errors}"
     )
-    return 0
-
-
-async def _run_prepare_profiling_batch(args: argparse.Namespace, settings: Settings) -> int:
-    run = load_run() or init_run(batch_size=args.limit or 10)
-
-    async with cli_db_session(settings) as session:
-        result = await prepare_batch(
-            session,
-            limit=args.limit or 10,
-            force=args.force,
-            settings=settings,
-            run=run,
-        )
-        if not args.dry_run:
-            await session.commit()
-            save_run(run)
-
-    print(f"Batch prepared in {result.batch_dir}")
-    print(f"  sources: {len(result.items)}")
-    print(f"  errors: {len(result.errors)}")
-    print()
-    print("Launch a subagent for each source with its prompt file:")
-    for item in result.items:
-        path = f"{result.batch_dir}/{item.source_id}.json"
-        print(f"  --source-id {item.source_id}  (prompt file: {path})")
-    if result.errors:
-        for error in result.errors:
-            print(f"  error: {error}", file=sys.stderr)
-    return 0 if result.items else 1
-
-
-async def _run_commit_profiling_batch(args: argparse.Namespace, settings: Settings) -> int:
-    batch_dir = Path(args.batch_dir)
-    manifest_path = batch_dir / "manifest.json"
-    if not manifest_path.exists():
-        print(f"Manifest not found: {manifest_path}", file=sys.stderr)
-        return 1
-
-    import json
-
-    manifest = json.loads(manifest_path.read_text())
-    source_ids = manifest.get("source_ids", [])
-
-    # Collect results: either from a combined result file or individual *.result.json files
-    results: dict[str, str] = {}
-    if args.result_file:
-        combined = json.loads(args.result_file.read_text())
-        results = combined
-    else:
-        for sid in source_ids:
-            result_file = batch_dir / f"{sid}.result.json"
-            if result_file.exists():
-                data = json.loads(result_file.read_text())
-                results[sid] = data.get("response", data.get("raw_response", ""))
-            else:
-                print(f"  warning: no result file for {sid}")
-
-    if not results:
-        print("No results found to commit.", file=sys.stderr)
-        return 1
-
-    run = load_run()
-    async with cli_db_session(settings) as session:
-        for source_id_str, raw_response in results.items():
-            source_id = uuid.UUID(source_id_str)
-            sub_result = await commit_result(
-                session,
-                source_id,
-                raw_response,
-                settings=settings,
-                run=run,
-            )
-            if sub_result.success:
-                print(f"  committed {source_id_str}: "
-                      f"asset_type={sub_result.profile.asset_type}, "
-                      f"confidence={sub_result.profile.confidence}")
-            else:
-                print(f"  failed {source_id_str}: {sub_result.error}", file=sys.stderr)
-        await session.commit()
-        if run:
-            save_run(run)
-
-    print(f"Batch committed: {len(results)} sources processed")
     return 0

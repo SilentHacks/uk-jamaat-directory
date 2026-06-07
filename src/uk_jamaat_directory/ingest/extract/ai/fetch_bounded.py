@@ -20,6 +20,7 @@ def _strip_html_tags(text: str) -> str:
     stripped = _TAG_RE.sub(" ", text)
     return re.sub(r"\s+", " ", stripped).strip()
 
+
 # Common paths to probe when looking for prayer timetables.
 _TIMETABLE_PATHS = (
     "/prayer-times",
