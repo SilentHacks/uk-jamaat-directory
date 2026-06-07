@@ -28,6 +28,7 @@ async def test_initial_migration_creates_core_tables(db_engine) -> None:  # noqa
         "dataset_versions",
         "change_events",
         "source_artifacts",
+        "source_extractor_assignments",
         "mosque_claims",
         "corrections",
     }

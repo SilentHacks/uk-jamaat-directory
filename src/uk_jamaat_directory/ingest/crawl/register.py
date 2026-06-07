@@ -128,7 +128,6 @@ async def ensure_crawl_sources(
                 "crawl_enabled": True,
                 "discovered_by": "website_url_bootstrap",
                 "homepage_url": homepage,
-                "profile_status": "pending",
                 "allowed_crawl_paths": ["/"],
             },
         )

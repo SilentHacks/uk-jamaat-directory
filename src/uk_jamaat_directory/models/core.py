@@ -417,6 +417,37 @@ class SourceHealth(TimestampMixin, Base):
     message: Mapped[str | None] = mapped_column(Text)
 
 
+class SourceExtractorAssignment(TimestampMixin, Base):
+    __tablename__ = "source_extractor_assignments"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("mosque_sources.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    extractor_key: Mapped[str] = mapped_column(String(180), nullable=False, index=True)
+    extractor_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
+    run_frequency: Mapped[str] = mapped_column(String(40), nullable=False)
+    run_timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, server_default="Europe/London"
+    )
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+
+
 class ChangeEvent(TimestampMixin, Base):
     __tablename__ = "change_events"
 
