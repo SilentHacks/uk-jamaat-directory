@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 import uuid
 from collections.abc import Mapping
 from datetime import date
@@ -1720,17 +1721,7 @@ async def _run_author_repo_extractors(args: argparse.Namespace, settings: Settin
 
 
 async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Settings) -> int:
-    from rich.console import Console
-    from rich.live import Live
-    from rich.progress import (
-        BarColumn,
-        MofNCompleteColumn,
-        Progress,
-        TextColumn,
-        TimeElapsedColumn,
-        TimeRemainingColumn,
-    )
-    from rich.table import Table
+    import logging as _logging
 
     from uk_jamaat_directory.ingest.authoring.orchestrator import (
         run_overnight_orchestrator,
@@ -1741,63 +1732,54 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
             update={"authoring_per_source_timeout_seconds": float(args.per_source_timeout)}
         )
 
-    console = Console()
-    progress = Progress(
-        TextColumn("[bold blue]{task.description}"),
-        BarColumn(bar_width=40),
-        MofNCompleteColumn(),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    )
-    task_id = progress.add_task("Authoring", total=0)
+    _logging.getLogger("httpx").setLevel(_logging.WARNING)
+    _logging.getLogger("httpcore").setLevel(_logging.WARNING)
 
-    stats_table = Table.grid(expand=True)
-    stats_table.add_column(style="green", justify="right")
-    stats_table.add_column(style="green")
-    stats_table.add_column(style="yellow", justify="right")
-    stats_table.add_column(style="yellow")
-    stats_table.add_column(style="red", justify="right")
-    stats_table.add_column(style="red")
-    stats_table.add_column(style="cyan", justify="right")
-    stats_table.add_column(style="cyan")
+    isatty = sys.stdout.isatty()
+    progress_line = ""
 
     async def _on_progress(summary) -> None:
-        progress.update(task_id, total=summary.candidates, completed=summary.processed)
-        stats_table.rows.clear()
-        stats_table.add_row(
-            "ok:", str(summary.preflight_ok),
-            "authored:", str(summary.authored),
-            "deployed:", str(summary.deployed),
-            "skipped:", str(summary.skipped_review),
-            "failed:", str(summary.failed),
+        nonlocal progress_line
+        elapsed = time.monotonic() - summary.start_time
+        processed = summary.processed
+        total = summary.candidates
+        pct = (processed / total * 100) if total else 0
+        avg = elapsed / processed if processed else 0
+        remaining = total - processed
+        eta = avg * remaining if avg else 0
+        line = (
+            f"[{processed}/{total}] {pct:.1f}% "
+            f"elapsed={elapsed:.0f}s eta={eta:.0f}s "
+            f"ok={summary.preflight_ok} "
+            f"authored={summary.authored} "
+            f"deployed={summary.deployed} "
+            f"skipped={summary.skipped_review} "
+            f"failed={summary.failed}"
         )
         if summary.errors:
-            last_error = summary.errors[-1]
-            stats_table.add_row(
-                "", "", "", "", "", "",
-                "last error:", last_error[:80],
-            )
+            line += f" | last_err={summary.errors[-1][:60]}"
+        progress_line = line
+        if isatty:
+            print(f"\r{line:<120}", end="", flush=True)
+        else:
+            print(line, flush=True)
 
-    with Live(progress, console=console, refresh_per_second=2):
-        async with cli_db_session(settings) as session:
-            summary = await run_overnight_orchestrator(
-                session=session,
-                settings=settings,
-                source_id=args.source_id,
-                limit=args.limit,
-                concurrency=args.concurrency,
-                dry_run=args.dry_run,
-                skip_failed=args.skip_failed,
-                on_progress=_on_progress,
-            )
-            await session.commit()
+    async with cli_db_session(settings) as session:
+        summary = await run_overnight_orchestrator(
+            session=session,
+            settings=settings,
+            source_id=args.source_id,
+            limit=args.limit,
+            concurrency=args.concurrency,
+            dry_run=args.dry_run,
+            skip_failed=args.skip_failed,
+            on_progress=_on_progress,
+        )
+        await session.commit()
 
-    console.print()
-    console.print("[bold]Final summary[/bold]")
-    payload = summary.as_dict()
-    console.print_json(json.dumps(payload, indent=2, sort_keys=True))
+    if isatty:
+        print()
+    print(json.dumps(summary.as_dict(), indent=2, sort_keys=True))
     return 0 if summary.failed == 0 else 1
 
 
