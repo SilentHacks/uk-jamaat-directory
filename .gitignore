@@ -36,6 +36,7 @@ data/private/
 data/profiling_batches/
 data/profiling_progress.json
 data/agent_profiles/
+data/authoring_results/
 minio-data/
 postgres-data/
 redis-data/
