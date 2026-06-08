@@ -46,37 +46,46 @@ a script or marks the source for human review.
    - Find the prayer-timetable page, following links or trying common paths
      (`/prayer-times`, `/timetable`, `/salah`, `/namaz`, `/calendar`, etc.).
    - If the timetable is HTML, write a single Python file at the path the
-     orchestrator pre-computed and emit a structured summary at the end.
+     orchestrator pre-computed and write a JSON result file after finishing.
    - If the timetable is a PDF, image, JSON, or JS-rendered page, do not write
-     a script; emit a structured summary that records the discovery.
+     a script; write a JSON result file that records the discovery.
    - Never visit web.archive.org, third-party widgets, or unrelated domains.
-5. The agent ends every run with a structured summary of the form:
+5. The orchestrator computes a deterministic JSON file path per source
+   (`data/authoring_results/<source_id>.json`) and passes it to the agent in
+   the prompt. The agent writes this JSON file as its **final action** after
+   any script. The JSON schema is:
+   ```json
+   {
+     "status": "authored|skipped_review|failed",
+     "target_url": "<url it actually used>",
+     "target_kind": "html|pdf|image|rendered_html|json",
+     "script_path": "<repo-relative path>",  // only when authored
+     "reason": "<short reason>",              // only when skipped_review or failed
+     "version": "1.0"
+   }
    ```
-   STATUS=authored|skipped_review|failed
-   TARGET_URL=<url it actually used>
-   TARGET_KIND=html|pdf|image|rendered_html|json
-   SCRIPT_PATH=<path>      # only when STATUS=authored
-   REASON=<short reason>   # only when STATUS=skipped_review or failed
-   ```
-   The orchestrator parses these lines from the last 1 KB of stdout.
-6. For `STATUS=authored` the orchestrator reads the file the agent reported,
+   The orchestrator reads the JSON file after the agent exits and validates it
+   with Pydantic. No parsing of the agent's free-form text output is required.
+6. The orchestrator cleans the JSON file before starting the agent, so stale
+   results from a previous (interrupted or timed-out) run cannot be picked up.
+7. For `status=authored` the orchestrator reads the file the agent reported,
    runs `check_script_source` + `check_extractor(allowed_domain=...)`, writes
    the file to the canonical scripts directory (if not already there), then
    runs `sync_repo_extractors` to create the `SourceExtractorAssignment`.
-7. For `STATUS=skipped_review` the orchestrator records the reason and the
+8. For `status=skipped_review` the orchestrator records the reason and the
    target kind. PDF, image, OCR, and JS-rendered targets land here until OCR
    is implemented.
-8. For any other status (or no status reported), the task is marked
+9. For any other status (or no JSON file written), the task is marked
    `failed` with the agent's stdout/stderr excerpt.
-9. Concurrency is bounded by an `asyncio.Semaphore` (`authoring_concurrency`,
-   default 8). Each source has a per-source timeout
-   (`authoring_per_source_timeout_seconds`, default 180s). The whole run has a
-   global timeout (default 4h) and is safe to re-run; existing `deployed` and
-   `awaiting_review` tasks are skipped.
-10. The OpenCode CLI is treated as a black-box subprocess: a wrapper handles
-    argv construction, prompt temp files, working directory, timeouts,
-    stdout/stderr capture, and JSON-event parsing. There is no shared state,
-    no live streaming, no tool-calling protocol.
+10. Concurrency is bounded by an `asyncio.Semaphore` (`authoring_concurrency`,
+    default 8). Each source has a per-source timeout
+    (`authoring_per_source_timeout_seconds`, default 180s). The whole run has a
+    global timeout (default 4h) and is safe to re-run; existing `deployed` and
+    `awaiting_review` tasks are skipped.
+11. The OpenCode CLI is treated as a black-box subprocess: a wrapper handles
+    argv construction, working directory, timeouts, stdout/stderr capture, and
+    JSON file reading. There is no shared state, no live streaming, no
+    tool-calling protocol.
 11. The orchestrator is exposed as a CLI command (`orchestrate-authoring`), a
     Celery task (`authoring.run_overnight`), and an admin list endpoint
     (`GET /v1/admin/authoring`) for observability. No public endpoints.
@@ -105,6 +114,9 @@ to a real network sandbox is a follow-up.
 - The agent writes scripts directly into
   `ingest/extract/repo_extractors/scripts/`. The orchestrator validates and
   syncs; the developer reviews the git diff and commits.
+- The agent writes a JSON result file to `data/authoring_results/` (ignored by
+  git). The orchestrator reads this file to know what the agent did; no parsing
+  of the agent's free-form text output is required.
 - The orchestrator does not commit, push, or open PRs. That stays a developer
   responsibility.
 - PDF / image / OCR / JS-rendered sources remain stuck on the review queue
