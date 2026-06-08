@@ -8,8 +8,9 @@ Create Date: 2026-06-08
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "006_repo_extractors"
 down_revision = "005_retire_standard_feed"
@@ -30,16 +31,36 @@ def upgrade() -> None:
         sa.Column("extractor_version", sa.String(length=80), nullable=False),
         sa.Column("status", sa.String(length=40), nullable=False, server_default="active"),
         sa.Column("run_frequency", sa.String(length=40), nullable=False),
-        sa.Column("run_timezone", sa.String(length=64), nullable=False, server_default="Europe/London"),
+        sa.Column(
+            "run_timezone",
+            sa.String(length=64),
+            nullable=False,
+            server_default="Europe/London",
+        ),
         sa.Column("next_run_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_run_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_success_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_failure_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("consecutive_failures", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "metadata",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
     )
     op.create_index(
         "ix_source_extractor_assignments_status_next_run_at",
