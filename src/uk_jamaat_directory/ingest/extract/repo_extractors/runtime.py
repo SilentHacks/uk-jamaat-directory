@@ -31,6 +31,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.validator import (
     check_target_url,
 )
 from uk_jamaat_directory.ingest.fetch import fetch_url
+from uk_jamaat_directory.ingest.fetch.playwright import fetch_rendered_html
 from uk_jamaat_directory.ingest.normalize import normalize_domain
 from uk_jamaat_directory.models.core import (
     ExtractionRun,
@@ -159,7 +160,12 @@ async def _fetch_target_artifact(
     prior = await latest_artifact_for_url(
         session, source_id=source.id, fetched_url=target.url
     )
-    fetch = await fetch_url(target.url, prior_artifact=prior, settings=settings)
+    if target.requires_javascript:
+        fetch = await fetch_rendered_html(
+            target.url, settings=settings, timeout_seconds=settings.crawl_timeout_seconds
+        )
+    else:
+        fetch = await fetch_url(target.url, prior_artifact=prior, settings=settings)
     if fetch.error:
         return f"target {target.label} fetch failed: {fetch.error}"
     if fetch.unchanged:

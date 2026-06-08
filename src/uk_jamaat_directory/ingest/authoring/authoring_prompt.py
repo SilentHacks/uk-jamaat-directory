@@ -80,17 +80,17 @@ def build_authoring_prompt(
            widgets, social-media profiles, or unrelated domains. If a link
            points off-site, ignore it.
 
-        3. Decide the target kind:
-           - ``html`` — a static HTML page with the timetable.
-           - ``pdf`` — a PDF file (skip authoring; see "PDF / image / OCR"
-             below).
-           - ``image`` — a screenshot or scan of a printed timetable
-             (skip authoring).
-           - ``rendered_html`` — the HTML is empty or only a JavaScript
-             container; the timetable is rendered client-side
-             (skip authoring).
-           - ``json`` — the timetable is served as JSON
-             (skip authoring until JSON extractors are supported).
+         3. Decide the target kind:
+            - ``html`` — a static HTML page with the timetable.
+            - ``rendered_html`` — the timetable is rendered client-side with
+              JavaScript (e.g. Flutter, React, Vue). The runtime uses
+              Playwright to fetch the fully-rendered DOM.
+            - ``pdf`` — a PDF file. The runtime downloads the PDF and passes
+              the raw bytes to the extractor.
+            - ``image`` — a screenshot or scan of a printed timetable
+              (skip authoring — OCR is not yet implemented).
+            - ``json`` — the timetable is served as JSON
+              (skip authoring until JSON extractors are supported).
 
          4. Prefer the **broadest** timetable you can find:
             - A **monthly** or **full-year** timetable is ideal.
@@ -103,15 +103,16 @@ def build_authoring_prompt(
             version. Use the broadest one you discover before you run out of
             page budget.
 
-         5. If the target is ``html``, write a single Python file at the
-            ``Target script path`` above, implementing one ``Extractor`` class.
-            The file must satisfy every requirement in the
-            "Extractor contract" section below. Validate locally with
-            ``python -m uk_jamaat_directory.cli validate-repo-extractor
-            --extractor-key {extractor_key}`` before finishing.
+         5. If the target is ``html`` or ``rendered_html`` or ``pdf``, write a
+            single Python file at the ``Target script path`` above,
+            implementing one ``Extractor`` class. The file must satisfy every
+            requirement in the "Extractor contract" section below. Validate
+            locally with ``python -m uk_jamaat_directory.cli
+            validate-repo-extractor --extractor-key {extractor_key}`` before
+            finishing.
 
-         6. If the target is ``pdf`` / ``image`` / ``rendered_html`` / ``json``,
-            do NOT write a script. Just record the discovery.
+         6. If the target is ``image`` or ``json``, do NOT write a script.
+            Just record the discovery.
 
          7. When you are done, write a JSON file to the **exact path**
             ``{result_path}``. The orchestrator reads this file after you
@@ -133,8 +134,8 @@ def build_authoring_prompt(
             Fields:
             - ``status`` (required): ``authored`` | ``skipped_review`` | ``failed``
             - ``target_url`` (required): the timetable URL you actually visited
-            - ``target_kind`` (required): ``html`` | ``pdf`` | ``image`` |
-              ``rendered_html`` | ``json``
+            - ``target_kind`` (required): ``html`` | ``rendered_html`` | ``pdf`` |
+              ``image`` | ``json``
             - ``script_path`` (required when ``status=authored``): repo-relative path
             - ``reason`` (required when ``status=skipped_review`` or ``failed``): short reason
             - ``version``: always ``"1.0"``
@@ -186,6 +187,10 @@ def build_authoring_prompt(
           network libraries (requests, httpx, urllib, socket, subprocess)
           or perform file IO outside the helpers. Static, capability,
           output, and candidate validation will run.
+        - For ``rendered_html`` targets, set ``requires_javascript=True`` on
+          the ``TargetSpec``.
+        - For ``pdf`` targets, set ``requires_pdf=True`` on the
+          ``TargetSpec``.
         - The script must use ``ctx.evidence(...)`` for every emitted row.
         - For relative rules such as "Maghrib 5 minutes after adhan", use
           ``relative.jamaat_after_start`` and store the derivation in
@@ -197,6 +202,7 @@ def build_authoring_prompt(
         Available helper modules:
 
         - ``html.parse``, ``html.extract_tables``, ``html.html_to_text``
+        - ``pdf.extract_text``, ``pdf.extract_tables`` (for PDF targets)
         - ``times.parse_time_loose``, ``times.coerce_time``
         - ``prayers.parse_prayer_label``, ``prayers.is_jumuah_label``
         - ``relative.add_minutes``, ``relative.jamaat_after_start``,
@@ -204,11 +210,10 @@ def build_authoring_prompt(
 
         # PDF / image / OCR
 
-        OCR and PDF text extraction are not yet implemented in the runtime.
-        If the timetable is a PDF, image, or rendered with JavaScript, set
-        ``status=skipped_review`` with a ``reason`` like ``pdf target — ocr
-        not yet implemented`` or ``rendered_html target — playwright not yet
-        enabled``. The orchestrator will queue the source for a human.
+        OCR and image text extraction are not yet implemented in the runtime.
+        If the timetable is a screenshot or scan, set ``status=skipped_review``
+        with a ``reason`` like ``image target — ocr not yet implemented``.
+        The orchestrator will queue the source for a human.
 
         # Notes
 
