@@ -1191,13 +1191,13 @@
         }
       }
     },
-    "/v1/admin/sources/{source_id}/profile": {
+    "/v1/admin/sources/{source_id}/extractor": {
       "get": {
         "tags": [
           "admin"
         ],
-        "summary": "Get Source Profile",
-        "operationId": "get_source_profile_v1_admin_sources__source_id__profile_get",
+        "summary": "Get Source Extractor",
+        "operationId": "get_source_extractor_v1_admin_sources__source_id__extractor_get",
         "security": [
           {
             "APIKeyHeader": []
@@ -1221,7 +1221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProfileResponse"
+                  "$ref": "#/components/schemas/AdminExtractorResponse"
                 }
               }
             }
@@ -1237,13 +1237,15 @@
             }
           }
         }
-      },
+      }
+    },
+    "/v1/admin/sources/{source_id}/extractor/sync": {
       "post": {
         "tags": [
           "admin"
         ],
-        "summary": "Trigger Source Profile",
-        "operationId": "trigger_source_profile_v1_admin_sources__source_id__profile_post",
+        "summary": "Sync Source Extractor",
+        "operationId": "sync_source_extractor_v1_admin_sources__source_id__extractor_sync_post",
         "security": [
           {
             "APIKeyHeader": []
@@ -1267,7 +1269,132 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminProfileTriggerResponse"
+                  "$ref": "#/components/schemas/AdminExtractorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/sources/{source_id}/extractor/disable": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Disable Source Extractor",
+        "operationId": "disable_source_extractor_v1_admin_sources__source_id__extractor_disable_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminExtractorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/extractors": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Extractors",
+        "operationId": "list_extractors_v1_admin_extractors_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminExtractorListResponse"
                 }
               }
             }
@@ -2555,6 +2682,149 @@
         ],
         "title": "AdminDuplicateBucket"
       },
+      "AdminExtractorListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminExtractorResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "count"
+        ],
+        "title": "AdminExtractorListResponse"
+      },
+      "AdminExtractorResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "extractor_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extractor Key"
+          },
+          "extractor_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extractor Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "run_frequency": {
+            "type": "string",
+            "title": "Run Frequency"
+          },
+          "run_timezone": {
+            "type": "string",
+            "title": "Run Timezone"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure At"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "title": "Consecutive Failures"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "extractor_key",
+          "extractor_version",
+          "status",
+          "run_frequency",
+          "run_timezone",
+          "next_run_at",
+          "last_run_at",
+          "last_success_at",
+          "last_failure_at",
+          "consecutive_failures",
+          "last_error"
+        ],
+        "title": "AdminExtractorResponse"
+      },
       "AdminHealthResponse": {
         "properties": {
           "status": {
@@ -3275,165 +3545,6 @@
         },
         "type": "object",
         "title": "AdminMosqueUpdate"
-      },
-      "AdminProfileResponse": {
-        "properties": {
-          "source_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Source Id"
-          },
-          "profile_status": {
-            "type": "string",
-            "title": "Profile Status"
-          },
-          "asset_type": {
-            "type": "string",
-            "title": "Asset Type"
-          },
-          "timetable_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timetable Url"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          },
-          "review_notes": {
-            "type": "string",
-            "title": "Review Notes"
-          },
-          "extraction_run_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extraction Run Id"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "profiled_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profiled At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source_id",
-          "profile_status",
-          "asset_type",
-          "timetable_url",
-          "confidence",
-          "review_notes",
-          "extraction_run_id",
-          "model",
-          "profiled_at"
-        ],
-        "title": "AdminProfileResponse"
-      },
-      "AdminProfileTriggerResponse": {
-        "properties": {
-          "source_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Source Id"
-          },
-          "profile_status": {
-            "type": "string",
-            "title": "Profile Status"
-          },
-          "asset_type": {
-            "type": "string",
-            "title": "Asset Type"
-          },
-          "timetable_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timetable Url"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          },
-          "review_notes": {
-            "type": "string",
-            "title": "Review Notes"
-          },
-          "extraction_run_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extraction Run Id"
-          },
-          "warnings": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Warnings"
-          },
-          "errors": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Errors"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source_id",
-          "profile_status",
-          "asset_type",
-          "timetable_url",
-          "confidence",
-          "review_notes",
-          "extraction_run_id",
-          "warnings",
-          "errors"
-        ],
-        "title": "AdminProfileTriggerResponse"
       },
       "AdminSourceAttach": {
         "properties": {

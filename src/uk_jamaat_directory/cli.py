@@ -398,6 +398,23 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
     sync_extractors.add_argument("--extractor-key", default=None)
     sync_extractors.add_argument("--dry-run", action="store_true")
 
+    author_extractor = subparsers.add_parser(
+        "author-repo-extractor",
+        help="Build an authoring prompt for one mosque_website source",
+    )
+    author_extractor.add_argument("--source-id", required=True, type=uuid.UUID)
+    author_extractor.add_argument(
+        "--extractor-key",
+        default=None,
+        help="Override the suggested extractor key (defaults to domain-based slug)",
+    )
+
+    author_extractors = subparsers.add_parser(
+        "author-repo-extractors",
+        help="Build authoring prompts for sources without an active repo extractor",
+    )
+    author_extractors.add_argument("--limit", type=int, default=20)
+
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
     generate_exports = subparsers.add_parser(
@@ -775,6 +792,15 @@ def main() -> None:
         raise SystemExit(_run_validate_repo_extractors(args))
     if args.command == "sync-repo-extractors":
         raise SystemExit(asyncio.run(_run_sync_repo_extractors(args, settings)))
+
+    if args.command == "author-repo-extractor":
+        raise SystemExit(
+            asyncio.run(_run_author_repo_extractor(args, settings))
+        )
+    if args.command == "author-repo-extractors":
+        raise SystemExit(
+            asyncio.run(_run_author_repo_extractors(args, settings))
+        )
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
@@ -1545,4 +1571,130 @@ async def _run_sync_repo_extractors(
         print(f"  marked_missing: {entry}")
     if args.dry_run:
         print("dry-run: not committing")
+    return 0
+
+
+def _suggest_extractor_key(domain: str | None) -> str:
+    if not domain:
+        return "site_extractor"
+    cleaned = domain.replace("www.", "").replace(".", "_")
+    return f"{cleaned}_extractor"
+
+
+async def _build_authoring_prompt_for_source(
+    session, source_id: uuid.UUID, *, extractor_key: str | None
+) -> tuple[str, str, str] | None:
+
+    from uk_jamaat_directory.ingest.extract.repo_extractors.authoring_prompt import (
+        build_authoring_prompt,
+    )
+    from uk_jamaat_directory.ingest.normalize import normalize_domain
+    from uk_jamaat_directory.models.core import Mosque, MosqueSource
+
+    source = await session.get(MosqueSource, source_id)
+    if source is None or source.source_url is None:
+        return None
+    mosque = await session.get(Mosque, source.mosque_id) if source.mosque_id else None
+    domain = normalize_domain(source.source_url)
+    key = extractor_key or _suggest_extractor_key(domain)
+    prompt = build_authoring_prompt(
+        source_id=str(source.id),
+        mosque_name=mosque.name if mosque else "(unknown)",
+        website_url=source.source_url,
+        extractor_key=key,
+        max_pages=10,
+    )
+    return key, source.source_url, prompt
+
+
+async def _record_authoring_attempt(
+    session, source_id: uuid.UUID, *, extractor_key: str
+) -> None:
+    import uuid as _uuid
+    from datetime import UTC, datetime
+
+    from uk_jamaat_directory.domain import ExtractionKind
+    from uk_jamaat_directory.models.core import ExtractionRun
+
+    run = ExtractionRun(
+        id=_uuid.uuid4(),
+        artifact_id=None,
+        source_id=source_id,
+        kind=ExtractionKind.AI,
+        extractor_version=f"author-draft/{extractor_key}",
+        status="succeeded",
+        started_at=datetime.now(UTC),
+        finished_at=datetime.now(UTC),
+        metadata_={
+            "phase": "authoring",
+            "extractor_key": extractor_key,
+            "contract": "repo_site_extractor/v1",
+            "gate_passed": False,
+            "notes": "Authoring prompt emitted; community or AI author writes the script.",
+        },
+    )
+    session.add(run)
+    await session.flush()
+
+
+async def _run_author_repo_extractor(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    async with cli_db_session(settings) as session:
+        result = await _build_authoring_prompt_for_source(
+            session, args.source_id, extractor_key=args.extractor_key
+        )
+        if result is None:
+            print(
+                f"error: source not found or has no source_url: {args.source_id}",
+                file=sys.stderr,
+            )
+            return 2
+        key, url, prompt = result
+        await _record_authoring_attempt(session, args.source_id, extractor_key=key)
+        await session.commit()
+
+    print(f"extractor_key: {key}")
+    print(f"website_url: {url}")
+    print()
+    print(prompt)
+    return 0
+
+
+async def _run_author_repo_extractors(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from sqlalchemy import select
+
+    from uk_jamaat_directory.domain import SourceType
+    from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+        SourceExtractorAssignment,
+    )
+    from uk_jamaat_directory.models.core import MosqueSource
+
+    async with cli_db_session(settings) as session:
+        stmt = (
+            select(MosqueSource)
+            .where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
+            .where(MosqueSource.source_url.is_not(None))
+            .limit(args.limit)
+        )
+        sources = (await session.execute(stmt)).scalars().all()
+        produced: list[str] = []
+        for source in sources:
+            assignment = await session.get(SourceExtractorAssignment, source.id)
+            if assignment is not None and assignment.status == "active":
+                continue
+            result = await _build_authoring_prompt_for_source(
+                session, source.id, extractor_key=None
+            )
+            if result is None:
+                continue
+            key, _url, prompt = result
+            await _record_authoring_attempt(session, source.id, extractor_key=key)
+            produced.append(f"{source.id}={key}")
+        await session.commit()
+
+    for entry in produced:
+        print(entry)
     return 0
