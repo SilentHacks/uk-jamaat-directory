@@ -44,13 +44,15 @@ from uk_jamaat_directory.domain import (
     AuthoringTaskStatus,
     SourceType,
 )
-from uk_jamaat_directory.ingest.authoring.agent import (
-    AgentResult,
-    is_opencode_available,
-    run_authoring_agent,
-)
+from uk_jamaat_directory.ingest.authoring.agent import run_authoring_agent
 from uk_jamaat_directory.ingest.authoring.authoring_prompt import (
     build_authoring_prompt,
+)
+from uk_jamaat_directory.ingest.authoring.authoring_result import (
+    AgentResult,
+    authoring_result_path,
+    clean_authoring_result,
+    is_opencode_available,
 )
 from uk_jamaat_directory.ingest.authoring.discovery import (
     preflight_source,
@@ -474,12 +476,16 @@ async def _process_source(
     domain = preflight.domain or normalize_domain(source.source_url) or ""
     scripts_dir = _scripts_filesystem_path()
     script_path = os.path.join(scripts_dir, f"{extractor_key}.py")
+    result_path = authoring_result_path(source.id)
+    clean_authoring_result(result_path)
+
     prompt = build_authoring_prompt(
         source_id=str(source.id),
         mosque_name=mosque_name,
         website_url=source.source_url or "",
         extractor_key=extractor_key,
         script_path=os.path.relpath(script_path, _repo_root()),
+        result_path=os.path.relpath(result_path, _repo_root()),
         domain=domain,
         predicted_kind=preflight.predicted_kind,
         max_pages=8,
@@ -489,6 +495,7 @@ async def _process_source(
         agent_result: AgentResult = await run_authoring_agent(
             prompt=prompt,
             settings=settings,
+            result_path=result_path,
             cwd=_repo_root(),
         )
     except TimeoutError as exc:

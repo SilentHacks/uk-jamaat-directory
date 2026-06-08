@@ -2,7 +2,9 @@
 
 The prompt is the only "policy" the agent has: it tells the agent where to
 start, where it is allowed to navigate, what contract to honour, what file
-to write, and what structured summary to emit at the end.
+(prayer-timetable extractor script) to write, and what JSON file to write at
+the end so the orchestrator can read the result without parsing the agent's
+free-form text output.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ def build_authoring_prompt(
     website_url: str,
     extractor_key: str,
     script_path: str,
+    result_path: str,
     domain: str,
     predicted_kind: AuthoringTargetKind,
     max_pages: int,
@@ -59,6 +62,7 @@ def build_authoring_prompt(
         Registrable domain (the only place you are allowed to navigate): {domain}
         Target extractor key: {extractor_key}
         Target script path: {script_path}
+        Result JSON path: {result_path}
 
         {kind_hint}
 
@@ -98,15 +102,31 @@ def build_authoring_prompt(
         5. If the target is ``pdf`` / ``image`` / ``rendered_html`` / ``json``,
            do NOT write a script. Just record the discovery.
 
-        6. When you are done, end your reply with a structured summary in
-           EXACTLY this format (no extra prose after the block, no code
-           fences around it):
+        6. When you are done, write a JSON file to the **exact path**
+           ``{result_path}``. The orchestrator reads this file after you
+           finish — it is the only way the orchestrator knows what you did.
 
-           STATUS=authored|skipped_review|failed
-           TARGET_URL=<the timetable URL you found, or the source URL if you could not>
-           TARGET_KIND=html|pdf|image|rendered_html|json
-           SCRIPT_PATH={script_path}     # only when STATUS=authored
-           REASON=<short reason>          # only when STATUS=skipped_review or failed
+           The JSON file must have this exact structure:
+
+           ```json
+           {{
+             "status": "authored",
+             "target_url": "https://example.com/prayer-times",
+             "target_kind": "html",
+             "script_path": "{script_path}",
+             "reason": "short reason",
+             "version": "1.0"
+           }}
+           ```
+
+           Fields:
+           - ``status`` (required): ``authored`` | ``skipped_review`` | ``failed``
+           - ``target_url`` (required): the timetable URL you actually visited
+           - ``target_kind`` (required): ``html`` | ``pdf`` | ``image`` |
+             ``rendered_html`` | ``json``
+           - ``script_path`` (required when ``status=authored``): repo-relative path
+           - ``reason`` (required when ``status=skipped_review`` or ``failed``): short reason
+           - ``version``: always ``"1.0"``
 
         # Extractor contract
 
@@ -175,20 +195,18 @@ def build_authoring_prompt(
 
         OCR and PDF text extraction are not yet implemented in the runtime.
         If the timetable is a PDF, image, or rendered with JavaScript, set
-        ``STATUS=skipped_review`` with a ``REASON`` like ``pdf target — ocr
+        ``status=skipped_review`` with a ``reason`` like ``pdf target — ocr
         not yet implemented`` or ``rendered_html target — playwright not yet
         enabled``. The orchestrator will queue the source for a human.
 
         # Notes
 
         - Network access is enabled. Stay on ``{domain}``.
-        - The orchestrator captures your stdout, parses the trailing
-          ``STATUS=…`` block, validates any file you wrote, and runs
-          ``sync_repo_extractors`` so the new extractor is scheduled. If
-          validation fails the task is marked ``failed`` and the file you
-          wrote is left in place for the operator to inspect.
-        - Never invent a TARGET_URL; it must be a URL you actually visited.
+        - The orchestrator reads the JSON file at ``{result_path}`` after you
+          finish. If the file is missing or invalid, the task is marked
+          ``failed``.
+        - Never invent a ``target_url``; it must be a URL you actually visited.
         - Never fabricate rows. If you cannot parse a single row from the
-          timetable, set ``STATUS=failed`` with a short reason.
+          timetable, set ``status=failed`` with a short reason.
         """
     ).strip()
