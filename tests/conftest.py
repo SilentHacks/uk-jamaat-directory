@@ -86,6 +86,8 @@ _DELETE_ORDER = [
     "extraction_runs",
     "source_artifacts",
     "source_health",
+    "extractor_authoring_tasks",
+    "source_extractor_assignments",
     "identity_match_reviews",
     "mosque_claims",
     "corrections",

@@ -88,6 +88,25 @@ class CorrectionStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class AuthoringTaskStatus(StrEnum):
+    QUEUED = "queued"
+    DISCOVERING = "discovering"
+    AUTHORING = "authoring"
+    AWAITING_REVIEW = "awaiting_review"
+    DEPLOYED = "deployed"
+    SKIPPED_REVIEW = "skipped_review"
+    FAILED = "failed"
+
+
+class AuthoringTargetKind(StrEnum):
+    HTML = "html"
+    RENDERED_HTML = "rendered_html"
+    PDF = "pdf"
+    IMAGE = "image"
+    JSON = "json"
+    UNKNOWN = "unknown"
+
+
 class ChangeEventType(StrEnum):
     MOSQUE_CREATED = "mosque_created"
     MOSQUE_UPDATED = "mosque_updated"

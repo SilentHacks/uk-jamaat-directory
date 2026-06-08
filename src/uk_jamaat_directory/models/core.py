@@ -417,6 +417,53 @@ class SourceHealth(TimestampMixin, Base):
     message: Mapped[str | None] = mapped_column(Text)
 
 
+class ExtractorAuthoringTask(TimestampMixin, Base):
+    __tablename__ = "extractor_authoring_tasks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("mosque_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    source: Mapped[MosqueSource] = relationship("MosqueSource")
+    status: Mapped[str] = mapped_column(
+        String(40), nullable=False, server_default="queued", index=True
+    )
+    discovered_url: Mapped[str | None] = mapped_column(Text)
+    target_kind: Mapped[str] = mapped_column(
+        String(40), nullable=False, server_default="unknown", index=True
+    )
+    extractor_key: Mapped[str | None] = mapped_column(String(180))
+    extractor_version: Mapped[str | None] = mapped_column(String(80))
+    script_path: Mapped[str | None] = mapped_column(Text)
+    agent_model: Mapped[str | None] = mapped_column(String(120))
+    agent_command: Mapped[str | None] = mapped_column(Text)
+    agent_duration_ms: Mapped[int | None] = mapped_column(Integer)
+    agent_stdout_excerpt: Mapped[str | None] = mapped_column(Text)
+    validation_issues: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+
+
 class SourceExtractorAssignment(TimestampMixin, Base):
     __tablename__ = "source_extractor_assignments"
 

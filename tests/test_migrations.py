@@ -29,6 +29,7 @@ async def test_initial_migration_creates_core_tables(db_engine) -> None:  # noqa
         "change_events",
         "source_artifacts",
         "source_extractor_assignments",
+        "extractor_authoring_tasks",
         "mosque_claims",
         "corrections",
     }
