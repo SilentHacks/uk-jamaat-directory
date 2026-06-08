@@ -101,7 +101,7 @@ async def test_sync_creates_assignment_for_matching_source(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    _mosque, source = _active_mosque_and_source(db_session)
+    _mosque, source = await _active_mosque_and_source(db_session)
 
     result = await sync_repo_extractors(db_session)
 
@@ -116,7 +116,7 @@ async def test_sync_creates_assignment_for_matching_source(
 async def test_sync_marks_missing_script(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    _mosque, source = _active_mosque_and_source(db_session)
+    _mosque, source = await _active_mosque_and_source(db_session)
     assignment = await _seed_assignment(db_session, source)
     assignment.extractor_key = "removed_extractor"
     await db_session.flush()
@@ -133,7 +133,7 @@ async def test_due_source_listing_uses_assignment(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    _mosque, source = _active_mosque_and_source(db_session)
+    _mosque, source = await _active_mosque_and_source(db_session)
     await _seed_assignment(db_session, source)
 
     settings = _settings(crawl_enabled=True)
@@ -147,7 +147,7 @@ async def test_process_source_runs_repo_extractor(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    mosque, source = _active_mosque_and_source(db_session)
+    mosque, source = await _active_mosque_and_source(db_session)
     await _seed_assignment(db_session, source)
 
     fetch_result = FetchResult(
@@ -219,7 +219,7 @@ async def test_process_source_handles_fetch_failure(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    _mosque, source = _active_mosque_and_source(db_session)
+    _mosque, source = await _active_mosque_and_source(db_session)
     await _seed_assignment(db_session, source)
 
     fetch_result = FetchResult(

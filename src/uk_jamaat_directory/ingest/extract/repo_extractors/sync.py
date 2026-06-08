@@ -66,6 +66,18 @@ async def sync_repo_extractors(
     result = SyncResult()
     extractors = {entry.extractor.key: entry for entry in load_all_extractors()}
 
+    if not extractor_key:
+        assignment_stmt = select(SourceExtractorAssignment)
+        if source_id is not None:
+            assignment_stmt = assignment_stmt.where(
+                SourceExtractorAssignment.source_id == source_id
+            )
+        assignments = (await session.execute(assignment_stmt)).scalars().all()
+        for assignment in assignments:
+            if assignment.extractor_key not in extractors:
+                assignment.status = "missing_script"
+                result.marked_missing.append(str(assignment.source_id))
+
     stmt = select(MosqueSource).where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
     if source_id is not None:
         stmt = stmt.where(MosqueSource.id == source_id)
@@ -132,19 +144,6 @@ async def sync_repo_extractors(
             if assignment.status == "failed_validation":
                 assignment.status = "active"
         result.upserted.append(f"{source.id}={key}")
-
-    if not extractor_key:
-        known_keys = set(extractors.keys())
-        assignment_stmt = select(SourceExtractorAssignment)
-        if source_id is not None:
-            assignment_stmt = assignment_stmt.where(
-                SourceExtractorAssignment.source_id == source_id
-            )
-        assignments = (await session.execute(assignment_stmt)).scalars().all()
-        for assignment in assignments:
-            if assignment.extractor_key not in known_keys:
-                assignment.status = "missing_script"
-                result.marked_missing.append(str(assignment.source_id))
 
     await session.flush()
     return result

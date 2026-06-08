@@ -30,7 +30,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.validator import (
     check_extractor_result,
     check_target_url,
 )
-from uk_jamaat_directory.ingest.fetch import FetchResult, fetch_url
+from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.normalize import normalize_domain
 from uk_jamaat_directory.models.core import (
     ExtractionRun,
@@ -152,21 +152,25 @@ async def _fetch_target_artifact(
     target: TargetSpec,
     *,
     settings: Settings,
-) -> tuple[SourceArtifact, FetchResult] | None:
+) -> tuple[SourceArtifact, bytes] | str:
     parsed = urlparse(target.url)
     if not parsed.netloc:
-        return None
+        return f"target {target.label} has no host"
     prior = await latest_artifact_for_url(
         session, source_id=source.id, fetched_url=target.url
     )
     fetch = await fetch_url(target.url, prior_artifact=prior, settings=settings)
     if fetch.error:
-        return None
+        return f"target {target.label} fetch failed: {fetch.error}"
     if fetch.unchanged:
         if prior is None:
-            return None
+            return f"target {target.label} returned unchanged without prior artifact"
         prior.last_seen_at = datetime.now(UTC)
-        return prior, fetch
+        body = b""
+        if prior.object_key:
+            storage = S3Storage(settings)
+            body = await storage.get_bytes(prior.object_key)
+        return prior, body
     content_type = fetch.content_type or "application/octet-stream"
     artifact, _created, _hash = await record_fetched_artifact(
         session,
@@ -179,7 +183,7 @@ async def _fetch_target_artifact(
         upload_to_s3=True,
         settings=settings,
     )
-    return artifact, fetch
+    return artifact, fetch.body or b""
 
 
 async def _build_sandbox_payload(
@@ -253,6 +257,7 @@ async def run_extractor_for_source(
         if entry.extractor.key == assignment.extractor_key
     ]
     if not matches:
+        _record_failure(assignment, "assigned extractor not found in registry")
         return RepoExtractionOutcome(
             extractor_key=assignment.extractor_key,
             extractor_version=assignment.extractor_version,
@@ -267,6 +272,7 @@ async def run_extractor_for_source(
 
     capability_issues = check_extractor(registered.extractor, allowed_domain=domain)
     if capability_issues:
+        _record_failure(assignment, "; ".join(capability_issues))
         return RepoExtractionOutcome(
             extractor_key=registered.extractor.key,
             extractor_version=registered.extractor.version,
@@ -283,6 +289,7 @@ async def run_extractor_for_source(
     for target in registered.extractor.targets:
         url_issue = check_target_url(target.url, allowed_domain=domain)
         if url_issue is not None:
+            _record_failure(assignment, url_issue)
             return RepoExtractionOutcome(
                 extractor_key=registered.extractor.key,
                 extractor_version=registered.extractor.version,
@@ -296,23 +303,20 @@ async def run_extractor_for_source(
         fetched = await _fetch_target_artifact(
             session, source, target, settings=cfg
         )
-        if fetched is None:
+        if isinstance(fetched, str):
+            _record_failure(assignment, fetched)
             return RepoExtractionOutcome(
                 extractor_key=registered.extractor.key,
                 extractor_version=registered.extractor.version,
                 artifact_ids=artifact_ids,
                 rows=0,
                 status="failed",
-                error=f"failed to fetch target {target.label}",
+                error=fetched,
                 warnings=[],
                 duration_ms=0,
             )
-        artifact, _fetch = fetched
+        artifact, body = fetched
         artifact_ids.append(artifact.id)
-        body = b""
-        if artifact.object_key:
-            storage = S3Storage(cfg)
-            body = await storage.get_bytes(artifact.object_key)
         artifacts[target.label] = ExtractorArtifact(
             target_label=target.label,
             target_url=target.url,
@@ -338,6 +342,7 @@ async def run_extractor_for_source(
         heavy=heavy,
     )
     if not sandbox_result.ok or sandbox_result.result is None:
+        _record_failure(assignment, sandbox_result.error or "sandbox failed")
         return RepoExtractionOutcome(
             extractor_key=registered.extractor.key,
             extractor_version=registered.extractor.version,
@@ -351,6 +356,7 @@ async def run_extractor_for_source(
 
     output_issues = check_extractor_result(sandbox_result.result)
     if output_issues:
+        _record_failure(assignment, "; ".join(output_issues))
         return RepoExtractionOutcome(
             extractor_key=registered.extractor.key,
             extractor_version=registered.extractor.version,
@@ -424,14 +430,28 @@ async def run_extractor_for_source(
     if cfg.crawl_validate_after_extract:
         await validate_candidates(session, source_ids={source.id})
 
+    _schedule_next_run(assignment, success=created_rows > 0)
+    if created_rows > 0:
+        assignment.last_success_at = datetime.now(UTC)
+    else:
+        assignment.last_failure_at = datetime.now(UTC)
+        assignment.last_error = "extractor produced no schedule rows"
+
     await session.flush()
     return RepoExtractionOutcome(
         extractor_key=registered.extractor.key,
         extractor_version=registered.extractor.version,
         artifact_ids=artifact_ids,
         rows=created_rows,
-        status="succeeded",
-        error=None,
+        status="succeeded" if created_rows > 0 else "failed",
+        error=None if created_rows > 0 else "extractor produced no schedule rows",
         warnings=[w.message for w in sandbox_result.result.warnings],
         duration_ms=sandbox_result.duration_ms,
     )
+
+
+def _record_failure(assignment: SourceExtractorAssignment, error: str) -> None:
+    assignment.consecutive_failures += 1
+    assignment.last_failure_at = datetime.now(UTC)
+    assignment.last_error = error
+    assignment.last_run_at = datetime.now(UTC)
