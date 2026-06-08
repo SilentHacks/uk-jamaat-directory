@@ -23,9 +23,7 @@ class SandboxRunResult:
     raw_output: dict[str, Any] | None = None
 
 
-def _resolve_timeout_seconds(
-    extractor_kind_needs_heavy: bool, settings: Settings
-) -> float:
+def _resolve_timeout_seconds(extractor_kind_needs_heavy: bool, settings: Settings) -> float:
     if extractor_kind_needs_heavy:
         return float(getattr(settings, "repo_extractor_ocr_timeout_seconds", 120.0))
     return float(getattr(settings, "repo_extractor_timeout_seconds", 30.0))

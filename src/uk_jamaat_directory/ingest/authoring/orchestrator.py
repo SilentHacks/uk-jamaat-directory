@@ -73,9 +73,7 @@ from uk_jamaat_directory.models.core import (
 )
 
 SCRIPTS_PACKAGE = "uk_jamaat_directory.ingest.extract.repo_extractors.scripts"
-SCRIPTS_DIR = (
-    "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
-)
+SCRIPTS_DIR = "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
 
 
 @dataclass
@@ -87,8 +85,11 @@ class OrchestrationSummary:
     skipped_review: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
+    start_time: float = field(default_factory=time.monotonic)
+    processed: int = 0
 
     def as_dict(self) -> dict[str, object]:
+        elapsed = time.monotonic() - self.start_time
         return {
             "candidates": self.candidates,
             "preflight_ok": self.preflight_ok,
@@ -96,6 +97,8 @@ class OrchestrationSummary:
             "deployed": self.deployed,
             "skipped_review": self.skipped_review,
             "failed": self.failed,
+            "processed": self.processed,
+            "elapsed_seconds": round(elapsed, 1),
             "errors": list(self.errors),
         }
 
@@ -181,9 +184,7 @@ async def _existing_task(
 ) -> ExtractorAuthoringTask | None:
     return (
         await session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source_id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source_id)
         )
     ).scalar_one_or_none()
 
@@ -331,9 +332,7 @@ def _classify_agent_result(
     return base
 
 
-async def _run_post_sync(
-    session: AsyncSession, *, source_id: uuid.UUID
-) -> tuple[str, str | None]:
+async def _run_post_sync(session: AsyncSession, *, source_id: uuid.UUID) -> tuple[str, str | None]:
     """Run :func:`sync_repo_extractors` for one source and return the
     post-sync state.
     """
@@ -368,9 +367,7 @@ async def _process_one(
 ) -> None:
     async with semaphore:
         started = time.monotonic()
-        result = await _process_source(
-            session=session, source=source, settings=settings
-        )
+        result = await _process_source(session=session, source=source, settings=settings)
 
         task = await _existing_task(session, source.id)
         if task is None:
@@ -385,9 +382,7 @@ async def _process_one(
         task.extractor_key = result.extractor_key
         task.extractor_version = result.extractor_version
         task.script_path = result.script_path
-        task.validation_issues = [
-            {"issue": issue} for issue in result.validation_issues
-        ]
+        task.validation_issues = [{"issue": issue} for issue in result.validation_issues]
         task.agent_model = result.agent_model
         task.agent_command = result.agent_command
         task.agent_duration_ms = result.agent_duration_ms
@@ -400,13 +395,8 @@ async def _process_one(
             "source_url": source.source_url,
         }
 
-        if (
-            not dry_run
-            and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value
-        ):
-            post_status, post_error = await _run_post_sync(
-                session, source_id=source.id
-            )
+        if not dry_run and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
+            post_status, post_error = await _run_post_sync(session, source_id=source.id)
             task.status = post_status
             if post_error:
                 task.error = post_error
@@ -421,6 +411,7 @@ async def _process_one(
             summary.skipped_review += 1
         else:
             summary.failed += 1
+        summary.processed += 1
         if result.error:
             summary.errors.append(f"{source.id}: {result.error[:200]}")
 
@@ -438,9 +429,7 @@ async def _process_source(
     )
     extractor_version = datetime.now(UTC).strftime("%Y.%m.%d.1")
 
-    preflight = await preflight_source(
-        source_url=source.source_url or "", settings=settings
-    )
+    preflight = await preflight_source(source_url=source.source_url or "", settings=settings)
     if not preflight.reachable:
         return _SourceProcessResult(
             status=AuthoringTaskStatus.FAILED.value,
@@ -520,9 +509,7 @@ async def run_overnight_orchestrator(
     semaphore = asyncio.Semaphore(workers)
     summary = OrchestrationSummary()
 
-    sources = await _list_candidate_sources(
-        session, source_id=source_id, limit=limit
-    )
+    sources = await _list_candidate_sources(session, source_id=source_id, limit=limit)
     summary.candidates = len(sources)
     if on_progress is not None:
         await on_progress(summary)

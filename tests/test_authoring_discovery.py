@@ -9,26 +9,11 @@ from uk_jamaat_directory.ingest.authoring.discovery import (
 
 
 def test_classify_kind_from_content_type() -> None:
-    assert (
-        coerce_kind_from_content_type("text/html; charset=utf-8")
-        == AuthoringTargetKind.HTML
-    )
-    assert (
-        coerce_kind_from_content_type("application/pdf")
-        == AuthoringTargetKind.PDF
-    )
-    assert (
-        coerce_kind_from_content_type("image/png")
-        == AuthoringTargetKind.IMAGE
-    )
-    assert (
-        coerce_kind_from_content_type("application/json")
-        == AuthoringTargetKind.JSON
-    )
-    assert (
-        coerce_kind_from_content_type("application/octet-stream")
-        == AuthoringTargetKind.UNKNOWN
-    )
+    assert coerce_kind_from_content_type("text/html; charset=utf-8") == AuthoringTargetKind.HTML
+    assert coerce_kind_from_content_type("application/pdf") == AuthoringTargetKind.PDF
+    assert coerce_kind_from_content_type("image/png") == AuthoringTargetKind.IMAGE
+    assert coerce_kind_from_content_type("application/json") == AuthoringTargetKind.JSON
+    assert coerce_kind_from_content_type("application/octet-stream") == AuthoringTargetKind.UNKNOWN
 
 
 def test_looks_like_javascript_widget_when_text_empty() -> None:
@@ -63,19 +48,11 @@ def test_looks_like_javascript_widget_when_text_empty() -> None:
 
 
 def test_classify_kind_handles_blank_content_type() -> None:
-    assert (
-        coerce_kind_from_content_type("")
-        == AuthoringTargetKind.UNKNOWN
-    )
-    assert (
-        coerce_kind_from_content_type(None)
-        == AuthoringTargetKind.UNKNOWN
-    )
+    assert coerce_kind_from_content_type("") == AuthoringTargetKind.UNKNOWN
+    assert coerce_kind_from_content_type(None) == AuthoringTargetKind.UNKNOWN
 
 
 def test_settings_authoring_concurrency_default() -> None:
-    settings = Settings(
-        environment="test", database_url="postgresql+asyncpg://x/y"
-    )
+    settings = Settings(environment="test", database_url="postgresql+asyncpg://x/y")
     assert settings.authoring_concurrency >= 1
     assert settings.authoring_per_source_timeout_seconds > 0

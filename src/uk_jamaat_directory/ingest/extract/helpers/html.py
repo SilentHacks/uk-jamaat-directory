@@ -106,11 +106,7 @@ class _TableParser(HTMLParser):
 def extract_tables(html: str) -> list[Table]:
     parser = _TableParser()
     parser.feed(html)
-    rows = [
-        row[:]
-        for row in parser._rows
-        if any(cell.strip() for cell in row)
-    ]
+    rows = [row[:] for row in parser._rows if any(cell.strip() for cell in row)]
     return [Table(rows)]
 
 

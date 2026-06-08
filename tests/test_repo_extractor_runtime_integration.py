@@ -96,9 +96,7 @@ async def _seed_assignment(db_session, source: MosqueSource) -> SourceExtractorA
 
 
 @pytest.mark.asyncio
-async def test_sync_creates_assignment_for_matching_source(
-    db_session, test_settings
-) -> None:
+async def test_sync_creates_assignment_for_matching_source(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     _mosque, source = await _active_mosque_and_source(db_session)
@@ -128,9 +126,7 @@ async def test_sync_marks_missing_script(db_session, test_settings) -> None:
 
 
 @pytest.mark.asyncio
-async def test_due_source_listing_uses_assignment(
-    db_session, test_settings
-) -> None:
+async def test_due_source_listing_uses_assignment(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     _mosque, source = await _active_mosque_and_source(db_session)
@@ -142,9 +138,7 @@ async def test_due_source_listing_uses_assignment(
 
 
 @pytest.mark.asyncio
-async def test_process_source_runs_repo_extractor(
-    db_session, test_settings
-) -> None:
+async def test_process_source_runs_repo_extractor(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     mosque, source = await _active_mosque_and_source(db_session)
@@ -178,9 +172,7 @@ async def test_process_source_runs_repo_extractor(
             new=AsyncMock(),
         ),
     ):
-        result = await process_source(
-            db_session, source.id, settings=settings, force=True
-        )
+        result = await process_source(db_session, source.id, settings=settings, force=True)
 
     assert result.extracted is True
     assert result.candidates_created >= 3
@@ -188,10 +180,14 @@ async def test_process_source_runs_repo_extractor(
     assert result.error is None
 
     candidates = (
-        await db_session.execute(
-            select(ScheduleCandidate).where(ScheduleCandidate.source_id == source.id)
+        (
+            await db_session.execute(
+                select(ScheduleCandidate).where(ScheduleCandidate.source_id == source.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     prayers = sorted(c.prayer.value for c in candidates)
     assert "fajr" in prayers
     assert "jumuah" in prayers
@@ -201,10 +197,14 @@ async def test_process_source_runs_repo_extractor(
         assert candidate.evidence.get("gate_passed") is True
 
     runs = (
-        await db_session.execute(
-            select(ExtractionRun).where(ExtractionRun.source_id == source.id)
+        (
+            await db_session.execute(
+                select(ExtractionRun).where(ExtractionRun.source_id == source.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert any(r.extractor_version.startswith("repo:") for r in runs)
 
     assignment = await db_session.get(SourceExtractorAssignment, source.id)
@@ -214,9 +214,7 @@ async def test_process_source_runs_repo_extractor(
 
 
 @pytest.mark.asyncio
-async def test_process_source_handles_fetch_failure(
-    db_session, test_settings
-) -> None:
+async def test_process_source_handles_fetch_failure(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     _mosque, source = await _active_mosque_and_source(db_session)

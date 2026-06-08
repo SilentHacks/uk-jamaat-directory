@@ -80,41 +80,79 @@ def build_authoring_prompt(
            widgets, social-media profiles, or unrelated domains. If a link
            points off-site, ignore it.
 
-         3. Decide the target kind:
-            - ``html`` — a static HTML page with the timetable.
-            - ``rendered_html`` — the timetable is rendered client-side with
-              JavaScript (e.g. Flutter, React, Vue). The runtime uses
-              Playwright to fetch the fully-rendered DOM.
-            - ``pdf`` — a PDF file. The runtime downloads the PDF and passes
-              the raw bytes to the extractor.
-            - ``image`` — a screenshot or scan of a printed timetable
-              (skip authoring — OCR is not yet implemented).
-            - ``json`` — the timetable is served as JSON
-              (skip authoring until JSON extractors are supported).
+        3. Decide the target kind:
+           - ``html`` — a static HTML page with the timetable.
+           - ``rendered_html`` — the timetable is rendered client-side with
+             JavaScript (e.g. Flutter, React, Vue). The runtime uses
+             Playwright to fetch the fully-rendered DOM.
+           - ``pdf`` — a PDF file. The runtime downloads the PDF and passes
+             the raw bytes to the extractor.
+           - ``image`` — a screenshot or scan of a printed timetable.
+           - ``json`` — the timetable is served as JSON
+             (skip authoring until JSON extractors are supported).
 
-         4. Prefer the **broadest** timetable you can find:
-            - A **monthly** or **full-year** timetable is ideal.
-            - A **weekly** timetable is acceptable if you cannot find a
-              monthly one.
-            - A **daily-only** timetable (e.g. "Today's prayer times") is a
-              last resort.
-            If the first page you find only shows today or this week, keep
-            exploring links on the same domain for a monthly or full-year
-            version. Use the broadest one you discover before you run out of
-            page budget.
+        4. Prefer the **broadest** timetable you can find:
+           - A **monthly** or **full-year** timetable is ideal.
+           - A **weekly** timetable is acceptable if you cannot find a
+             monthly one.
+           - A **daily-only** timetable (e.g. "Today's prayer times") is a
+             last resort.
+           If the first page you find only shows today or this week, keep
+           exploring links on the same domain for a monthly or full-year
+           version. Use the broadest one you discover before you run out of
+           page budget.
 
-         5. If the target is ``html`` or ``rendered_html`` or ``pdf``, write a
-            single Python file at the ``Target script path`` above,
-            implementing one ``Extractor`` class. The file must satisfy every
-            requirement in the "Extractor contract" section below. Validate
-            locally with ``python -m uk_jamaat_directory.cli
-            validate-repo-extractor --extractor-key {extractor_key}`` before
-            finishing.
+        5. If the URL you find is month-specific (e.g. ``/june-2026`` or
+           ``/july-timetable``), try to find a pattern or a more stable URL
+           first. If there is no stable URL, write the script to construct
+           the URL dynamically based on the current date. For example,
+           ``f"https://{domain}/{{now.strftime('%B-%Y').lower()}}"`` or
+           ``f"https://{domain}/{{now.year}}/{{now.strftime('%m')}}"``.
+           You may also use ``relative.add_months`` to handle month
+           boundaries.
 
-         6. If the target is ``image`` or ``json``, do NOT write a script.
-            Just record the discovery.
+        6. **JAMAAT times are the goal.** The extractor must find **jamaat**
+           (also called **iqamah** or **congregation**) times. These are the
+           times when the congregation gathers for prayer. **Adhan** (also
+           called **azaan** or **athan**) or **start** times alone are NOT
+           sufficient. If the timetable only shows adhan/start times with no
+           jamaat/iqamah times, try harder:
+           - Look for a separate "jamaat" or "iqamah" column.
+           - Check if the page says "jamaat after adhan + X minutes".
+           - Look for a downloadable PDF or image that might have jamaat times.
+           - If absolutely no jamaat times can be found anywhere on the site,
+             set ``status=failed`` with reason ``no jamaat times found``.
 
-         7. When you are done, write a JSON file to the **exact path**
+        7. Check for **jumuah-only** mosques. If the mosque's timetable only
+           shows Jumuah (Friday prayer) and explicitly says "Jumuah only" or
+           "No daily prayers", the extractor should:
+           - Emit rows with ``prayer="jumuah"`` and ``session_number=1``
+             for the Jumuah time.
+           - Set ``no_schedule_reason="jumuah_only"`` on the result.
+           - Do NOT emit rows for Fajr, Dhuhr, Asr, Maghrib, Isha.
+           This is a valid outcome; set ``status=authored``.
+
+        8. If the target is ``html`` or ``rendered_html`` or ``pdf``, write a
+           single Python file at the ``Target script path`` above,
+           implementing one ``Extractor`` class. The file must satisfy every
+           requirement in the "Extractor contract" section below. Validate
+           locally with ``python -m uk_jamaat_directory.cli
+           validate-repo-extractor --extractor-key {extractor_key}`` before
+           finishing.
+
+        9. If the target is ``image``:
+           - Write the extractor script anyway. Set the target kind to
+             ``image`` and use ``requires_ocr=True``.
+           - The script should return ``ExtractorResult(rows=[],
+             no_schedule_reason="image target — awaiting OCR")``.
+           - The URL is preserved in the ``targets`` so a human can later
+             implement OCR and run the extractor again.
+           - Set ``status=authored``.
+
+        10. If the target is ``json``, do NOT write a script.
+            Just record the discovery with ``status=skipped_review``.
+
+        11. When you are done, write a JSON file to the **exact path**
             ``{result_path}``. The orchestrator reads this file after you
             finish — it is the only way the orchestrator knows what you did.
 
@@ -210,6 +248,35 @@ def build_authoring_prompt(
                 return ExtractorResult(rows=rows, warnings=warnings)
         ```
 
+        Image example (set ``requires_ocr=True``):
+
+        ```python
+        from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+            BaseMosqueWebsiteExtractor, ExtractContext, ExtractorResult,
+            RefreshPolicy, RunFrequency, SourceMatch, TargetSpec, TargetKind,
+        )
+
+        class Extractor(BaseMosqueWebsiteExtractor):
+            key = "{extractor_key}"
+            version = "YYYY.MM.DD.1"
+            source_match = SourceMatch(domains=("{domain}",))
+            refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
+            targets = (
+                TargetSpec(
+                    label="timetable",
+                    url="<the TARGET_URL you discovered>",
+                    kind=TargetKind.IMAGE,
+                    requires_ocr=True,
+                ),
+            )
+
+            def extract(self, ctx: ExtractContext) -> ExtractorResult:
+                return ExtractorResult(
+                    rows=[],
+                    no_schedule_reason="image target — awaiting OCR",
+                )
+        ```
+
         Constraints:
 
         - The script must implement exactly one ``Extractor`` class.
@@ -220,6 +287,8 @@ def build_authoring_prompt(
         - For ``rendered_html`` targets, set ``requires_javascript=True`` on
           the ``TargetSpec``.
         - For ``pdf`` targets, set ``requires_pdf=True`` on the
+          ``TargetSpec``.
+        - For ``image`` targets, set ``requires_ocr=True`` on the
           ``TargetSpec``.
         - The script must use ``ctx.evidence(...)`` for every emitted row.
         - For relative rules such as "Maghrib 5 minutes after adhan", use
@@ -237,13 +306,6 @@ def build_authoring_prompt(
         - ``prayers.parse_prayer_label``, ``prayers.is_jumuah_label``
         - ``relative.add_minutes``, ``relative.jamaat_after_start``,
           ``relative.parse_offset_minutes``
-
-        # PDF / image / OCR
-
-        OCR and image text extraction are not yet implemented in the runtime.
-        If the timetable is a screenshot or scan, set ``status=skipped_review``
-        with a ``reason`` like ``image target — ocr not yet implemented``.
-        The orchestrator will queue the source for a human.
 
         # Notes
 

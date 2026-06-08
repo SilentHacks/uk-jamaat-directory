@@ -84,9 +84,7 @@ async def latest_artifact_for_url(
     )
 
 
-def _is_repo_extractor_due(
-    assignment: SourceExtractorAssignment, *, now: datetime
-) -> bool:
+def _is_repo_extractor_due(assignment: SourceExtractorAssignment, *, now: datetime) -> bool:
     if assignment.status != "active":
         return False
     if assignment.next_run_at is None:
@@ -129,15 +127,11 @@ async def list_due_repo_extractor_source_ids(
     return due
 
 
-def _schedule_next_run(
-    assignment: SourceExtractorAssignment, *, success: bool
-) -> None:
+def _schedule_next_run(assignment: SourceExtractorAssignment, *, success: bool) -> None:
     now = datetime.now(UTC)
     assignment.last_run_at = now
     if success:
-        delta = SCHEDULE_DELTAS.get(
-            RunFrequency(assignment.run_frequency), timedelta(days=1)
-        )
+        delta = SCHEDULE_DELTAS.get(RunFrequency(assignment.run_frequency), timedelta(days=1))
         assignment.next_run_at = now + delta
         assignment.consecutive_failures = 0
     else:
@@ -157,9 +151,7 @@ async def _fetch_target_artifact(
     parsed = urlparse(target.url)
     if not parsed.netloc:
         return f"target {target.label} has no host"
-    prior = await latest_artifact_for_url(
-        session, source_id=source.id, fetched_url=target.url
-    )
+    prior = await latest_artifact_for_url(session, source_id=source.id, fetched_url=target.url)
     if target.requires_javascript:
         fetch = await fetch_rendered_html(
             target.url, settings=settings, timeout_seconds=settings.crawl_timeout_seconds
@@ -258,9 +250,7 @@ async def run_extractor_for_source(
     mosque = await session.get(Mosque, source.mosque_id) if source.mosque_id else None
     domain = normalize_domain(source.source_url)
     matches = [
-        entry
-        for entry in load_all_extractors()
-        if entry.extractor.key == assignment.extractor_key
+        entry for entry in load_all_extractors() if entry.extractor.key == assignment.extractor_key
     ]
     if not matches:
         _record_failure(assignment, "assigned extractor not found in registry")
@@ -306,9 +296,7 @@ async def run_extractor_for_source(
                 warnings=[],
                 duration_ms=0,
             )
-        fetched = await _fetch_target_artifact(
-            session, source, target, settings=cfg
-        )
+        fetched = await _fetch_target_artifact(session, source, target, settings=cfg)
         if isinstance(fetched, str):
             _record_failure(assignment, fetched)
             return RepoExtractionOutcome(
@@ -380,9 +368,7 @@ async def run_extractor_for_source(
         artifact_id=primary_artifact_id,
         source_id=source.id,
         kind=ExtractionKind.DETERMINISTIC,
-        extractor_version=(
-            f"repo:{registered.extractor.key}@{registered.extractor.version}"
-        ),
+        extractor_version=(f"repo:{registered.extractor.key}@{registered.extractor.version}"),
         status="succeeded" if sandbox_result.result.rows else "failed",
         score=None,
         started_at=datetime.now(UTC),

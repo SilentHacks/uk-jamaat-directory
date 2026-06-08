@@ -33,16 +33,12 @@ class TestRegistry:
         assert "synthetic_html_table" in keys
 
     def test_find_extractor_for_source_by_domain(self) -> None:
-        matches = find_extractor_for_source(
-            domain="synthetic.example", mosque_name=None
-        )
+        matches = find_extractor_for_source(domain="synthetic.example", mosque_name=None)
         keys = [m.extractor.key for m in matches]
         assert "synthetic_html_table" in keys
 
     def test_find_extractor_for_source_no_match(self) -> None:
-        matches = find_extractor_for_source(
-            domain="other.example", mosque_name="Synthetic Masjid"
-        )
+        matches = find_extractor_for_source(domain="other.example", mosque_name="Synthetic Masjid")
         assert all(m.extractor.key != "synthetic_html_table" for m in matches)
 
 
@@ -92,8 +88,7 @@ class TestStaticGates:
         from pathlib import Path
 
         source = Path(
-            "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
-            "/synthetic_html_table.py"
+            "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts/synthetic_html_table.py"
         ).read_text()
         result = check_script_source(source)
         assert result.ok, result.issues
@@ -101,16 +96,12 @@ class TestStaticGates:
 
 class TestCapabilityAndTargetGates:
     def test_target_url_must_be_same_domain(self) -> None:
-        issue = check_target_url(
-            "https://other.example/page", allowed_domain="mosque.example"
-        )
+        issue = check_target_url("https://other.example/page", allowed_domain="mosque.example")
         assert issue is not None
         assert "outside allowed domain" in issue
 
     def test_target_url_accepts_subdomain(self) -> None:
-        issue = check_target_url(
-            "https://www.mosque.example/page", allowed_domain="mosque.example"
-        )
+        issue = check_target_url("https://www.mosque.example/page", allowed_domain="mosque.example")
         assert issue is None
 
     def test_check_extractor_flags_no_targets(self) -> None:
@@ -119,9 +110,7 @@ class TestCapabilityAndTargetGates:
         original = entry.extractor.targets
         try:
             entry.extractor.targets = ()
-            issues = check_extractor(
-                entry.extractor, allowed_domain="synthetic.example"
-            )
+            issues = check_extractor(entry.extractor, allowed_domain="synthetic.example")
             assert any("no targets" in i for i in issues)
         finally:
             entry.extractor.targets = original

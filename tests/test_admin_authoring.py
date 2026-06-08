@@ -79,9 +79,7 @@ async def test_admin_list_authoring_tasks_returns_seeded_rows(
     assert response.status_code == 200
     payload = response.json()
     assert payload["count"] >= 1
-    item = next(
-        entry for entry in payload["items"] if entry["id"] == str(task.id)
-    )
+    item = next(entry for entry in payload["items"] if entry["id"] == str(task.id))
     assert item["status"] == AuthoringTaskStatus.AWAITING_REVIEW.value
     assert item["extractor_key"] == "authoring_test_draft"
     assert item["target_kind"] == "html"
@@ -106,6 +104,5 @@ async def test_admin_list_authoring_tasks_filters_by_status(
     payload = response.json()
     assert any(item["id"] == str(task.id) for item in payload["items"])
     assert all(
-        item["status"] == AuthoringTaskStatus.SKIPPED_REVIEW.value
-        for item in payload["items"]
+        item["status"] == AuthoringTaskStatus.SKIPPED_REVIEW.value for item in payload["items"]
     )

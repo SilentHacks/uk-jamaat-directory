@@ -52,17 +52,13 @@ def test_validate_draft_source_flags_banned_import() -> None:
 
 def test_validate_extractor_for_domain_synthetic() -> None:
     extractor = Extractor()
-    issues = validate_extractor_for_domain(
-        extractor=extractor, allowed_domain="synthetic.example"
-    )
+    issues = validate_extractor_for_domain(extractor=extractor, allowed_domain="synthetic.example")
     assert issues == []
 
 
 def test_validate_extractor_for_domain_rejects_other_domain() -> None:
     extractor = Extractor()
-    issues = validate_extractor_for_domain(
-        extractor=extractor, allowed_domain="other.example"
-    )
+    issues = validate_extractor_for_domain(extractor=extractor, allowed_domain="other.example")
     assert any("outside allowed domain" in issue for issue in issues)
 
 
@@ -78,9 +74,7 @@ def test_write_draft_to_scripts_creates_file(tmp_path: Path) -> None:
 
 def test_write_draft_to_scripts_rejects_empty_key(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
-        write_draft_to_scripts(
-            extractor_key="!!!", source="x", scripts_dir=str(tmp_path)
-        )
+        write_draft_to_scripts(extractor_key="!!!", source="x", scripts_dir=str(tmp_path))
 
 
 def test_target_kind_enum_values() -> None:

@@ -52,16 +52,13 @@ class SourceMatch(BaseModel):
                 return False
             normalized = domain.lower()
             if not any(
-                normalized == candidate.lower()
-                or normalized.endswith(f".{candidate.lower()}")
+                normalized == candidate.lower() or normalized.endswith(f".{candidate.lower()}")
                 for candidate in self.domains
             ):
                 return False
         if self.mosque_name_patterns and name:
             lowered = name.lower()
-            if not any(
-                pattern.lower() in lowered for pattern in self.mosque_name_patterns
-            ):
+            if not any(pattern.lower() in lowered for pattern in self.mosque_name_patterns):
                 return False
         return True
 

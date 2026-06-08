@@ -59,6 +59,7 @@ ALLOWED_MODULES: frozenset[str] = frozenset(
         "uk_jamaat_directory.domain",
         "uk_jamaat_directory.ingest.extract.repo_extractors.contract",
         "uk_jamaat_directory.ingest.extract.helpers.html",
+        "uk_jamaat_directory.ingest.extract.helpers.pdf",
         "uk_jamaat_directory.ingest.extract.helpers.times",
         "uk_jamaat_directory.ingest.extract.helpers.prayers",
         "uk_jamaat_directory.ingest.extract.helpers.relative",
@@ -159,17 +160,17 @@ def check_target_url(url: str, *, allowed_domain: str | None) -> str | None:
 
 def check_capabilities(
     extractor: BaseMosqueWebsiteExtractor,
+    *,
+    strict_ocr: bool = False,
 ) -> tuple[str, ...]:
     issues: list[str] = []
     for target in extractor.targets:
-        kind_value = (
-            target.kind.value if hasattr(target.kind, "value") else str(target.kind)
-        )
+        kind_value = target.kind.value if hasattr(target.kind, "value") else str(target.kind)
         if kind_value not in TARGET_KINDS:
             issues.append(f"unknown target kind: {kind_value}")
         if target.requires_pdf and not pdf_text_available():
             issues.append("target requires pdf but pymupdf is not installed")
-        if target.requires_ocr and not ocr_available():
+        if target.requires_ocr and not ocr_available() and strict_ocr:
             issues.append("target requires ocr but pytesseract is not installed")
         if target.requires_javascript and not render_html_available():
             issues.append("target requires rendered html but playwright is not installed")
@@ -192,7 +193,7 @@ def check_extractor(
         url_issue = check_target_url(target.url, allowed_domain=allowed_domain)
         if url_issue is not None:
             issues.append(url_issue)
-    issues.extend(check_capabilities(extractor))
+    issues.extend(check_capabilities(extractor, strict_ocr=False))
     return tuple(issues)
 
 

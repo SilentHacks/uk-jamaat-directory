@@ -482,9 +482,7 @@ class SourceExtractorAssignment(TimestampMixin, Base):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    consecutive_failures: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text)
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata",

@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 import uuid
 from collections.abc import Mapping
 from datetime import date
@@ -816,17 +817,11 @@ def main() -> None:
         raise SystemExit(asyncio.run(_run_sync_repo_extractors(args, settings)))
 
     if args.command == "author-repo-extractor":
-        raise SystemExit(
-            asyncio.run(_run_author_repo_extractor(args, settings))
-        )
+        raise SystemExit(asyncio.run(_run_author_repo_extractor(args, settings)))
     if args.command == "author-repo-extractors":
-        raise SystemExit(
-            asyncio.run(_run_author_repo_extractors(args, settings))
-        )
+        raise SystemExit(asyncio.run(_run_author_repo_extractors(args, settings)))
     if args.command == "orchestrate-authoring":
-        raise SystemExit(
-            asyncio.run(_run_orchestrate_authoring(args, settings))
-        )
+        raise SystemExit(asyncio.run(_run_orchestrate_authoring(args, settings)))
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
@@ -1523,8 +1518,10 @@ def _run_validate_repo_extractor(args: argparse.Namespace) -> int:
     module_file = parts[-1] + ".py"
     package_parts = parts[:-1]
     try:
-        text = resources.files(".".join(package_parts)).joinpath(module_file).read_text(
-            encoding="utf-8"
+        text = (
+            resources.files(".".join(package_parts))
+            .joinpath(module_file)
+            .read_text(encoding="utf-8")
         )
         source = text
     except (FileNotFoundError, ModuleNotFoundError):
@@ -1564,9 +1561,7 @@ def _run_validate_repo_extractors(args: argparse.Namespace) -> int:
     return 0
 
 
-async def _run_sync_repo_extractors(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_sync_repo_extractors(args: argparse.Namespace, settings: Settings) -> int:
     from uk_jamaat_directory.ingest.extract.repo_extractors.sync import (
         sync_repo_extractors,
     )
@@ -1633,9 +1628,7 @@ async def _build_authoring_prompt_for_source(
     return key, source.source_url, prompt
 
 
-async def _record_authoring_attempt(
-    session, source_id: uuid.UUID, *, extractor_key: str
-) -> None:
+async def _record_authoring_attempt(session, source_id: uuid.UUID, *, extractor_key: str) -> None:
     import uuid as _uuid
     from datetime import UTC, datetime
 
@@ -1663,9 +1656,7 @@ async def _record_authoring_attempt(
     await session.flush()
 
 
-async def _run_author_repo_extractor(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_author_repo_extractor(args: argparse.Namespace, settings: Settings) -> int:
     async with cli_db_session(settings) as session:
         result = await _build_authoring_prompt_for_source(
             session, args.source_id, extractor_key=args.extractor_key
@@ -1687,9 +1678,7 @@ async def _run_author_repo_extractor(
     return 0
 
 
-async def _run_author_repo_extractors(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_author_repo_extractors(args: argparse.Namespace, settings: Settings) -> int:
     from sqlalchemy import select
 
     from uk_jamaat_directory.domain import SourceType
@@ -1726,9 +1715,7 @@ async def _run_author_repo_extractors(
     return 0
 
 
-async def _run_orchestrate_authoring(
-    args: argparse.Namespace, settings: Settings
-) -> int:
+async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Settings) -> int:
     from uk_jamaat_directory.ingest.authoring.orchestrator import (
         run_overnight_orchestrator,
     )
@@ -1739,10 +1726,21 @@ async def _run_orchestrate_authoring(
         )
 
     async def _on_progress(summary) -> None:
+        elapsed = time.monotonic() - summary.start_time
+        processed = summary.processed
+        total = summary.candidates
+        pct = (processed / total * 100) if total else 0
+        avg = elapsed / processed if processed else 0
+        remaining = total - processed
+        eta = avg * remaining if avg else 0
         print(
-            f"  progress: candidates={summary.candidates} "
-            f"preflight_ok={summary.preflight_ok} authored={summary.authored} "
-            f"deployed={summary.deployed} skipped={summary.skipped_review} "
+            f"  [{processed}/{total}] {pct:.1f}% "
+            f"elapsed={elapsed:.0f}s "
+            f"eta={eta:.0f}s "
+            f"ok={summary.preflight_ok} "
+            f"authored={summary.authored} "
+            f"deployed={summary.deployed} "
+            f"skipped={summary.skipped_review} "
             f"failed={summary.failed}",
             flush=True,
         )

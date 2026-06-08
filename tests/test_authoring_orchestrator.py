@@ -133,9 +133,7 @@ async def test_orchestrator_marks_failed_when_preflight_unreachable(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    source = await _seed_source(
-        db_session, name="Unreachable", domain="unreachable.test"
-    )
+    source = await _seed_source(db_session, name="Unreachable", domain="unreachable.test")
     await db_session.flush()
     settings = _settings(crawl_enabled=True)
 
@@ -164,9 +162,7 @@ async def test_orchestrator_marks_failed_when_preflight_unreachable(
 
     task = (
         await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source.id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source.id)
         )
     ).scalar_one_or_none()
     assert task is not None
@@ -181,9 +177,7 @@ async def test_orchestrator_marks_skipped_review_when_agent_skips(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    source = await _seed_source(
-        db_session, name="PDF Mosque", domain="pdf.test"
-    )
+    source = await _seed_source(db_session, name="PDF Mosque", domain="pdf.test")
     await db_session.flush()
     settings = _settings(crawl_enabled=True)
 
@@ -233,9 +227,7 @@ async def test_orchestrator_marks_skipped_review_when_agent_skips(
 
     task = (
         await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source.id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source.id)
         )
     ).scalar_one_or_none()
     assert task is not None
@@ -247,15 +239,11 @@ async def test_orchestrator_marks_skipped_review_when_agent_skips(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_deploys_draft_when_agent_authored(
-    db_session, test_settings
-) -> None:
+async def test_orchestrator_deploys_draft_when_agent_authored(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     _cleanup_orphan_scripts()
-    source = await _seed_source(
-        db_session, name="Draft Masjid", domain="draft.test"
-    )
+    source = await _seed_source(db_session, name="Draft Masjid", domain="draft.test")
     await db_session.flush()
     settings = _settings(crawl_enabled=True)
 
@@ -268,9 +256,7 @@ async def test_orchestrator_deploys_draft_when_agent_authored(
         _safe_extractor_key,
     )
 
-    expected_key = _safe_extractor_key(
-        f"Draft Masjid_{str(source.id)[:8]}"
-    )
+    expected_key = _safe_extractor_key(f"Draft Masjid_{str(source.id)[:8]}")
     agent_script_path = os.path.join(SCRIPTS_DIR, f"{expected_key}.py")
 
     async def fake_run_authoring_agent(
@@ -317,9 +303,7 @@ async def test_orchestrator_deploys_draft_when_agent_authored(
 
     task = (
         await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source.id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source.id)
         )
     ).scalar_one_or_none()
     assert task is not None
@@ -332,9 +316,7 @@ async def test_orchestrator_deploys_draft_when_agent_authored(
     assert task.discovered_url == "https://draft.test/prayer-times"
     assert summary.deployed == 1
 
-    assignment = await db_session.get(
-        SourceExtractorAssignment, source.id
-    )
+    assignment = await db_session.get(SourceExtractorAssignment, source.id)
     assert assignment is not None
     assert assignment.extractor_key == "test_html_draft"
     _cleanup_orphan_scripts()
@@ -346,9 +328,7 @@ async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
-    source = await _seed_source(
-        db_session, name="No Status", domain="nostatus.test"
-    )
+    source = await _seed_source(db_session, name="No Status", domain="nostatus.test")
     await db_session.flush()
     settings = _settings(crawl_enabled=True)
 
@@ -389,9 +369,7 @@ async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
 
     task = (
         await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source.id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source.id)
         )
     ).scalar_one_or_none()
     assert task is not None
@@ -401,15 +379,11 @@ async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_marks_failed_when_validation_fails(
-    db_session, test_settings
-) -> None:
+async def test_orchestrator_marks_failed_when_validation_fails(db_session, test_settings) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     _cleanup_orphan_scripts()
-    source = await _seed_source(
-        db_session, name="Bad Draft", domain="baddraft.test"
-    )
+    source = await _seed_source(db_session, name="Bad Draft", domain="baddraft.test")
     await db_session.flush()
     settings = _settings(crawl_enabled=True)
 
@@ -418,9 +392,7 @@ async def test_orchestrator_marks_failed_when_validation_fails(
         _safe_extractor_key,
     )
 
-    expected_key = _safe_extractor_key(
-        f"Bad Draft_{str(source.id)[:8]}"
-    )
+    expected_key = _safe_extractor_key(f"Bad Draft_{str(source.id)[:8]}")
     bad_path = os.path.join(SCRIPTS_DIR, f"{expected_key}.py")
 
     bad_script = (
@@ -479,9 +451,7 @@ async def test_orchestrator_marks_failed_when_validation_fails(
 
     task = (
         await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == source.id
-            )
+            select(ExtractorAuthoringTask).where(ExtractorAuthoringTask.source_id == source.id)
         )
     ).scalar_one_or_none()
     assert task is not None

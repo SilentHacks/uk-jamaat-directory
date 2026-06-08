@@ -55,9 +55,7 @@ def coerce_kind_from_content_type(content_type: str | None) -> AuthoringTargetKi
     return AuthoringTargetKind.UNKNOWN
 
 
-def looks_like_javascript_widget(
-    *, content_type: str | None, body: bytes
-) -> bool:
+def looks_like_javascript_widget(*, content_type: str | None, body: bytes) -> bool:
     """Heuristic: HTML body that is mostly empty with a script tag suggests a
     JavaScript-rendered page. The agent can still try, but the orchestrator
     flags this up-front so the agent knows to expect a JS-rendered target.
@@ -71,9 +69,7 @@ def looks_like_javascript_widget(
     return "<script" in text and len(text) < 4_000
 
 
-async def preflight_source(
-    *, source_url: str, settings: Settings
-) -> PreFlightResult:
+async def preflight_source(*, source_url: str, settings: Settings) -> PreFlightResult:
     """Run a polite ``fetch_url`` to confirm the source is reachable."""
     domain = normalize_domain(source_url) or ""
     parsed = urlparse(source_url)

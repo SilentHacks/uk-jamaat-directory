@@ -25,9 +25,7 @@ RESULTS_DIR = Path("data/authoring_results")
 RESULT_SCHEMA_VERSION = "1.0"
 
 # Allowed statuses the agent may report.
-VALID_STATUSES: frozenset[str] = frozenset(
-    {"authored", "skipped_review", "failed"}
-)
+VALID_STATUSES: frozenset[str] = frozenset({"authored", "skipped_review", "failed"})
 
 
 class OpenCodeNotInstalledError(RuntimeError):
@@ -84,9 +82,7 @@ class AuthoringResultJson(BaseModel):
     target_url: str = Field(
         ..., description="The timetable URL the agent found (or the source URL)"
     )
-    target_kind: str = Field(
-        ..., description="html | pdf | image | rendered_html | json | unknown"
-    )
+    target_kind: str = Field(..., description="html | pdf | image | rendered_html | json | unknown")
     script_path: str | None = Field(
         default=None,
         description="Repo-relative path to the authored script (authored only)",

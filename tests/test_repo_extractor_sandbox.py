@@ -14,8 +14,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.runner import run_sandbo
 
 def _fixture_html() -> str:
     source = Path(
-        "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
-        "/synthetic_html_table.py"
+        "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts/synthetic_html_table.py"
     ).read_text()
     match = re.search(r"SYNTHETIC_FIXTURE\s*=\s*\"\"\"(.*?)\"\"\"", source, re.S)
     assert match is not None
@@ -49,9 +48,7 @@ def test_synthetic_extractor_is_registered() -> None:
 @pytest.mark.asyncio
 async def test_sandbox_runs_synthetic_extractor() -> None:
     payload = _payload(_fixture_html())
-    result = await run_sandbox(
-        payload["extractor_key"], payload, settings=get_settings()
-    )
+    result = await run_sandbox(payload["extractor_key"], payload, settings=get_settings())
     assert result.ok, result.error
     assert result.result is not None
     assert result.result.rows
@@ -72,9 +69,7 @@ async def test_sandbox_runs_synthetic_extractor() -> None:
 async def test_sandbox_handles_empty_artifact() -> None:
     payload = _payload("")
     payload["artifacts"]["timetable"]["body_hex"] = b"".hex()
-    result = await run_sandbox(
-        payload["extractor_key"], payload, settings=get_settings()
-    )
+    result = await run_sandbox(payload["extractor_key"], payload, settings=get_settings())
     assert result.ok
     assert result.result is not None
     assert result.result.rows == []

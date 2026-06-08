@@ -199,9 +199,7 @@ async def list_due_source_ids(
     return due
 
 
-async def _has_active_repo_assignment(
-    session: AsyncSession, source_id: uuid.UUID
-) -> bool:
+async def _has_active_repo_assignment(session: AsyncSession, source_id: uuid.UUID) -> bool:
     assignment = await session.get(SourceExtractorAssignment, source_id)
     return assignment is not None and assignment.status == "active"
 

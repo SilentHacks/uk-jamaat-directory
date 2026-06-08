@@ -48,9 +48,7 @@ class SyncResult:
     errors: list[str] = field(default_factory=list)
 
 
-async def _mosque_name_for_source(
-    session: AsyncSession, source: MosqueSource
-) -> str | None:
+async def _mosque_name_for_source(session: AsyncSession, source: MosqueSource) -> str | None:
     if source.mosque_id is None:
         return None
     mosque = await session.get(Mosque, source.mosque_id)

@@ -622,9 +622,7 @@ async def get_source_extractor(
 ) -> AdminExtractorResponse:
     source = await session.get(MosqueSource, source_id)
     if source is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
     return await _assignment_to_response(session, source)
 
 
@@ -642,9 +640,7 @@ async def sync_source_extractor(
 
     source = await session.get(MosqueSource, source_id)
     if source is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
     await sync_repo_extractors(session, source_id=source_id)
     await session.commit()
     return await _assignment_to_response(session, source)
@@ -662,9 +658,7 @@ async def disable_source_extractor(
 
     source = await session.get(MosqueSource, source_id)
     if source is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
     assignment = await session.get(SourceExtractorAssignment, source_id)
     if assignment is not None:
         assignment.status = "disabled"

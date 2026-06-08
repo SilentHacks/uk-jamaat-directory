@@ -64,9 +64,7 @@ async def run_authoring_agent(
     if settings.ai_agent_base_url:
         env.setdefault("OPENAI_BASE_URL", settings.ai_agent_base_url)
 
-    command_repr = (
-        f"opencode -m {model} run --format json <prompt:{len(prompt)} chars>"
-    )
+    command_repr = f"opencode -m {model} run --format json <prompt:{len(prompt)} chars>"
 
     start = time.monotonic()
     process = await asyncio.create_subprocess_exec(
@@ -83,9 +81,7 @@ async def run_authoring_agent(
         env=env,
     )
     try:
-        stdout_b, stderr_b = await asyncio.wait_for(
-            process.communicate(), timeout=timeout
-        )
+        stdout_b, stderr_b = await asyncio.wait_for(process.communicate(), timeout=timeout)
     except TimeoutError as exc:
         process.kill()
         await process.wait()

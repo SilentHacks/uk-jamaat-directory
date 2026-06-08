@@ -30,18 +30,13 @@ class TestHtmlHelpers:
         assert strip_tags("<p>hello <b>world</b></p>") == "hello world"
 
     def test_html_to_text_skips_scripts(self) -> None:
-        text = html_to_text(
-            "<div>visible<script>alert(1)</script>tail</div>"
-        )
+        text = html_to_text("<div>visible<script>alert(1)</script>tail</div>")
         assert "visible" in text
         assert "alert" not in text
         assert "tail" in text
 
     def test_extract_tables_returns_rows(self) -> None:
-        html = (
-            "<table><tr><th>A</th><th>B</th></tr>"
-            "<tr><td>1</td><td>2</td></tr></table>"
-        )
+        html = "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
         tables = extract_tables(html)
         assert len(tables) == 1
         assert tables[0].header == ["A", "B"]
