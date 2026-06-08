@@ -156,6 +156,7 @@ async def _list_candidate_sources(
     *,
     source_id: uuid.UUID | None = None,
     limit: int | None = None,
+    skip_failed: bool = False,
 ) -> list[MosqueSource]:
     stmt = (
         select(MosqueSource)
@@ -175,6 +176,17 @@ async def _list_candidate_sources(
         assignment = await session.get(SourceExtractorAssignment, source.id)
         if assignment is not None and assignment.status == "active":
             continue
+        # Resume support: skip sources already processed (unless failed)
+        existing_task = await _existing_task(session, source.id)
+        if existing_task is not None:
+            if existing_task.status in {
+                AuthoringTaskStatus.DEPLOYED.value,
+                AuthoringTaskStatus.AWAITING_REVIEW.value,
+                AuthoringTaskStatus.SKIPPED_REVIEW.value,
+            }:
+                continue
+            if skip_failed and existing_task.status == AuthoringTaskStatus.FAILED.value:
+                continue
         eligible.append(source)
     return eligible
 
@@ -341,11 +353,15 @@ async def _run_post_sync(session: AsyncSession, *, source_id: uuid.UUID) -> tupl
     await session.flush()
     assignment = await session.get(SourceExtractorAssignment, source_id)
     if assignment is None:
-        invalid = "; ".join(
-            item.get("issues", ["invalid"])
-            for item in sync_result.invalid
-            if item.get("source_id") == str(source_id)
-        )
+        issues: list[str] = []
+        for item in sync_result.invalid:
+            if item.get("source_id") == str(source_id):
+                raw = item.get("issues", ["invalid"])
+                if isinstance(raw, list):
+                    issues.extend(raw)
+                else:
+                    issues.append(str(raw))
+        invalid = "; ".join(issues) if issues else None
         return (
             AuthoringTaskStatus.FAILED.value,
             invalid or "no assignment created",
@@ -367,54 +383,82 @@ async def _process_one(
 ) -> None:
     async with semaphore:
         started = time.monotonic()
-        async with session_factory() as session:
-            result = await _process_source(session=session, source=source, settings=settings)
+        task_status = AuthoringTaskStatus.FAILED.value
+        task_error: str | None = None
+        try:
+            async with session_factory() as session:
+                result = await _process_source(session=session, source=source, settings=settings)
 
-            task = await _existing_task(session, source.id)
-            if task is None:
-                task = ExtractorAuthoringTask(
-                    id=uuid.uuid4(),
-                    source_id=source.id,
-                )
-                session.add(task)
-            task.status = result.status
-            task.discovered_url = result.discovered_url
-            task.target_kind = result.target_kind
-            task.extractor_key = result.extractor_key
-            task.extractor_version = result.extractor_version
-            task.script_path = result.script_path
-            task.validation_issues = [{"issue": issue} for issue in result.validation_issues]
-            task.agent_model = result.agent_model
-            task.agent_command = result.agent_command
-            task.agent_duration_ms = result.agent_duration_ms
-            task.agent_stdout_excerpt = result.agent_stdout_excerpt
-            task.error = result.error
-            task.started_at = datetime.now(UTC)
-            task.finished_at = datetime.now(UTC)
-            task.metadata_ = {
-                "duration_ms": int((time.monotonic() - started) * 1000),
-                "source_url": source.source_url,
-            }
+                task = await _existing_task(session, source.id)
+                if task is None:
+                    task = ExtractorAuthoringTask(
+                        id=uuid.uuid4(),
+                        source_id=source.id,
+                    )
+                    session.add(task)
+                task.status = result.status
+                task.discovered_url = result.discovered_url
+                task.target_kind = result.target_kind
+                task.extractor_key = result.extractor_key
+                task.extractor_version = result.extractor_version
+                task.script_path = result.script_path
+                task.validation_issues = [{"issue": issue} for issue in result.validation_issues]
+                task.agent_model = result.agent_model
+                task.agent_command = result.agent_command
+                task.agent_duration_ms = result.agent_duration_ms
+                task.agent_stdout_excerpt = result.agent_stdout_excerpt
+                task.error = result.error
+                task.started_at = datetime.now(UTC)
+                task.finished_at = datetime.now(UTC)
+                task.metadata_ = {
+                    "duration_ms": int((time.monotonic() - started) * 1000),
+                    "source_url": source.source_url,
+                }
 
-            if not dry_run and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
-                post_status, post_error = await _run_post_sync(session, source_id=source.id)
-                task.status = post_status
-                if post_error:
-                    task.error = post_error
+                if not dry_run and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
+                    try:
+                        post_status, post_error = await _run_post_sync(session, source_id=source.id)
+                        task.status = post_status
+                        if post_error:
+                            task.error = post_error
+                    except Exception as post_exc:
+                        task.status = AuthoringTaskStatus.FAILED.value
+                        task.error = f"post-sync failed: {post_exc}"
 
-            await session.commit()
+                await session.commit()
+                task_status = task.status
+                task_error = task.error
+        except Exception as exc:
+            task_error = f"unhandled exception: {exc}"
+            try:
+                async with session_factory() as session:
+                    task = await _existing_task(session, source.id)
+                    if task is None:
+                        task = ExtractorAuthoringTask(
+                            id=uuid.uuid4(),
+                            source_id=source.id,
+                        )
+                        session.add(task)
+                    task.status = AuthoringTaskStatus.FAILED.value
+                    task.error = task_error
+                    task.started_at = datetime.now(UTC)
+                    task.finished_at = datetime.now(UTC)
+                    task.metadata_ = {"source_url": source.source_url}
+                    await session.commit()
+            except Exception:
+                pass
 
-        if task.status == AuthoringTaskStatus.DEPLOYED.value:
+        if task_status == AuthoringTaskStatus.DEPLOYED.value:
             summary.deployed += 1
-        elif task.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
+        elif task_status == AuthoringTaskStatus.AWAITING_REVIEW.value:
             summary.authored += 1
-        elif task.status == AuthoringTaskStatus.SKIPPED_REVIEW.value:
+        elif task_status == AuthoringTaskStatus.SKIPPED_REVIEW.value:
             summary.skipped_review += 1
         else:
             summary.failed += 1
         summary.processed += 1
-        if result.error:
-            summary.errors.append(f"{source.id}: {result.error[:200]}")
+        if task_error:
+            summary.errors.append(f"{source.id}: {task_error[:200]}")
 
 
 async def _process_source(
@@ -503,6 +547,7 @@ async def run_overnight_orchestrator(
     limit: int | None = None,
     concurrency: int | None = None,
     dry_run: bool = False,
+    skip_failed: bool = False,
     on_progress: Callable[[OrchestrationSummary], Awaitable[None]] | None = None,
 ) -> OrchestrationSummary:
     cfg = settings or get_settings()
@@ -510,7 +555,9 @@ async def run_overnight_orchestrator(
     semaphore = asyncio.Semaphore(workers)
     summary = OrchestrationSummary()
 
-    sources = await _list_candidate_sources(session, source_id=source_id, limit=limit)
+    sources = await _list_candidate_sources(
+        session, source_id=source_id, limit=limit, skip_failed=skip_failed
+    )
     summary.candidates = len(sources)
     if on_progress is not None:
         await on_progress(summary)
