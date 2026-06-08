@@ -109,6 +109,57 @@ def test_mosque_website_requires_manual_approval() -> None:
             result,
             extraction_kind=ExtractionKind.DETERMINISTIC,
             source=source,
+            candidate=candidate,
+        )
+        == CandidateStatus.PENDING
+    )
+
+
+def test_mosque_website_with_gate_evidence_auto_approves() -> None:
+    from uk_jamaat_directory.config import Settings, get_settings
+
+    candidate = _candidate()
+    candidate.evidence = {
+        "contract": "repo_site_extractor/v1",
+        "gate_passed": True,
+        "extractor_key": "synthetic_html_table",
+    }
+    source = _source()
+    source.source_type = SourceType.MOSQUE_WEBSITE
+    settings = Settings(
+        **{**get_settings().model_dump(), "repo_extractor_auto_approve_candidates": True}
+    )
+    result = validate_candidate(candidate, mosque=_mosque(), source=source, settings=settings)
+    assert result.is_valid
+    assert (
+        status_after_validation(
+            result,
+            extraction_kind=ExtractionKind.DETERMINISTIC,
+            source=source,
+            candidate=candidate,
+            settings=settings,
+        )
+        == CandidateStatus.APPROVED
+    )
+
+
+def test_mosque_website_without_gate_evidence_stays_pending_even_when_auto_enabled() -> None:
+    from uk_jamaat_directory.config import Settings, get_settings
+
+    candidate = _candidate()
+    source = _source()
+    source.source_type = SourceType.MOSQUE_WEBSITE
+    settings = Settings(
+        **{**get_settings().model_dump(), "repo_extractor_auto_approve_candidates": True}
+    )
+    result = validate_candidate(candidate, mosque=_mosque(), source=source, settings=settings)
+    assert (
+        status_after_validation(
+            result,
+            extraction_kind=ExtractionKind.DETERMINISTIC,
+            source=source,
+            candidate=candidate,
+            settings=settings,
         )
         == CandidateStatus.PENDING
     )

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uk_jamaat_directory.api.deps import require_admin_key
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.domain import CandidateStatus
-from uk_jamaat_directory.ingest.extract.ai.agent_orchestrator import profile_single_source
 from uk_jamaat_directory.models.core import MosqueSource
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
@@ -23,6 +22,8 @@ from uk_jamaat_directory.schemas.admin import (
     AdminDiscoveryLeadCreate,
     AdminDiscoveryLeadResponse,
     AdminDuplicateBucket,
+    AdminExtractorListResponse,
+    AdminExtractorResponse,
     AdminIdentityActionResponse,
     AdminIdentityOverlapItem,
     AdminIdentityQualityResponse,
@@ -34,8 +35,6 @@ from uk_jamaat_directory.schemas.admin import (
     AdminMosqueMerge,
     AdminMosqueResponse,
     AdminMosqueUpdate,
-    AdminProfileResponse,
-    AdminProfileTriggerResponse,
     AdminSourceAttach,
     AdminSourceHealthItem,
     AdminSourceHealthResponse,
@@ -576,63 +575,136 @@ async def get_source_health(
     return AdminSourceHealthResponse(items=items, count=total)
 
 
-@router.get("/sources/{source_id}/profile", response_model=AdminProfileResponse)
-async def get_source_profile(
+async def _assignment_to_response(session, source: MosqueSource) -> AdminExtractorResponse:
+    from uk_jamaat_directory.models.core import SourceExtractorAssignment
+
+    assignment = await session.get(SourceExtractorAssignment, source.id)
+    if assignment is None:
+        return AdminExtractorResponse(
+            source_id=source.id,
+            extractor_key=None,
+            extractor_version=None,
+            status="unassigned",
+            run_frequency="manual",
+            run_timezone="Europe/London",
+            next_run_at=None,
+            last_run_at=None,
+            last_success_at=None,
+            last_failure_at=None,
+            consecutive_failures=0,
+            last_error=None,
+        )
+    return AdminExtractorResponse(
+        source_id=source.id,
+        extractor_key=assignment.extractor_key,
+        extractor_version=assignment.extractor_version,
+        status=assignment.status,
+        run_frequency=assignment.run_frequency,
+        run_timezone=assignment.run_timezone,
+        next_run_at=assignment.next_run_at,
+        last_run_at=assignment.last_run_at,
+        last_success_at=assignment.last_success_at,
+        last_failure_at=assignment.last_failure_at,
+        consecutive_failures=assignment.consecutive_failures,
+        last_error=assignment.last_error,
+    )
+
+
+@router.get(
+    "/sources/{source_id}/extractor",
+    response_model=AdminExtractorResponse,
+)
+async def get_source_extractor(
     source_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
-) -> AdminProfileResponse:
+) -> AdminExtractorResponse:
     source = await session.get(MosqueSource, source_id)
     if source is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
-
-    profile = (source.metadata_ or {}).get("extraction_profile", {})
-    return AdminProfileResponse(
-        source_id=source.id,
-        profile_status=(source.metadata_ or {}).get("profile_status", "pending"),
-        asset_type=profile.get("asset_type", "unknown"),
-        timetable_url=profile.get("timetable_url"),
-        confidence=profile.get("confidence", 0.0),
-        review_notes=profile.get("review_notes", ""),
-        extraction_run_id=None,
-        model=(source.metadata_ or {}).get("profile_model"),
-        profiled_at=None,
-    )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
+        )
+    return await _assignment_to_response(session, source)
 
 
-@router.post("/sources/{source_id}/profile", response_model=AdminProfileTriggerResponse)
-async def trigger_source_profile(
+@router.post(
+    "/sources/{source_id}/extractor/sync",
+    response_model=AdminExtractorResponse,
+)
+async def sync_source_extractor(
     source_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
-) -> AdminProfileTriggerResponse:
-    from uk_jamaat_directory.config import get_settings
-
-    settings = get_settings()
-    result = await profile_single_source(session, source_id, settings)
+) -> AdminExtractorResponse:
+    from uk_jamaat_directory.ingest.extract.repo_extractors.sync import (
+        sync_repo_extractors,
+    )
 
     source = await session.get(MosqueSource, source_id)
-    profile = result.profile
-
-    if result.parse_errors:
-        return AdminProfileTriggerResponse(
-            source_id=source_id,
-            profile_status="failed",
-            asset_type="unknown",
-            timetable_url=None,
-            confidence=0.0,
-            review_notes="; ".join(result.parse_errors),
-            extraction_run_id=None,
-            warnings=[],
-            errors=result.parse_errors,
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
         )
+    await sync_repo_extractors(session, source_id=source_id)
+    await session.commit()
+    return await _assignment_to_response(session, source)
 
-    return AdminProfileTriggerResponse(
-        source_id=source_id,
-        profile_status=(source.metadata_ or {}).get("profile_status", "review_needed"),
-        asset_type=profile.asset_type,
-        timetable_url=profile.timetable_url,
-        confidence=profile.confidence,
-        review_notes=profile.review_notes,
-        extraction_run_id=None,
-        warnings=[],
-        errors=[],
-    )
+
+@router.post(
+    "/sources/{source_id}/extractor/disable",
+    response_model=AdminExtractorResponse,
+)
+async def disable_source_extractor(
+    source_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminExtractorResponse:
+    from uk_jamaat_directory.models.core import SourceExtractorAssignment
+
+    source = await session.get(MosqueSource, source_id)
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Source not found"
+        )
+    assignment = await session.get(SourceExtractorAssignment, source_id)
+    if assignment is not None:
+        assignment.status = "disabled"
+        await session.commit()
+    return await _assignment_to_response(session, source)
+
+
+@router.get("/extractors", response_model=AdminExtractorListResponse)
+async def list_extractors(
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminExtractorListResponse:
+    from sqlalchemy import select
+
+    from uk_jamaat_directory.models.core import SourceExtractorAssignment
+
+    stmt = select(SourceExtractorAssignment)
+    if status_filter is not None:
+        stmt = stmt.where(SourceExtractorAssignment.status == status_filter)
+    stmt = stmt.order_by(SourceExtractorAssignment.source_id).offset(offset).limit(limit)
+    assignments = (await session.execute(stmt)).scalars().all()
+    items: list[AdminExtractorResponse] = []
+    for assignment in assignments:
+        source = await session.get(MosqueSource, assignment.source_id)
+        if source is None:
+            continue
+        items.append(
+            AdminExtractorResponse(
+                source_id=source.id,
+                extractor_key=assignment.extractor_key,
+                extractor_version=assignment.extractor_version,
+                status=assignment.status,
+                run_frequency=assignment.run_frequency,
+                run_timezone=assignment.run_timezone,
+                next_run_at=assignment.next_run_at,
+                last_run_at=assignment.last_run_at,
+                last_success_at=assignment.last_success_at,
+                last_failure_at=assignment.last_failure_at,
+                consecutive_failures=assignment.consecutive_failures,
+                last_error=assignment.last_error,
+            )
+        )
+    return AdminExtractorListResponse(items=items, count=len(items))

@@ -10,9 +10,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.domain import FreshnessStatus, SourceType
 from uk_jamaat_directory.ingest.artifacts import latest_artifact_for_source, record_fetched_artifact
+from uk_jamaat_directory.ingest.extract.repo_extractors.runtime import (
+    RepoExtractionOutcome,
+    _schedule_next_run,
+    list_due_repo_extractor_source_ids,
+    run_extractor_for_source,
+)
 from uk_jamaat_directory.ingest.extract.runner import ExtractionRunResult, run_extraction
 from uk_jamaat_directory.ingest.fetch import fetch_url
-from uk_jamaat_directory.models.core import ExtractionRun, MosqueSource, SourceHealth
+from uk_jamaat_directory.models.core import (
+    ExtractionRun,
+    MosqueSource,
+    SourceExtractorAssignment,
+    SourceHealth,
+)
 
 
 @dataclass
@@ -26,6 +37,9 @@ class ProcessSourceResult:
     skipped_reason: str | None = None
     error: str | None = None
     warnings: list[str] = field(default_factory=list)
+    extractor_key: str | None = None
+    extractor_version: str | None = None
+    target_count: int = 0
 
 
 def _crawl_enabled_for_source(source: MosqueSource, settings: Settings) -> bool:
@@ -156,6 +170,10 @@ async def list_due_source_ids(
     if not cfg.crawl_enabled:
         return []
 
+    repo_due = await list_due_repo_extractor_source_ids(session, settings=cfg)
+    if repo_due:
+        return repo_due
+
     now = datetime.now(UTC)
     sources = (
         (
@@ -181,6 +199,50 @@ async def list_due_source_ids(
     return due
 
 
+async def _has_active_repo_assignment(
+    session: AsyncSession, source_id: uuid.UUID
+) -> bool:
+    assignment = await session.get(SourceExtractorAssignment, source_id)
+    return assignment is not None and assignment.status == "active"
+
+
+async def _apply_repo_extraction_outcome(
+    session: AsyncSession,
+    source: MosqueSource,
+    *,
+    settings: Settings,
+    result: ProcessSourceResult,
+    outcome: RepoExtractionOutcome,
+) -> ProcessSourceResult:
+    assignment = await session.get(SourceExtractorAssignment, source.id)
+    success = outcome.status == "succeeded"
+    result.extracted = success
+    result.candidates_created = outcome.rows
+    result.extractor_key = outcome.extractor_key or None
+    result.extractor_version = outcome.extractor_version or None
+    result.target_count = len(outcome.artifact_ids)
+    result.warnings.extend(outcome.warnings)
+    if outcome.error:
+        result.error = outcome.error
+    if assignment is not None:
+        _schedule_next_run(assignment, success=success)
+        if success:
+            assignment.last_success_at = datetime.now(UTC)
+        else:
+            assignment.last_failure_at = datetime.now(UTC)
+            assignment.last_error = outcome.error
+    health = await _touch_source_health(
+        session,
+        source.id,
+        success=success,
+        message=outcome.error or "repo extractor run completed",
+    )
+    if not success and health.consecutive_failures >= 3 and assignment is not None:
+        assignment.status = "failed_validation"
+    await session.flush()
+    return result
+
+
 async def process_source(
     session: AsyncSession,
     source_id: uuid.UUID,
@@ -199,6 +261,12 @@ async def process_source(
     if not _crawl_enabled_for_source(source, cfg):
         result.skipped_reason = "crawl disabled"
         return result
+
+    if await _has_active_repo_assignment(session, source.id):
+        outcome = await run_extractor_for_source(session, source, settings=cfg)
+        return await _apply_repo_extraction_outcome(
+            session, source, settings=cfg, result=result, outcome=outcome
+        )
 
     now = datetime.now(UTC)
     if not force and not _is_due(source, now=now):

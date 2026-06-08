@@ -411,6 +411,34 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Profile even sources that already have a ready profile",
     )
 
+    subparsers.add_parser(
+        "list-repo-extractors",
+        help="List repo-owned extractor scripts and their gates",
+    )
+
+    validate_extractor = subparsers.add_parser(
+        "validate-repo-extractor",
+        help="Run static, capability, and contract gates on one repo extractor",
+    )
+    validate_extractor.add_argument(
+        "--extractor-key",
+        required=True,
+        help="Extractor key (matches module filename under repo_extractors/scripts)",
+    )
+
+    subparsers.add_parser(
+        "validate-repo-extractors",
+        help="Run gates on every registered repo extractor",
+    )
+
+    sync_extractors = subparsers.add_parser(
+        "sync-repo-extractors",
+        help="Match repo extractors to mosque_website sources and upsert assignments",
+    )
+    sync_extractors.add_argument("--source-id", type=uuid.UUID, default=None)
+    sync_extractors.add_argument("--extractor-key", default=None)
+    sync_extractors.add_argument("--dry-run", action="store_true")
+
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
     generate_exports = subparsers.add_parser(
@@ -782,6 +810,15 @@ def main() -> None:
 
     if args.command == "profile-agent-sources":
         raise SystemExit(asyncio.run(_run_profile_agent_sources(args, settings)))
+
+    if args.command == "list-repo-extractors":
+        raise SystemExit(_run_list_repo_extractors(args))
+    if args.command == "validate-repo-extractor":
+        raise SystemExit(_run_validate_repo_extractor(args))
+    if args.command == "validate-repo-extractors":
+        raise SystemExit(_run_validate_repo_extractors(args))
+    if args.command == "sync-repo-extractors":
+        raise SystemExit(asyncio.run(_run_sync_repo_extractors(args, settings)))
 
     if args.command == "generate-exports":
         raise SystemExit(asyncio.run(_run_generate_exports(args, settings)))
@@ -1458,3 +1495,130 @@ async def _run_profile_agent_sources(args: argparse.Namespace, settings: Setting
         print(f"  output_dir: {result.output_dir}")
 
     return 0 if result.failed == 0 else 1
+
+
+def _run_list_repo_extractors(args: argparse.Namespace) -> int:
+    from uk_jamaat_directory.ingest.extract.repo_extractors.registry import (
+        load_all_extractors,
+    )
+    from uk_jamaat_directory.ingest.extract.repo_extractors.validator import (
+        check_capabilities,
+        validate_refresh_policy,
+        validate_source_match,
+    )
+
+    entries = load_all_extractors()
+    for entry in entries:
+        ext = entry.extractor
+        issues = list(validate_source_match(ext.source_match))
+        issues.extend(validate_refresh_policy(ext.refresh_policy))
+        issues.extend(check_capabilities(ext))
+        status = "ok" if not issues else "issues"
+        print(
+            f"{ext.key}@{ext.version} [{status}] "
+            f"freq={ext.refresh_policy.frequency.value} "
+            f"domains={','.join(ext.source_match.domains) or '-'} "
+            f"targets={len(ext.targets)}"
+        )
+        for issue in issues:
+            print(f"  issue: {issue}")
+    return 0
+
+
+def _run_validate_repo_extractor(args: argparse.Namespace) -> int:
+    from importlib import resources
+
+    from uk_jamaat_directory.ingest.extract.repo_extractors.registry import (
+        load_all_extractors,
+    )
+    from uk_jamaat_directory.ingest.extract.repo_extractors.validator import (
+        check_capabilities,
+        check_script_source,
+        validate_refresh_policy,
+        validate_source_match,
+    )
+
+    entries = [e for e in load_all_extractors() if e.extractor.key == args.extractor_key]
+    if not entries:
+        print(f"error: extractor not found: {args.extractor_key}", file=sys.stderr)
+        return 2
+    entry = entries[0]
+    parts = entry.module_name.split(".")
+    module_file = parts[-1] + ".py"
+    package_parts = parts[:-1]
+    try:
+        text = resources.files(".".join(package_parts)).joinpath(module_file).read_text(
+            encoding="utf-8"
+        )
+        source = text
+    except (FileNotFoundError, ModuleNotFoundError):
+        print(
+            f"error: source not found for {args.extractor_key}",
+            file=sys.stderr,
+        )
+        return 2
+    static = check_script_source(source)
+    issues = list(static.issues)
+    issues.extend(validate_source_match(entry.extractor.source_match))
+    issues.extend(validate_refresh_policy(entry.extractor.refresh_policy))
+    issues.extend(check_capabilities(entry.extractor))
+    if issues:
+        for issue in issues:
+            print(f"  issue: {issue}")
+        print(f"failed: {entry.extractor.key}")
+        return 1
+    print(f"ok: {entry.extractor.key}@{entry.extractor.version}")
+    return 0
+
+
+def _run_validate_repo_extractors(args: argparse.Namespace) -> int:
+    from uk_jamaat_directory.ingest.extract.repo_extractors.registry import (
+        load_all_extractors,
+    )
+
+    failed: list[str] = []
+    for entry in load_all_extractors():
+        args.extractor_key = entry.extractor.key
+        result = _run_validate_repo_extractor(args)
+        if result != 0:
+            failed.append(entry.extractor.key)
+    if failed:
+        print(f"failed: {', '.join(failed)}", file=sys.stderr)
+        return 1
+    return 0
+
+
+async def _run_sync_repo_extractors(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from uk_jamaat_directory.ingest.extract.repo_extractors.sync import (
+        sync_repo_extractors,
+    )
+
+    async with cli_db_session(settings) as session:
+        result = await sync_repo_extractors(
+            session,
+            source_id=args.source_id,
+            extractor_key=args.extractor_key,
+        )
+
+    print(
+        f"upserted={len(result.upserted)} "
+        f"matched_zero={len(result.matched_zero)} "
+        f"matched_multiple={len(result.matched_multiple)} "
+        f"invalid={len(result.invalid)} "
+        f"marked_missing={len(result.marked_missing)}"
+    )
+    for entry in result.upserted:
+        print(f"  upserted: {entry}")
+    for entry in result.matched_zero:
+        print(f"  matched_zero: {entry}")
+    for entry in result.matched_multiple:
+        print(f"  matched_multiple: {entry}")
+    for entry in result.invalid:
+        print(f"  invalid: {entry}")
+    for entry in result.marked_missing:
+        print(f"  marked_missing: {entry}")
+    if args.dry_run:
+        print("dry-run: not committing")
+    return 0

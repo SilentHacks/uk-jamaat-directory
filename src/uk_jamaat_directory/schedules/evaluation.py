@@ -64,6 +64,8 @@ def evaluate_candidate_in_context(
         validation,
         extraction_kind=extraction_kind,
         source=source,
+        candidate=candidate,
+        settings=cfg,
     )
     return CandidateEvaluation(
         validation=validation,

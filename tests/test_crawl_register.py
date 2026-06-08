@@ -48,7 +48,7 @@ async def test_creates_mosque_website_for_active_mosque(db_session, test_setting
     assert source.confidence == Confidence.OFFICIAL_IMPORT
     assert source.metadata_["crawl_enabled"] is True
     assert source.metadata_["homepage_url"] == "https://website-test.example.org/some/path"
-    assert source.metadata_["profile_status"] == "pending"
+    assert "profile_status" not in source.metadata_
     assert source.metadata_["allowed_crawl_paths"] == ["/"]
 
 

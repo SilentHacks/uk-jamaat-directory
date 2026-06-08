@@ -216,13 +216,26 @@ def _append_dst_warnings(
 def _requires_manual_approval(
     source: MosqueSource | None,
     extraction_kind: ExtractionKind | None,
+    *,
+    candidate: ScheduleCandidate | None = None,
+    settings: Settings | None = None,
 ) -> bool:
     if extraction_kind == ExtractionKind.AI:
         return True
     if source is not None and source.source_type == SourceType.COMMUNITY:
         return True
     if source is not None and source.source_type == SourceType.MOSQUE_WEBSITE:
-        return True
+        cfg = settings or get_settings()
+        if not cfg.repo_extractor_auto_approve_candidates:
+            return True
+        if candidate is None:
+            return True
+        evidence = candidate.evidence or {}
+        if evidence.get("contract") != "repo_site_extractor/v1":
+            return True
+        if not evidence.get("gate_passed", False):
+            return True
+        return False
     return False
 
 
@@ -231,9 +244,16 @@ def status_after_validation(
     *,
     extraction_kind: ExtractionKind | None,
     source: MosqueSource | None = None,
+    candidate: ScheduleCandidate | None = None,
+    settings: Settings | None = None,
 ) -> CandidateStatus:
     if not result.is_valid:
         return CandidateStatus.REJECTED
-    if _requires_manual_approval(source, extraction_kind):
+    if _requires_manual_approval(
+        source,
+        extraction_kind,
+        candidate=candidate,
+        settings=settings,
+    ):
         return CandidateStatus.PENDING
     return CandidateStatus.APPROVED

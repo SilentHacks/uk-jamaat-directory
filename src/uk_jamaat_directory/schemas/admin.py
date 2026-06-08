@@ -276,25 +276,21 @@ class AdminSourceHealthResponse(BaseModel):
     count: int
 
 
-class AdminProfileResponse(BaseModel):
+class AdminExtractorResponse(BaseModel):
     source_id: uuid.UUID
-    profile_status: str
-    asset_type: str
-    timetable_url: str | None
-    confidence: float
-    review_notes: str
-    extraction_run_id: uuid.UUID | None
-    model: str | None
-    profiled_at: datetime | None
+    extractor_key: str | None
+    extractor_version: str | None
+    status: str
+    run_frequency: str
+    run_timezone: str
+    next_run_at: datetime | None
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    last_failure_at: datetime | None
+    consecutive_failures: int
+    last_error: str | None
 
 
-class AdminProfileTriggerResponse(BaseModel):
-    source_id: uuid.UUID
-    profile_status: str
-    asset_type: str
-    timetable_url: str | None
-    confidence: float
-    review_notes: str
-    extraction_run_id: uuid.UUID | None
-    warnings: list[str]
-    errors: list[str]
+class AdminExtractorListResponse(BaseModel):
+    items: list[AdminExtractorResponse]
+    count: int
