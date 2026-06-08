@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
     authoring_concurrency: int = 8
-    authoring_per_source_timeout_seconds: float = 180.0
+    authoring_per_source_timeout_seconds: float = 600.0
     authoring_global_timeout_seconds: float = 4 * 60 * 60.0
     authoring_drafts_dir: str = "data/authoring/drafts"
     authoring_max_candidate_links: int = 5

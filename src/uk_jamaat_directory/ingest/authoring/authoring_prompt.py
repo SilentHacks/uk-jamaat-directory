@@ -92,41 +92,52 @@ def build_authoring_prompt(
            - ``json`` — the timetable is served as JSON
              (skip authoring until JSON extractors are supported).
 
-        4. If the target is ``html``, write a single Python file at the
-           ``Target script path`` above, implementing one ``Extractor`` class.
-           The file must satisfy every requirement in the
-           "Extractor contract" section below. Validate locally with
-           ``python -m uk_jamaat_directory.cli validate-repo-extractor
-           --extractor-key {extractor_key}`` before finishing.
+         4. Prefer the **broadest** timetable you can find:
+            - A **monthly** or **full-year** timetable is ideal.
+            - A **weekly** timetable is acceptable if you cannot find a
+              monthly one.
+            - A **daily-only** timetable (e.g. "Today's prayer times") is a
+              last resort.
+            If the first page you find only shows today or this week, keep
+            exploring links on the same domain for a monthly or full-year
+            version. Use the broadest one you discover before you run out of
+            page budget.
 
-        5. If the target is ``pdf`` / ``image`` / ``rendered_html`` / ``json``,
-           do NOT write a script. Just record the discovery.
+         5. If the target is ``html``, write a single Python file at the
+            ``Target script path`` above, implementing one ``Extractor`` class.
+            The file must satisfy every requirement in the
+            "Extractor contract" section below. Validate locally with
+            ``python -m uk_jamaat_directory.cli validate-repo-extractor
+            --extractor-key {extractor_key}`` before finishing.
 
-        6. When you are done, write a JSON file to the **exact path**
-           ``{result_path}``. The orchestrator reads this file after you
-           finish — it is the only way the orchestrator knows what you did.
+         6. If the target is ``pdf`` / ``image`` / ``rendered_html`` / ``json``,
+            do NOT write a script. Just record the discovery.
 
-           The JSON file must have this exact structure:
+         7. When you are done, write a JSON file to the **exact path**
+            ``{result_path}``. The orchestrator reads this file after you
+            finish — it is the only way the orchestrator knows what you did.
 
-           ```json
-           {{
-             "status": "authored",
-             "target_url": "https://example.com/prayer-times",
-             "target_kind": "html",
-             "script_path": "{script_path}",
-             "reason": "short reason",
-             "version": "1.0"
-           }}
-           ```
+            The JSON file must have this exact structure:
 
-           Fields:
-           - ``status`` (required): ``authored`` | ``skipped_review`` | ``failed``
-           - ``target_url`` (required): the timetable URL you actually visited
-           - ``target_kind`` (required): ``html`` | ``pdf`` | ``image`` |
-             ``rendered_html`` | ``json``
-           - ``script_path`` (required when ``status=authored``): repo-relative path
-           - ``reason`` (required when ``status=skipped_review`` or ``failed``): short reason
-           - ``version``: always ``"1.0"``
+            ```json
+            {{
+              "status": "authored",
+              "target_url": "https://example.com/prayer-times",
+              "target_kind": "html",
+              "script_path": "{script_path}",
+              "reason": "short reason",
+              "version": "1.0"
+            }}
+            ```
+
+            Fields:
+            - ``status`` (required): ``authored`` | ``skipped_review`` | ``failed``
+            - ``target_url`` (required): the timetable URL you actually visited
+            - ``target_kind`` (required): ``html`` | ``pdf`` | ``image`` |
+              ``rendered_html`` | ``json``
+            - ``script_path`` (required when ``status=authored``): repo-relative path
+            - ``reason`` (required when ``status=skipped_review`` or ``failed``): short reason
+            - ``version``: always ``"1.0"``
 
         # Extractor contract
 
