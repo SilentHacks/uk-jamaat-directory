@@ -368,22 +368,9 @@ async def _process_one(
 ) -> None:
     async with semaphore:
         started = time.monotonic()
-        result: _SourceProcessResult | None = None
-        try:
-            result = await asyncio.wait_for(
-                _process_source(
-                    session=session, source=source, settings=settings
-                ),
-                timeout=settings.authoring_per_source_timeout_seconds,
-            )
-        except TimeoutError:
-            result = _SourceProcessResult(
-                status=AuthoringTaskStatus.FAILED.value,
-                error=(
-                    "orchestrator timeout after "
-                    f"{settings.authoring_per_source_timeout_seconds:.0f}s"
-                ),
-            )
+        result = await _process_source(
+            session=session, source=source, settings=settings
+        )
 
         task = await _existing_task(session, source.id)
         if task is None:

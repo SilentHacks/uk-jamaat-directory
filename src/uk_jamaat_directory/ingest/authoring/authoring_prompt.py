@@ -142,7 +142,7 @@ def build_authoring_prompt(
 
         # Extractor contract
 
-        Required shape:
+        Required shape (HTML example):
 
         ```python
         from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
@@ -176,6 +176,36 @@ def build_authoring_prompt(
 
             def extract(self, ctx: ExtractContext) -> ExtractorResult:
                 artifact = ctx.artifact("timetable")
+                ...
+                return ExtractorResult(rows=rows, warnings=warnings)
+        ```
+
+        PDF example (set ``requires_pdf=True``):
+
+        ```python
+        from uk_jamaat_directory.ingest.extract.helpers import pdf, times, prayers
+        from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+            BaseMosqueWebsiteExtractor, ExtractContext, ExtractorResult,
+            RefreshPolicy, RunFrequency, SourceMatch, TargetSpec, TargetKind,
+        )
+
+        class Extractor(BaseMosqueWebsiteExtractor):
+            key = "{extractor_key}"
+            version = "YYYY.MM.DD.1"
+            source_match = SourceMatch(domains=("{domain}",))
+            refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
+            targets = (
+                TargetSpec(
+                    label="timetable",
+                    url="<the TARGET_URL you discovered>",
+                    kind=TargetKind.PDF,
+                    requires_pdf=True,
+                ),
+            )
+
+            def extract(self, ctx: ExtractContext) -> ExtractorResult:
+                artifact = ctx.artifact("timetable")
+                text = pdf.extract_text(artifact.body)
                 ...
                 return ExtractorResult(rows=rows, warnings=warnings)
         ```
