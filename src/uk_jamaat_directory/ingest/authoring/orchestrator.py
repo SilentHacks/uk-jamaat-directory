@@ -1,20 +1,27 @@
 """Overnight extractor authoring orchestrator.
 
-This is the implementation behind the ``orchestrate-authoring`` CLI. Given a
-list of ``mosque_website`` sources, it:
+The orchestrator hands each ``mosque_website`` source to the OpenCode CLI
+as a subprocess and lets the agent navigate the source's registrable
+domain to find the prayer-timetable page. The agent then either writes a
+repo extractor script directly into
+``ingest/extract/repo_extractors/scripts/`` or marks the source for
+human review (PDF / image / OCR / JS-rendered targets).
 
-1. Picks candidates that do not yet have an active repo extractor
-   (``source_extractor_assignments.status != 'active'`` or missing).
-2. For each candidate, runs :mod:`discovery` to find a likely timetable URL
-   and classify the target kind.
-3. For HTML / rendered HTML targets, calls the OpenCode CLI to author a
-   Python extractor script.
-4. Validates the draft (static + capability + sandbox dry-run).
-5. Writes the draft to ``ingest/extract/repo_extractors/scripts/`` and runs
-   :func:`sync_repo_extractors` so the assignment is created in the DB.
+Flow per source (concurrent, semaphore-bounded):
 
-PDF, image, and other unsupported kinds are marked ``skipped_review`` without
-spawning an LLM.
+1. ``preflight_source`` confirms the source URL is reachable and records
+   the predicted target kind. The agent is still free to disagree.
+2. The orchestrator builds a prompt with the source URL, the registrable
+   domain restriction, the canonical script path, the contract, and the
+   structured ``STATUS=…`` summary the agent must emit.
+3. The agent navigates the site, decides the target kind, and either
+   writes the script or skips to the review queue.
+4. On ``STATUS=authored`` the orchestrator reads the file the agent
+   reported, runs the same static + capability gates as
+   ``validate-repo-extractor``, then calls ``sync_repo_extractors`` to
+   create the assignment.
+5. On ``STATUS=skipped_review`` the orchestrator records the reason and
+   target kind. No LLM call happens for unsupported kinds.
 """
 
 from __future__ import annotations
@@ -24,7 +31,7 @@ import importlib.util
 import os
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -38,25 +45,24 @@ from uk_jamaat_directory.domain import (
     SourceType,
 )
 from uk_jamaat_directory.ingest.authoring.agent import (
-    extract_python_block,
+    AgentResult,
     is_opencode_available,
     run_authoring_agent,
 )
+from uk_jamaat_directory.ingest.authoring.authoring_prompt import (
+    build_authoring_prompt,
+)
 from uk_jamaat_directory.ingest.authoring.discovery import (
-    DiscoveryResult,
-    discover_timetable_url,
-    looks_like_javascript_widget,
+    preflight_source,
 )
 from uk_jamaat_directory.ingest.authoring.validator_post import (
     validate_draft_source,
     write_draft_to_scripts,
 )
-from uk_jamaat_directory.ingest.extract.repo_extractors.authoring_prompt import (
-    build_authoring_prompt,
-)
 from uk_jamaat_directory.ingest.extract.repo_extractors.sync import (
     sync_repo_extractors,
 )
+from uk_jamaat_directory.ingest.normalize import normalize_domain
 from uk_jamaat_directory.models.core import (
     ExtractorAuthoringTask,
     Mosque,
@@ -64,16 +70,16 @@ from uk_jamaat_directory.models.core import (
     SourceExtractorAssignment,
 )
 
-SCRIPTS_PACKAGE = (
-    "uk_jamaat_directory.ingest.extract.repo_extractors.scripts"
+SCRIPTS_PACKAGE = "uk_jamaat_directory.ingest.extract.repo_extractors.scripts"
+SCRIPTS_DIR = (
+    "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
 )
-SCRIPTS_DIR = "src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts"
 
 
 @dataclass
 class OrchestrationSummary:
     candidates: int = 0
-    discovered: int = 0
+    preflight_ok: int = 0
     authored: int = 0
     deployed: int = 0
     skipped_review: int = 0
@@ -83,7 +89,7 @@ class OrchestrationSummary:
     def as_dict(self) -> dict[str, object]:
         return {
             "candidates": self.candidates,
-            "discovered": self.discovered,
+            "preflight_ok": self.preflight_ok,
             "authored": self.authored,
             "deployed": self.deployed,
             "skipped_review": self.skipped_review,
@@ -99,12 +105,9 @@ def _safe_extractor_key(value: str) -> str:
 
 
 def _scripts_filesystem_path() -> str:
-    """Resolve the on-disk path of the scripts package for the running process.
-
-    The orchestrator writes the file using the same absolute path that
-    ``importlib`` will use to load it. We add the repo source root to
-    ``sys.path`` if necessary so the file can be imported by the sandbox
-    immediately after writing.
+    """Resolve the on-disk path of the scripts package for the running
+    process. The agent writes to this directory; the validator and the
+    registry import from the same one.
     """
 
     try:
@@ -128,17 +131,19 @@ def _scripts_filesystem_path() -> str:
     return candidates[0]
 
 
-async def _existing_assignment_statuses(
-    session: AsyncSession, source_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, str]:
-    rows = (
-        await session.execute(
-            select(SourceExtractorAssignment.source_id, SourceExtractorAssignment.status).where(
-                SourceExtractorAssignment.source_id.in_(list(source_ids))
-            )
-        )
-    ).all()
-    return {row[0]: row[1] for row in rows}
+def _repo_root() -> str:
+    """The repo root that contains the ``src/`` layout the agent should
+    operate in. Defaults to the current working directory.
+    """
+
+    cwd = os.getcwd()
+    src = os.path.join(cwd, "src")
+    if os.path.isdir(src):
+        return cwd
+    parent = os.path.dirname(cwd)
+    if os.path.isdir(os.path.join(parent, "src")):
+        return parent
+    return cwd
 
 
 async def _list_candidate_sources(
@@ -169,27 +174,16 @@ async def _list_candidate_sources(
     return eligible
 
 
-async def _existing_tasks(
-    session: AsyncSession, source_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, ExtractorAuthoringTask]:
-    rows = (
+async def _existing_task(
+    session: AsyncSession, source_id: uuid.UUID
+) -> ExtractorAuthoringTask | None:
+    return (
         await session.execute(
             select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id.in_(list(source_ids))
+                ExtractorAuthoringTask.source_id == source_id
             )
         )
-    ).scalars().all()
-    return {row.source_id: row for row in rows}
-
-
-async def _should_skip_task(task: ExtractorAuthoringTask | None) -> bool:
-    """A task is skipped if it has already reached a terminal state."""
-    if task is None:
-        return False
-    return task.status in {
-        AuthoringTaskStatus.DEPLOYED.value,
-        AuthoringTaskStatus.AWAITING_REVIEW.value,
-    }
+    ).scalar_one_or_none()
 
 
 async def _mosque_name(session: AsyncSession, source: MosqueSource) -> str:
@@ -201,52 +195,13 @@ async def _mosque_name(session: AsyncSession, source: MosqueSource) -> str:
     return mosque.name
 
 
-def _classify_target(discovery: DiscoveryResult) -> AuthoringTargetKind:
-    if discovery.target_kind != AuthoringTargetKind.HTML:
-        return discovery.target_kind
-    return looks_like_javascript_widget(
-        sample_text=discovery.sample_text, sample_html=""
-    )
-
-
-def _build_prompt(
-    *,
-    source_id: str,
-    mosque_name: str,
-    website_url: str,
-    extractor_key: str,
-    target_url: str,
-    sample_text: str,
-    target_kind: AuthoringTargetKind,
-) -> str:
-    base = build_authoring_prompt(
-        source_id=source_id,
-        mosque_name=mosque_name,
-        website_url=website_url,
-        extractor_key=extractor_key,
-        max_pages=3,
-    )
-    extra = (
-        "\n\n"
-        f"---\n"
-        f"Discovered timetable URL: {target_url}\n"
-        f"Target kind: {target_kind.value}\n"
-        f"Sample (already trimmed, max 16 KB of body text):\n"
-        f"```\n{sample_text[:16000]}\n```\n"
-        f"---\n"
-        f"Author a single Python file at "
-        f"`src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts/{extractor_key}.py`. "
-        f"When you are done, print a short summary and finish. Do not run any other tools."
-    )
-    return base + extra
-
-
-def _classify_target(discovery: DiscoveryResult) -> AuthoringTargetKind:
-    if discovery.target_kind != AuthoringTargetKind.HTML:
-        return discovery.target_kind
-    return looks_like_javascript_widget(
-        sample_text=discovery.sample_text, sample_html=""
-    )
+def _task_should_skip(task: ExtractorAuthoringTask | None) -> bool:
+    if task is None:
+        return False
+    return task.status in {
+        AuthoringTaskStatus.DEPLOYED.value,
+        AuthoringTaskStatus.AWAITING_REVIEW.value,
+    }
 
 
 @dataclass
@@ -265,137 +220,134 @@ class _SourceProcessResult:
     agent_stdout_excerpt: str | None = None
 
 
-async def _process_source(
-    *,
-    source: MosqueSource,
-    mosque_name: str,
-    settings: Settings,
-    dry_run: bool,
-) -> _SourceProcessResult:
-    extractor_key = _safe_extractor_key(
-        f"{mosque_name.replace(' ', '_')}_{str(source.id)[:8]}"
-    )
-    extractor_key = extractor_key or f"source_{str(source.id)[:8]}"
-    extractor_version = datetime.now(UTC).strftime("%Y.%m.%d.1")
-
-    discovery: DiscoveryResult = await discover_timetable_url(
-        source_url=source.source_url or "",
-        settings=settings,
-    )
-    if discovery.error or discovery.discovered_url is None:
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.FAILED.value,
-            error=discovery.error or "no candidates",
-            discovered_url=None,
-            target_kind=discovery.target_kind.value,
-        )
-    target_kind = _classify_target(discovery)
-
-    if target_kind in {
-        AuthoringTargetKind.PDF,
-        AuthoringTargetKind.IMAGE,
-        AuthoringTargetKind.RENDERED_HTML,
-        AuthoringTargetKind.JSON,
-        AuthoringTargetKind.UNKNOWN,
-    }:
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.SKIPPED_REVIEW.value,
-            error=f"{target_kind.value} target not yet supported (ocr/render/json not implemented)",
-            discovered_url=discovery.discovered_url,
-            target_kind=target_kind.value,
-        )
-
-    if not is_opencode_available():
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.FAILED.value,
-            error="opencode binary not found on PATH",
-            discovered_url=discovery.discovered_url,
-            target_kind=target_kind.value,
-        )
-
-    prompt = _build_prompt(
-        source_id=str(source.id),
-        mosque_name=mosque_name,
-        website_url=source.source_url or "",
-        extractor_key=extractor_key,
-        target_url=discovery.discovered_url,
-        sample_text=discovery.sample_text,
-        target_kind=target_kind,
-    )
+def _read_text_file(path: str) -> str | None:
     try:
-        agent_result = await run_authoring_agent(prompt=prompt, settings=settings)
-    except TimeoutError as exc:
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.FAILED.value,
-            error=str(exc),
-            discovered_url=discovery.discovered_url,
-            target_kind=target_kind.value,
-            extractor_key=extractor_key,
-            extractor_version=extractor_version,
-        )
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        return None
 
-    source_text = extract_python_block(agent_result.text) or agent_result.text
-    issues = validate_draft_source(source_text)
-    if issues:
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.FAILED.value,
-            error="; ".join(issues),
-            discovered_url=discovery.discovered_url,
-            target_kind=target_kind.value,
-            extractor_key=extractor_key,
-            extractor_version=extractor_version,
-            validation_issues=issues,
-            agent_model=settings.ai_agent_model,
-            agent_command=agent_result.command,
-            agent_duration_ms=agent_result.duration_ms,
-            agent_stdout_excerpt=agent_result.stdout_excerpt,
-        )
 
-    if dry_run:
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.AWAITING_REVIEW.value,
-            discovered_url=discovery.discovered_url,
-            target_kind=target_kind.value,
-            extractor_key=extractor_key,
-            extractor_version=extractor_version,
-            validation_issues=[],
-            agent_model=settings.ai_agent_model,
-            agent_command=agent_result.command,
-            agent_duration_ms=agent_result.duration_ms,
-            agent_stdout_excerpt=agent_result.stdout_excerpt,
-        )
+def _resolve_script_absolute_path(script_path: str) -> str | None:
+    """Turn the agent's reported ``SCRIPT_PATH`` (which may be repo-relative
+    or absolute) into an absolute path the orchestrator can read.
+    """
 
-    scripts_dir = _scripts_filesystem_path()
-    script_path = write_draft_to_scripts(
-        extractor_key=extractor_key,
-        source=source_text,
-        scripts_dir=scripts_dir,
-    )
-    return _SourceProcessResult(
-        status=AuthoringTaskStatus.AWAITING_REVIEW.value,
-        discovered_url=discovery.discovered_url,
-        target_kind=target_kind.value,
+    if not script_path:
+        return None
+    if os.path.isabs(script_path):
+        return script_path
+    candidates = [
+        os.path.abspath(os.path.join(_repo_root(), script_path)),
+        os.path.abspath(script_path),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return candidates[0]
+
+
+def _classify_agent_result(
+    *,
+    agent_result: AgentResult,
+    source: MosqueSource,
+    extractor_key: str,
+    scripts_dir: str,
+) -> _SourceProcessResult:
+    """Translate the agent's structured report into a ``_SourceProcessResult``."""
+
+    report = agent_result.report
+    extractor_version = datetime.now(UTC).strftime("%Y.%m.%d.1")
+    base = _SourceProcessResult(
+        status=AuthoringTaskStatus.FAILED.value,
+        discovered_url=report.target_url or source.source_url,
+        target_kind=(
+            report.target_kind.value
+            if report.target_kind is not None
+            else AuthoringTargetKind.UNKNOWN.value
+        ),
         extractor_key=extractor_key,
         extractor_version=extractor_version,
-        script_path=script_path,
-        validation_issues=[],
-        agent_model=settings.ai_agent_model,
+        agent_model=None,
         agent_command=agent_result.command,
         agent_duration_ms=agent_result.duration_ms,
         agent_stdout_excerpt=agent_result.stdout_excerpt,
     )
 
+    if not report.status:
+        base.error = "agent did not emit a STATUS=… summary"
+        return base
+    status = report.status.lower().strip()
+
+    if status == "skipped_review":
+        base.status = AuthoringTaskStatus.SKIPPED_REVIEW.value
+        base.error = report.reason or "skipped by agent (no reason given)"
+        return base
+
+    if status == "failed":
+        base.status = AuthoringTaskStatus.FAILED.value
+        base.error = report.reason or "agent reported failure (no reason given)"
+        return base
+
+    if status != "authored":
+        base.error = f"agent reported unknown status: {status!r}"
+        return base
+
+    if not report.script_path:
+        base.error = "agent reported authored but no SCRIPT_PATH"
+        return base
+    absolute = _resolve_script_absolute_path(report.script_path)
+    if absolute is None or not os.path.isfile(absolute):
+        base.error = f"script not found at {report.script_path}"
+        return base
+
+    source_text = _read_text_file(absolute)
+    if source_text is None:
+        base.error = f"could not read script at {absolute}"
+        return base
+
+    issues = validate_draft_source(source_text)
+    if issues:
+        base.validation_issues = issues
+        base.script_path = absolute
+        base.error = "; ".join(issues)
+        return base
+
+    # The agent may have written anywhere on disk. Normalise the file into
+    # the canonical scripts directory under the orchestrator's chosen key.
+    target_path = os.path.join(scripts_dir, f"{extractor_key}.py")
+    if os.path.abspath(absolute) != os.path.abspath(target_path):
+        written = write_draft_to_scripts(
+            extractor_key=extractor_key,
+            source=source_text,
+            scripts_dir=scripts_dir,
+        )
+        base.script_path = written
+    else:
+        base.script_path = absolute
+    base.status = AuthoringTaskStatus.AWAITING_REVIEW.value
+    return base
+
 
 async def _run_post_sync(
     session: AsyncSession, *, source_id: uuid.UUID
 ) -> tuple[str, str | None]:
-    """Run :func:`sync_repo_extractors` for one source and return the assignment state."""
+    """Run :func:`sync_repo_extractors` for one source and return the
+    post-sync state.
+    """
+
     sync_result = await sync_repo_extractors(session, source_id=source_id)
+    await session.flush()
     assignment = await session.get(SourceExtractorAssignment, source_id)
     if assignment is None:
+        invalid = "; ".join(
+            item.get("issues", ["invalid"])
+            for item in sync_result.invalid
+            if item.get("source_id") == str(source_id)
+        )
         return (
             AuthoringTaskStatus.FAILED.value,
-            "; ".join(sync_result.invalid) or "no assignment created",
+            invalid or "no assignment created",
         )
     return (
         AuthoringTaskStatus.DEPLOYED.value,
@@ -414,13 +366,11 @@ async def _process_one(
 ) -> None:
     async with semaphore:
         started = time.monotonic()
+        result: _SourceProcessResult | None = None
         try:
             result = await asyncio.wait_for(
                 _process_source(
-                    source=source,
-                    mosque_name=await _mosque_name(session, source),
-                    settings=settings,
-                    dry_run=dry_run,
+                    session=session, source=source, settings=settings
                 ),
                 timeout=settings.authoring_per_source_timeout_seconds,
             )
@@ -433,13 +383,7 @@ async def _process_one(
                 ),
             )
 
-        task = (
-            await session.execute(
-                select(ExtractorAuthoringTask).where(
-                    ExtractorAuthoringTask.source_id == source.id
-                )
-            )
-        ).scalar_one_or_none()
+        task = await _existing_task(session, source.id)
         if task is None:
             task = ExtractorAuthoringTask(
                 id=uuid.uuid4(),
@@ -467,7 +411,10 @@ async def _process_one(
             "source_url": source.source_url,
         }
 
-        if result.status == AuthoringTaskStatus.AWAITING_REVIEW.value and not dry_run:
+        if (
+            not dry_run
+            and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value
+        ):
             post_status, post_error = await _run_post_sync(
                 session, source_id=source.id
             )
@@ -487,6 +434,81 @@ async def _process_one(
             summary.failed += 1
         if result.error:
             summary.errors.append(f"{source.id}: {result.error[:200]}")
+
+
+async def _process_source(
+    *,
+    session: AsyncSession,
+    source: MosqueSource,
+    settings: Settings,
+) -> _SourceProcessResult:
+    mosque_name = await _mosque_name(session, source)
+    extractor_key = (
+        _safe_extractor_key(f"{mosque_name.replace(' ', '_')}_{str(source.id)[:8]}")
+        or f"source_{str(source.id)[:8]}"
+    )
+    extractor_version = datetime.now(UTC).strftime("%Y.%m.%d.1")
+
+    preflight = await preflight_source(
+        source_url=source.source_url or "", settings=settings
+    )
+    if not preflight.reachable:
+        return _SourceProcessResult(
+            status=AuthoringTaskStatus.FAILED.value,
+            error=preflight.error or "preflight: source unreachable",
+            target_kind=preflight.predicted_kind.value,
+            extractor_key=extractor_key,
+            extractor_version=extractor_version,
+        )
+
+    if not is_opencode_available():
+        return _SourceProcessResult(
+            status=AuthoringTaskStatus.FAILED.value,
+            error="opencode binary not found on PATH",
+            discovered_url=source.source_url,
+            target_kind=preflight.predicted_kind.value,
+            extractor_key=extractor_key,
+            extractor_version=extractor_version,
+        )
+
+    domain = preflight.domain or normalize_domain(source.source_url) or ""
+    scripts_dir = _scripts_filesystem_path()
+    script_path = os.path.join(scripts_dir, f"{extractor_key}.py")
+    prompt = build_authoring_prompt(
+        source_id=str(source.id),
+        mosque_name=mosque_name,
+        website_url=source.source_url or "",
+        extractor_key=extractor_key,
+        script_path=os.path.relpath(script_path, _repo_root()),
+        domain=domain,
+        predicted_kind=preflight.predicted_kind,
+        max_pages=8,
+    )
+
+    try:
+        agent_result: AgentResult = await run_authoring_agent(
+            prompt=prompt,
+            settings=settings,
+            cwd=_repo_root(),
+        )
+    except TimeoutError as exc:
+        return _SourceProcessResult(
+            status=AuthoringTaskStatus.FAILED.value,
+            error=str(exc),
+            discovered_url=source.source_url,
+            target_kind=preflight.predicted_kind.value,
+            extractor_key=extractor_key,
+            extractor_version=extractor_version,
+        )
+
+    result = _classify_agent_result(
+        agent_result=agent_result,
+        source=source,
+        extractor_key=extractor_key,
+        scripts_dir=scripts_dir,
+    )
+    result.agent_model = settings.ai_agent_model
+    return result
 
 
 async def run_overnight_orchestrator(
