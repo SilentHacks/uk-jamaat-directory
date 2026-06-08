@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.domain import (
@@ -358,7 +358,7 @@ async def _run_post_sync(session: AsyncSession, *, source_id: uuid.UUID) -> tupl
 
 async def _process_one(
     *,
-    session: AsyncSession,
+    session_factory: async_sessionmaker,
     source: MosqueSource,
     semaphore: asyncio.Semaphore,
     summary: OrchestrationSummary,
@@ -367,41 +367,42 @@ async def _process_one(
 ) -> None:
     async with semaphore:
         started = time.monotonic()
-        result = await _process_source(session=session, source=source, settings=settings)
+        async with session_factory() as session:
+            result = await _process_source(session=session, source=source, settings=settings)
 
-        task = await _existing_task(session, source.id)
-        if task is None:
-            task = ExtractorAuthoringTask(
-                id=uuid.uuid4(),
-                source_id=source.id,
-            )
-            session.add(task)
-        task.status = result.status
-        task.discovered_url = result.discovered_url
-        task.target_kind = result.target_kind
-        task.extractor_key = result.extractor_key
-        task.extractor_version = result.extractor_version
-        task.script_path = result.script_path
-        task.validation_issues = [{"issue": issue} for issue in result.validation_issues]
-        task.agent_model = result.agent_model
-        task.agent_command = result.agent_command
-        task.agent_duration_ms = result.agent_duration_ms
-        task.agent_stdout_excerpt = result.agent_stdout_excerpt
-        task.error = result.error
-        task.started_at = datetime.now(UTC)
-        task.finished_at = datetime.now(UTC)
-        task.metadata_ = {
-            "duration_ms": int((time.monotonic() - started) * 1000),
-            "source_url": source.source_url,
-        }
+            task = await _existing_task(session, source.id)
+            if task is None:
+                task = ExtractorAuthoringTask(
+                    id=uuid.uuid4(),
+                    source_id=source.id,
+                )
+                session.add(task)
+            task.status = result.status
+            task.discovered_url = result.discovered_url
+            task.target_kind = result.target_kind
+            task.extractor_key = result.extractor_key
+            task.extractor_version = result.extractor_version
+            task.script_path = result.script_path
+            task.validation_issues = [{"issue": issue} for issue in result.validation_issues]
+            task.agent_model = result.agent_model
+            task.agent_command = result.agent_command
+            task.agent_duration_ms = result.agent_duration_ms
+            task.agent_stdout_excerpt = result.agent_stdout_excerpt
+            task.error = result.error
+            task.started_at = datetime.now(UTC)
+            task.finished_at = datetime.now(UTC)
+            task.metadata_ = {
+                "duration_ms": int((time.monotonic() - started) * 1000),
+                "source_url": source.source_url,
+            }
 
-        if not dry_run and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
-            post_status, post_error = await _run_post_sync(session, source_id=source.id)
-            task.status = post_status
-            if post_error:
-                task.error = post_error
+            if not dry_run and result.status == AuthoringTaskStatus.AWAITING_REVIEW.value:
+                post_status, post_error = await _run_post_sync(session, source_id=source.id)
+                task.status = post_status
+                if post_error:
+                    task.error = post_error
 
-        await session.flush()
+            await session.commit()
 
         if task.status == AuthoringTaskStatus.DEPLOYED.value:
             summary.deployed += 1
@@ -516,10 +517,14 @@ async def run_overnight_orchestrator(
     if not sources:
         return summary
 
+    await session.commit()
+    engine = session.bind
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
     tasks = [
         asyncio.create_task(
             _process_one(
-                session=session,
+                session_factory=session_factory,
                 source=source,
                 semaphore=semaphore,
                 summary=summary,
