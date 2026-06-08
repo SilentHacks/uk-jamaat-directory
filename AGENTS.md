@@ -16,6 +16,7 @@
 - PostGIS tests: `make test-postgres` (runs preflight first) — see **PostGIS integration tests** below
 - Export OpenAPI/JSON schemas: `make export-contracts`
 - Repo extractor flow: `list-repo-extractors`, `validate-repo-extractor(s)`, `sync-repo-extractors`, `process-source --source-id <uuid>`
+- Overnight authoring: `orchestrate-authoring [--concurrency N --limit N --source-id UUID --dry-run]`. Requires the `opencode` binary on PATH and `CRAWL_ENABLED=true`. Set `OPENAI_BASE_URL` / `OPENAI_API_KEY` (auto-populated from `ai_agent_base_url` / `ai_agent_api_key`) to route the OpenCode agent to a real provider. PDF/Image targets are skipped to the review queue automatically.
 
 ## Current Scope (implemented)
 
@@ -33,6 +34,7 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 - Phase 7 schedules: `validate-candidates`, `publish-candidates`, `recompute-freshness` CLI; explicit publish only (see ADR 0006)
 - Phase 8 admin: candidate approve/reject/list, source list/patch, coverage, source-health; public corrections, schedule submissions, and claims on `/v1/mosques/{id}/…`
 - Phase 7 AI replaced by repo-owned deterministic extractor scripts (ADR 0016): Python modules under `ingest/extract/repo_extractors/scripts/` are the source of truth. CLIs `list-repo-extractors`, `validate-repo-extractor(s)`, `sync-repo-extractors`, `process-source` consume repo scripts; admin API `GET/POST /v1/admin/sources/{id}/extractor` exposes assignments. Scheduled runtime is sandboxed with no network access; passing static, capability, output, and candidate validation gates activates a script.
+- Phase 7b overnight authoring orchestrator (ADR 0017): CLI `orchestrate-authoring` (and Celery beat `authoring.run_overnight` at 02:00 Europe/London) discovers prayer-timetable pages for `mosque_website` sources without an active assignment, calls the OpenCode CLI as a subprocess (`opencode -m <model> run --format json <prompt>`), validates the returned Python against the same gates as `validate-repo-extractor`, writes the script to `ingest/extract/repo_extractors/scripts/`, then runs `sync-repo-extractors` to create the assignment. PDF / image / OCR / rendered-JS targets are skipped to a review queue (`extractor_authoring_tasks.status = skipped_review`). Status visible at `GET /v1/admin/authoring`. The agent only sees the source URL, the discovered target URL, and a trimmed HTML sample (max 16 KB). OCR / PDF / browser rendering are explicitly out of scope (see ADR 0017).
 - Phase 9 crawl: mosque_website fetch, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, …). HTML/PDF/OCR deferred.
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
 - Phase 11 deploy: `docker-compose.production.yml`, bundled Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
