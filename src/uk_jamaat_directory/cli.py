@@ -1762,3 +1762,7 @@ async def _run_orchestrate_authoring(
     payload = summary.as_dict()
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if summary.failed == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
