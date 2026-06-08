@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import re
-from datetime import time
-
 from uk_jamaat_directory.domain import Prayer
 
 PRAYER_KEYWORDS: dict[Prayer, tuple[str, ...]] = {

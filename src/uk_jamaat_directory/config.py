@@ -57,11 +57,6 @@ class Settings(BaseSettings):
     muslimsinbritain_enabled: bool = False
     muslimsinbritain_publication_policy: str = "public_redistribution_allowed"
     openai_api_key: str | None = None
-    ai_profiling_enabled: bool = True
-    ai_agent_model: str = "opencode-go/deepseek-v4-flash"
-    ai_agent_timeout: float = 120.0
-    ai_agent_max_pages: int = 10
-    ai_agent_concurrency: int = 3
 
     community_submission_rate_limit: int = 10
     community_submission_rate_window_seconds: int = 60

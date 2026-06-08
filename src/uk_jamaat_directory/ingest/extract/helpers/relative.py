@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from datetime import time, timedelta
 
-
 _OFFSET_PATTERN = re.compile(
     r"(?P<minutes>\d{1,3})\s*(?:minute|min|minutes|mins|m)(?:\s|$|[^\w])",
     re.IGNORECASE,

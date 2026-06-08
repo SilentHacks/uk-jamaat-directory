@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Sequence
 from html.parser import HTMLParser
-from typing import Iterable, Sequence
 
 _HTML_TAG = re.compile(r"<[^>]+>")
 _WHITESPACE = re.compile(r"\s+")
@@ -106,7 +106,12 @@ class _TableParser(HTMLParser):
 def extract_tables(html: str) -> list[Table]:
     parser = _TableParser()
     parser.feed(html)
-    return [Table([row[:] for row in parser._rows if any(cell.strip() for cell in row)]) for _ in (0,)]
+    rows = [
+        row[:]
+        for row in parser._rows
+        if any(cell.strip() for cell in row)
+    ]
+    return [Table(rows)]
 
 
 def find_table(html: str, *, header_keywords: Sequence[str]) -> Table | None:

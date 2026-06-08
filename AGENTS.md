@@ -15,6 +15,7 @@
 - Unit tests: `make test` (~0.3s; skips PostGIS integration tests)
 - PostGIS tests: `make test-postgres` (runs preflight first) — see **PostGIS integration tests** below
 - Export OpenAPI/JSON schemas: `make export-contracts`
+- Repo extractor flow: `list-repo-extractors`, `validate-repo-extractor(s)`, `sync-repo-extractors`, `process-source --source-id <uuid>`
 
 ## Current Scope (implemented)
 
@@ -31,7 +32,7 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 
 - Phase 7 schedules: `validate-candidates`, `publish-candidates`, `recompute-freshness` CLI; explicit publish only (see ADR 0006)
 - Phase 8 admin: candidate approve/reject/list, source list/patch, coverage, source-health; public corrections, schedule submissions, and claims on `/v1/mosques/{id}/…`
-- Phase 7 AI: `profile-agent-sources` CLI; autonomous OpenCode agent profiling with `deepseek-v4-flash`; `ExtractionProfile` schema; async orchestrator with timeout/concurrency/resumability; admin API `GET/POST /v1/admin/sources/{id}/profile` (ADR 0015).
+- Phase 7 AI replaced by repo-owned deterministic extractor scripts (ADR 0016): Python modules under `ingest/extract/repo_extractors/scripts/` are the source of truth. CLIs `list-repo-extractors`, `validate-repo-extractor(s)`, `sync-repo-extractors`, `process-source` consume repo scripts; admin API `GET/POST /v1/admin/sources/{id}/extractor` exposes assignments. Scheduled runtime is sandboxed with no network access; passing static, capability, output, and candidate validation gates activates a script.
 - Phase 9 crawl: mosque_website fetch, private S3 artifacts, Celery tasks (`register_sources`, `fetch_due_sources`, `process_source`), CLI (`register-crawl-sources`, `process-source`, …). HTML/PDF/OCR deferred.
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
 - Phase 11 deploy: `docker-compose.production.yml`, bundled Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).

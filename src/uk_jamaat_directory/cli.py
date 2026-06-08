@@ -18,7 +18,6 @@ from uk_jamaat_directory.db.session import create_engine
 from uk_jamaat_directory.exports import generate_dataset_exports
 from uk_jamaat_directory.ingest.crawl.pipeline import process_source
 from uk_jamaat_directory.ingest.crawl.register import ensure_crawl_sources
-from uk_jamaat_directory.ingest.extract.ai.agent_orchestrator import run_agent_profiling
 from uk_jamaat_directory.ingest.extract.runner import run_extraction
 from uk_jamaat_directory.ingest.fetch import fetch_url
 from uk_jamaat_directory.ingest.policy import parse_publication_policy
@@ -370,46 +369,6 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Re-run extraction for a stored source artifact",
     )
     extract_artifact.add_argument("--artifact-id", required=True, type=uuid.UUID)
-
-    profile_agent_sources = subparsers.add_parser(
-        "profile-agent-sources",
-        help="Bulk autonomous agent profiling for mosque website sources",
-    )
-    profile_agent_sources.add_argument(
-        "--limit",
-        type=int,
-        default=50,
-        help="Maximum number of sources to profile (default 50)",
-    )
-    profile_agent_sources.add_argument(
-        "--concurrency",
-        type=int,
-        default=None,
-        help="Concurrent agent subprocesses (defaults to ai_agent_concurrency setting)",
-    )
-    profile_agent_sources.add_argument(
-        "--timeout",
-        type=int,
-        default=None,
-        help="Timeout per agent in seconds (defaults to ai_agent_timeout setting)",
-    )
-    profile_agent_sources.add_argument(
-        "--max-pages",
-        type=int,
-        default=None,
-        help="Max pages per agent (defaults to ai_agent_max_pages setting)",
-    )
-    profile_agent_sources.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Directory to store agent result files (defaults to data/agent_profiles/<timestamp>)",
-    )
-    profile_agent_sources.add_argument(
-        "--force",
-        action="store_true",
-        help="Profile even sources that already have a ready profile",
-    )
 
     subparsers.add_parser(
         "list-repo-extractors",
@@ -807,9 +766,6 @@ def main() -> None:
 
     if args.command == "extract-artifact":
         raise SystemExit(asyncio.run(_run_extract_artifact(args, settings)))
-
-    if args.command == "profile-agent-sources":
-        raise SystemExit(asyncio.run(_run_profile_agent_sources(args, settings)))
 
     if args.command == "list-repo-extractors":
         raise SystemExit(_run_list_repo_extractors(args))
@@ -1463,38 +1419,6 @@ async def _run_analyse_discovery_leads(args: argparse.Namespace, settings: Setti
     for loc, count in report.location_cluster.most_common(10):
         print(f"    {loc}: {count}")
     return 0
-
-
-async def _run_profile_agent_sources(args: argparse.Namespace, settings: Settings) -> int:
-    if not settings.ai_profiling_enabled:
-        print("error: ai_profiling_enabled is False", file=sys.stderr)
-        return 1
-
-    async with cli_db_session(settings) as session:
-        result = await run_agent_profiling(
-            session,
-            settings,
-            limit=args.limit,
-            concurrency=args.concurrency or settings.ai_agent_concurrency,
-            timeout=args.timeout or settings.ai_agent_timeout,
-            max_pages=args.max_pages or settings.ai_agent_max_pages,
-            output_dir=args.output_dir,
-            force=args.force,
-        )
-
-    if result.errors:
-        for error in result.errors:
-            print(f"  error: {error}", file=sys.stderr)
-
-    print(
-        f"Agent profiling: attempted={result.attempted}, "
-        f"ready={result.succeeded}, review_needed={result.review_needed}, "
-        f"failed={result.failed}"
-    )
-    if result.output_dir:
-        print(f"  output_dir: {result.output_dir}")
-
-    return 0 if result.failed == 0 else 1
 
 
 def _run_list_repo_extractors(args: argparse.Namespace) -> int:
