@@ -380,6 +380,8 @@ async def _process_one(
     summary: OrchestrationSummary,
     dry_run: bool,
     settings: Settings,
+    progress_lock: asyncio.Lock,
+    on_progress: Callable[[OrchestrationSummary], Awaitable[None]] | None,
 ) -> None:
     async with semaphore:
         started = time.monotonic()
@@ -448,17 +450,23 @@ async def _process_one(
             except Exception:
                 pass
 
-        if task_status == AuthoringTaskStatus.DEPLOYED.value:
-            summary.deployed += 1
-        elif task_status == AuthoringTaskStatus.AWAITING_REVIEW.value:
-            summary.authored += 1
-        elif task_status == AuthoringTaskStatus.SKIPPED_REVIEW.value:
-            summary.skipped_review += 1
-        else:
-            summary.failed += 1
-        summary.processed += 1
-        if task_error:
-            summary.errors.append(f"{source.id}: {task_error[:200]}")
+        async with progress_lock:
+            if task_status == AuthoringTaskStatus.DEPLOYED.value:
+                summary.deployed += 1
+                summary.preflight_ok += 1
+            elif task_status == AuthoringTaskStatus.AWAITING_REVIEW.value:
+                summary.authored += 1
+                summary.preflight_ok += 1
+            elif task_status == AuthoringTaskStatus.SKIPPED_REVIEW.value:
+                summary.skipped_review += 1
+                summary.preflight_ok += 1
+            else:
+                summary.failed += 1
+            summary.processed += 1
+            if task_error:
+                summary.errors.append(f"{source.id}: {task_error[:200]}")
+            if on_progress is not None:
+                await on_progress(summary)
 
 
 async def _process_source(
@@ -567,6 +575,7 @@ async def run_overnight_orchestrator(
     await session.commit()
     engine = session.bind
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    progress_lock = asyncio.Lock()
 
     tasks = [
         asyncio.create_task(
@@ -577,6 +586,8 @@ async def run_overnight_orchestrator(
                 summary=summary,
                 dry_run=dry_run,
                 settings=cfg,
+                progress_lock=progress_lock,
+                on_progress=on_progress,
             )
         )
         for source in sources
