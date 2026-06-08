@@ -17,7 +17,7 @@ from uk_jamaat_directory.domain import (
     SourcePublicationPolicy,
     SourceType,
 )
-from uk_jamaat_directory.ingest.authoring.agent import AgentReport, AgentResult
+from uk_jamaat_directory.ingest.authoring.authoring_result import AgentReport, AgentResult
 from uk_jamaat_directory.ingest.authoring.orchestrator import (
     _scripts_filesystem_path,
     run_overnight_orchestrator,
