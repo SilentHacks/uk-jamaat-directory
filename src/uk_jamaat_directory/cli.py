@@ -1741,7 +1741,7 @@ async def _run_orchestrate_authoring(
     async def _on_progress(summary) -> None:
         print(
             f"  progress: candidates={summary.candidates} "
-            f"discovered={summary.discovered} authored={summary.authored} "
+            f"preflight_ok={summary.preflight_ok} authored={summary.authored} "
             f"deployed={summary.deployed} skipped={summary.skipped_review} "
             f"failed={summary.failed}",
             flush=True,
