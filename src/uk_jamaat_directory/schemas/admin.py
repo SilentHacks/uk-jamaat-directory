@@ -294,3 +294,27 @@ class AdminExtractorResponse(BaseModel):
 class AdminExtractorListResponse(BaseModel):
     items: list[AdminExtractorResponse]
     count: int
+
+
+class AdminAuthoringTaskItem(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    status: str
+    discovered_url: str | None
+    target_kind: str
+    extractor_key: str | None
+    extractor_version: str | None
+    script_path: str | None
+    agent_model: str | None
+    agent_duration_ms: int | None
+    validation_issues: list[dict[str, Any]]
+    error: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminAuthoringTaskListResponse(BaseModel):
+    items: list[AdminAuthoringTaskItem]
+    count: int

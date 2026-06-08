@@ -415,6 +415,28 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
     )
     author_extractors.add_argument("--limit", type=int, default=20)
 
+    orchestrate = subparsers.add_parser(
+        "orchestrate-authoring",
+        help=(
+            "Run the overnight authoring orchestrator: discover timetables, "
+            "call the OpenCode agent, write drafts to scripts/, sync assignments."
+        ),
+    )
+    orchestrate.add_argument("--source-id", type=uuid.UUID, default=None)
+    orchestrate.add_argument("--limit", type=int, default=None)
+    orchestrate.add_argument("--concurrency", type=int, default=None)
+    orchestrate.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover + author + validate but do not write to scripts/ or sync",
+    )
+    orchestrate.add_argument(
+        "--per-source-timeout",
+        type=float,
+        default=None,
+        help="Override authoring_per_source_timeout_seconds",
+    )
+
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
     generate_exports = subparsers.add_parser(
@@ -800,6 +822,10 @@ def main() -> None:
     if args.command == "author-repo-extractors":
         raise SystemExit(
             asyncio.run(_run_author_repo_extractors(args, settings))
+        )
+    if args.command == "orchestrate-authoring":
+        raise SystemExit(
+            asyncio.run(_run_orchestrate_authoring(args, settings))
         )
 
     if args.command == "generate-exports":
@@ -1698,3 +1724,41 @@ async def _run_author_repo_extractors(
     for entry in produced:
         print(entry)
     return 0
+
+
+async def _run_orchestrate_authoring(
+    args: argparse.Namespace, settings: Settings
+) -> int:
+    from uk_jamaat_directory.ingest.authoring.orchestrator import (
+        run_overnight_orchestrator,
+    )
+
+    if args.per_source_timeout is not None:
+        settings = settings.model_copy(
+            update={"authoring_per_source_timeout_seconds": float(args.per_source_timeout)}
+        )
+
+    async def _on_progress(summary) -> None:
+        print(
+            f"  progress: candidates={summary.candidates} "
+            f"discovered={summary.discovered} authored={summary.authored} "
+            f"deployed={summary.deployed} skipped={summary.skipped_review} "
+            f"failed={summary.failed}",
+            flush=True,
+        )
+
+    async with cli_db_session(settings) as session:
+        summary = await run_overnight_orchestrator(
+            session=session,
+            settings=settings,
+            source_id=args.source_id,
+            limit=args.limit,
+            concurrency=args.concurrency,
+            dry_run=args.dry_run,
+            on_progress=_on_progress,
+        )
+        await session.commit()
+
+    payload = summary.as_dict()
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if summary.failed == 0 else 1

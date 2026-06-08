@@ -13,6 +13,8 @@ from uk_jamaat_directory.domain import CandidateStatus
 from uk_jamaat_directory.models.core import MosqueSource
 from uk_jamaat_directory.schemas.admin import (
     AdminAliasCreate,
+    AdminAuthoringTaskItem,
+    AdminAuthoringTaskListResponse,
     AdminBulkIdentityReviewAccept,
     AdminBulkMosqueActivate,
     AdminCandidateActionResponse,
@@ -708,3 +710,50 @@ async def list_extractors(
             )
         )
     return AdminExtractorListResponse(items=items, count=len(items))
+
+
+@router.get(
+    "/authoring",
+    response_model=AdminAuthoringTaskListResponse,
+    dependencies=[Depends(require_admin_key)],
+)
+async def list_authoring_tasks(
+    status_filter: str | None = Query(default=None, alias="status"),
+    target_kind: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db_session),
+) -> AdminAuthoringTaskListResponse:
+    from sqlalchemy import select
+
+    from uk_jamaat_directory.models.core import ExtractorAuthoringTask
+
+    stmt = select(ExtractorAuthoringTask)
+    if status_filter is not None:
+        stmt = stmt.where(ExtractorAuthoringTask.status == status_filter)
+    if target_kind is not None:
+        stmt = stmt.where(ExtractorAuthoringTask.target_kind == target_kind)
+    stmt = stmt.order_by(ExtractorAuthoringTask.updated_at.desc()).offset(offset).limit(limit)
+    rows = (await session.execute(stmt)).scalars().all()
+    items = [
+        AdminAuthoringTaskItem(
+            id=row.id,
+            source_id=row.source_id,
+            status=row.status,
+            discovered_url=row.discovered_url,
+            target_kind=row.target_kind,
+            extractor_key=row.extractor_key,
+            extractor_version=row.extractor_version,
+            script_path=row.script_path,
+            agent_model=row.agent_model,
+            agent_duration_ms=row.agent_duration_ms,
+            validation_issues=list(row.validation_issues or []),
+            error=row.error,
+            started_at=row.started_at,
+            finished_at=row.finished_at,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
+    return AdminAuthoringTaskListResponse(items=items, count=len(items))
