@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import os
 import uuid
 from typing import Any
@@ -16,7 +17,9 @@ from uk_jamaat_directory.domain import (
     SourcePublicationPolicy,
     SourceType,
 )
+from uk_jamaat_directory.ingest.authoring.agent import AgentReport, AgentResult
 from uk_jamaat_directory.ingest.authoring.orchestrator import (
+    _scripts_filesystem_path,
     run_overnight_orchestrator,
 )
 from uk_jamaat_directory.ingest.fetch.types import FetchResult
@@ -27,27 +30,20 @@ from uk_jamaat_directory.models.core import (
     SourceExtractorAssignment,
 )
 
-HTML_PAGE = """
-<!doctype html>
-<html>
-  <body>
-    <nav>
-      <a href="/">Home</a>
-      <a href="/prayer-times">Prayer Times</a>
-      <a href="/donate">Donate</a>
-    </nav>
-  </body>
-</html>
-"""
+SCRIPTS_DIR = _scripts_filesystem_path()
 
-PDF_HEAD = FetchResult(
-    status_code=200,
-    body=b"%PDF-1.4\n%fake pdf body for test purposes\n",
-    content_type="application/pdf",
-    etag=None,
-    last_modified=None,
-    unchanged=False,
-)
+
+def _cleanup_orphan_scripts() -> None:
+    """Remove ``*.py`` files left in the scripts directory by previous
+    test runs (except ``__init__.py`` and ``synthetic_html_table.py``).
+    """
+
+    for path in glob.glob(os.path.join(SCRIPTS_DIR, "*.py")):
+        name = os.path.basename(path)
+        if name in {"__init__.py", "synthetic_html_table.py"}:
+            continue
+        os.unlink(path)
+
 
 DRAFT_SCRIPT = '''"""Draft authored by stubbed agent for tests."""
 from __future__ import annotations
@@ -95,7 +91,7 @@ def _settings(**overrides: Any) -> Settings:
 
 
 async def _seed_source(
-    session, *, name: str, domain: str, body_kind: str
+    session, *, name: str, domain: str, source_url: str | None = None
 ) -> MosqueSource:
     mosque = Mosque(
         id=uuid.uuid4(),
@@ -109,10 +105,10 @@ async def _seed_source(
         mosque_id=mosque.id,
         source_type=SourceType.MOSQUE_WEBSITE,
         external_id=f"web-{mosque.id}",
-        source_url=f"https://{domain}/",
+        source_url=source_url or f"https://{domain}/",
         publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
         confidence=Confidence.OFFICIAL_IMPORT,
-        metadata_={"crawl_enabled": True, "test_kind": body_kind},
+        metadata_={"crawl_enabled": True},
     )
     session.add(mosque)
     session.add(source)
@@ -120,199 +116,41 @@ async def _seed_source(
     return source
 
 
-@pytest.mark.asyncio
-async def test_orchestrator_skips_pdf_sources(db_session, test_settings) -> None:
-    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
-        pytest.skip("PostGIS integration test disabled")
-    pdf_source = await _seed_source(
-        db_session,
-        name="PDF Masjid",
-        domain="pdf.test",
-        body_kind="pdf",
-    )
-    await db_session.flush()
-
-    settings = _settings(
-        crawl_enabled=True,
-        authoring_per_source_timeout_seconds=30.0,
-    )
-    with (
-        patch(
-            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
-            new=AsyncMock(return_value=PDF_HEAD),
-        ),
-        patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=True,
-        ),
-    ):
-        summary = await run_overnight_orchestrator(
-            session=db_session,
-            settings=settings,
-            concurrency=1,
-            dry_run=True,
-        )
-    await db_session.commit()
-
-    task = (
-        await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == pdf_source.id
-            )
-        )
-    ).scalar_one_or_none()
-    assert task is not None
-    assert task.status == AuthoringTaskStatus.SKIPPED_REVIEW.value
-    assert task.target_kind == "pdf"
-    assert summary.skipped_review == 1
-    assert summary.deployed == 0
-
-
-@pytest.mark.asyncio
-async def test_orchestrator_writes_draft_for_html_source(
-    db_session, test_settings, tmp_path
-) -> None:
-    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
-        pytest.skip("PostGIS integration test disabled")
-    html_source = await _seed_source(
-        db_session,
-        name="Draft Masjid",
-        domain="draft.test",
-        body_kind="html",
-    )
-    await db_session.flush()
-
-    html_fetch = FetchResult(
+def _ok_fetch() -> FetchResult:
+    return FetchResult(
         status_code=200,
-        body=HTML_PAGE.encode("utf-8"),
-        content_type="text/html; charset=utf-8",
-        etag=None,
-        last_modified=None,
-        unchanged=False,
-    )
-    timetable_fetch = FetchResult(
-        status_code=200,
-        body=b"<html><body><table><tr><td>placeholder</td></tr></table></body></html>",
+        body=b"<html><body>hello</body></html>",
         content_type="text/html; charset=utf-8",
         etag=None,
         last_modified=None,
         unchanged=False,
     )
 
-    settings = _settings(
-        crawl_enabled=True,
-        authoring_per_source_timeout_seconds=30.0,
-    )
-
-    from uk_jamaat_directory.ingest.authoring import orchestrator as orch_mod
-    from uk_jamaat_directory.ingest.authoring.agent import AgentResult
-    from uk_jamaat_directory.ingest.extract.repo_extractors.scripts import (
-        __path__ as scripts_pkg_path,
-    )
-
-    async def fake_run_authoring_agent(*, prompt: str, settings: Settings, **kwargs: Any):
-        return AgentResult(
-            text=f"```python\n{DRAFT_SCRIPT}\n```",
-            duration_ms=42,
-            command="opencode -m test",
-            returncode=0,
-            stdout_excerpt="ok",
-        )
-
-    scripts_pkg_path.append(str(tmp_path))
-    try:
-        with (
-            patch(
-                "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
-                new=AsyncMock(side_effect=[html_fetch, timetable_fetch]),
-            ),
-            patch(
-                "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-                return_value=True,
-            ),
-            patch(
-                "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
-                new=fake_run_authoring_agent,
-            ),
-            patch.object(
-                orch_mod,
-                "_scripts_filesystem_path",
-                return_value=str(tmp_path),
-            ),
-        ):
-            summary = await run_overnight_orchestrator(
-                session=db_session,
-                settings=settings,
-                source_id=html_source.id,
-                concurrency=1,
-                dry_run=False,
-            )
-    finally:
-        if str(tmp_path) in scripts_pkg_path:
-            scripts_pkg_path.remove(str(tmp_path))
-    await db_session.commit()
-
-    task = (
-        await db_session.execute(
-            select(ExtractorAuthoringTask).where(
-                ExtractorAuthoringTask.source_id == html_source.id
-            )
-        )
-    ).scalar_one_or_none()
-    assert task is not None
-    if task.status not in {
-        AuthoringTaskStatus.AWAITING_REVIEW.value,
-        AuthoringTaskStatus.DEPLOYED.value,
-    }:
-        pytest.fail(
-            f"unexpected status: {task.status} error={task.error} validation={task.validation_issues}"
-        )
-    assert task.discovered_url == "https://draft.test/prayer-times"
-    assert task.target_kind == "html"
-    assert task.extractor_key is not None
-    assert (tmp_path / f"{task.extractor_key}.py").exists()
-    assert summary.authored + summary.deployed >= 1
-    if task.status == AuthoringTaskStatus.DEPLOYED.value:
-        assignment = await db_session.get(
-            SourceExtractorAssignment, html_source.id
-        )
-        assert assignment is not None
-        assert assignment.extractor_key == "test_html_draft"
-
 
 @pytest.mark.asyncio
-async def test_orchestrator_marks_failed_when_no_opencode(
+async def test_orchestrator_marks_failed_when_preflight_unreachable(
     db_session, test_settings
 ) -> None:
     if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
         pytest.skip("PostGIS integration test disabled")
     source = await _seed_source(
-        db_session,
-        name="No OpenCode",
-        domain="noc.test",
-        body_kind="html",
+        db_session, name="Unreachable", domain="unreachable.test"
     )
     await db_session.flush()
-    fetch = FetchResult(
-        status_code=200,
-        body=HTML_PAGE.encode("utf-8"),
-        content_type="text/html; charset=utf-8",
-        etag=None,
-        last_modified=None,
-        unchanged=False,
-    )
-    settings = _settings(
-        crawl_enabled=True,
-        authoring_per_source_timeout_seconds=30.0,
-    )
-    with (
-        patch(
-            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
-            new=AsyncMock(return_value=fetch),
-        ),
-        patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=False,
+    settings = _settings(crawl_enabled=True)
+
+    with patch(
+        "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
+        new=AsyncMock(
+            return_value=FetchResult(
+                status_code=None,
+                body=b"",
+                content_type=None,
+                etag=None,
+                last_modified=None,
+                unchanged=False,
+                error="robots.txt disallows fetch",
+            )
         ),
     ):
         summary = await run_overnight_orchestrator(
@@ -333,5 +171,320 @@ async def test_orchestrator_marks_failed_when_no_opencode(
     ).scalar_one_or_none()
     assert task is not None
     assert task.status == AuthoringTaskStatus.FAILED.value
-    assert "opencode" in (task.error or "")
+    assert "robots" in (task.error or "")
     assert summary.failed == 1
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_marks_skipped_review_when_agent_skips(
+    db_session, test_settings
+) -> None:
+    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
+        pytest.skip("PostGIS integration test disabled")
+    source = await _seed_source(
+        db_session, name="PDF Mosque", domain="pdf.test"
+    )
+    await db_session.flush()
+    settings = _settings(crawl_enabled=True)
+
+    from uk_jamaat_directory.domain import AuthoringTargetKind
+
+    skip_report = AgentReport(
+        status="skipped_review",
+        target_url="https://pdf.test/timetable.pdf",
+        target_kind=AuthoringTargetKind.PDF,
+        reason="pdf target — ocr not yet implemented",
+    )
+
+    async def fake_run_authoring_agent(
+        *, prompt: str, settings: Settings, **kwargs: Any
+    ) -> AgentResult:
+        return AgentResult(
+            text="STATUS=skipped_review\n",
+            duration_ms=10,
+            command="opencode -m test",
+            returncode=0,
+            stdout_excerpt="ok",
+            report=skip_report,
+        )
+
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
+            new=AsyncMock(return_value=_ok_fetch()),
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
+            return_value=True,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
+            new=fake_run_authoring_agent,
+        ),
+    ):
+        summary = await run_overnight_orchestrator(
+            session=db_session,
+            settings=settings,
+            source_id=source.id,
+            concurrency=1,
+            dry_run=True,
+        )
+    await db_session.commit()
+
+    task = (
+        await db_session.execute(
+            select(ExtractorAuthoringTask).where(
+                ExtractorAuthoringTask.source_id == source.id
+            )
+        )
+    ).scalar_one_or_none()
+    assert task is not None
+    assert task.status == AuthoringTaskStatus.SKIPPED_REVIEW.value
+    assert task.target_kind == "pdf"
+    assert task.discovered_url == "https://pdf.test/timetable.pdf"
+    assert "ocr" in (task.error or "")
+    assert summary.skipped_review == 1
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_deploys_draft_when_agent_authored(
+    db_session, test_settings
+) -> None:
+    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
+        pytest.skip("PostGIS integration test disabled")
+    _cleanup_orphan_scripts()
+    source = await _seed_source(
+        db_session, name="Draft Masjid", domain="draft.test"
+    )
+    await db_session.flush()
+    settings = _settings(crawl_enabled=True)
+
+    # The agent writes the script to the canonical scripts directory
+    # under the orchestrator's computed key. The orchestrator reads,
+    # validates, and runs ``sync_repo_extractors`` to create the
+    # assignment.
+    from uk_jamaat_directory.domain import AuthoringTargetKind
+    from uk_jamaat_directory.ingest.authoring.orchestrator import (
+        _safe_extractor_key,
+    )
+
+    expected_key = _safe_extractor_key(
+        f"Draft Masjid_{str(source.id)[:8]}"
+    )
+    agent_script_path = os.path.join(SCRIPTS_DIR, f"{expected_key}.py")
+
+    async def fake_run_authoring_agent(
+        *, prompt: str, settings: Settings, **kwargs: Any
+    ) -> AgentResult:
+        with open(agent_script_path, "w", encoding="utf-8") as handle:
+            handle.write(DRAFT_SCRIPT)
+        return AgentResult(
+            text="STATUS=authored\n",
+            duration_ms=42,
+            command="opencode -m test",
+            returncode=0,
+            stdout_excerpt="ok",
+            report=AgentReport(
+                status="authored",
+                target_url="https://draft.test/prayer-times",
+                target_kind=AuthoringTargetKind.HTML,
+                script_path=agent_script_path,
+            ),
+        )
+
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
+            new=AsyncMock(return_value=_ok_fetch()),
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
+            return_value=True,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
+            new=fake_run_authoring_agent,
+        ),
+    ):
+        summary = await run_overnight_orchestrator(
+            session=db_session,
+            settings=settings,
+            source_id=source.id,
+            concurrency=1,
+            dry_run=False,
+        )
+    await db_session.commit()
+
+    task = (
+        await db_session.execute(
+            select(ExtractorAuthoringTask).where(
+                ExtractorAuthoringTask.source_id == source.id
+            )
+        )
+    ).scalar_one_or_none()
+    assert task is not None
+    if task.status != AuthoringTaskStatus.DEPLOYED.value:
+        pytest.fail(
+            f"unexpected status: {task.status} error={task.error} "
+            f"validation={task.validation_issues}"
+        )
+    assert task.target_kind == "html"
+    assert task.discovered_url == "https://draft.test/prayer-times"
+    assert summary.deployed == 1
+
+    assignment = await db_session.get(
+        SourceExtractorAssignment, source.id
+    )
+    assert assignment is not None
+    assert assignment.extractor_key == "test_html_draft"
+    _cleanup_orphan_scripts()
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
+    db_session, test_settings
+) -> None:
+    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
+        pytest.skip("PostGIS integration test disabled")
+    source = await _seed_source(
+        db_session, name="No Status", domain="nostatus.test"
+    )
+    await db_session.flush()
+    settings = _settings(crawl_enabled=True)
+
+    async def fake_run_authoring_agent(
+        *, prompt: str, settings: Settings, **kwargs: Any
+    ) -> AgentResult:
+        return AgentResult(
+            text="I got distracted and forgot to emit a summary.",
+            duration_ms=10,
+            command="opencode -m test",
+            returncode=0,
+            stdout_excerpt="ok",
+            report=AgentReport(),
+        )
+
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
+            new=AsyncMock(return_value=_ok_fetch()),
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
+            return_value=True,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
+            new=fake_run_authoring_agent,
+        ),
+    ):
+        summary = await run_overnight_orchestrator(
+            session=db_session,
+            settings=settings,
+            source_id=source.id,
+            concurrency=1,
+            dry_run=True,
+        )
+    await db_session.commit()
+
+    task = (
+        await db_session.execute(
+            select(ExtractorAuthoringTask).where(
+                ExtractorAuthoringTask.source_id == source.id
+            )
+        )
+    ).scalar_one_or_none()
+    assert task is not None
+    assert task.status == AuthoringTaskStatus.FAILED.value
+    assert "STATUS" in (task.error or "")
+    assert summary.failed == 1
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_marks_failed_when_validation_fails(
+    db_session, test_settings
+) -> None:
+    if os.getenv("UK_JAMAAT_TEST_POSTGRES") != "1":
+        pytest.skip("PostGIS integration test disabled")
+    _cleanup_orphan_scripts()
+    source = await _seed_source(
+        db_session, name="Bad Draft", domain="baddraft.test"
+    )
+    await db_session.flush()
+    settings = _settings(crawl_enabled=True)
+
+    from uk_jamaat_directory.domain import AuthoringTargetKind
+    from uk_jamaat_directory.ingest.authoring.orchestrator import (
+        _safe_extractor_key,
+    )
+
+    expected_key = _safe_extractor_key(
+        f"Bad Draft_{str(source.id)[:8]}"
+    )
+    bad_path = os.path.join(SCRIPTS_DIR, f"{expected_key}.py")
+
+    bad_script = (
+        "import os\n"
+        "from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (\n"
+        "    BaseMosqueWebsiteExtractor,\n"
+        ")\n"
+        "class Extractor(BaseMosqueWebsiteExtractor):\n"
+        "    key = 'bad'\n"
+        "    version = '2026.06.08.1'\n"
+        "    def extract(self, ctx):\n"
+        "        pass\n"
+    )
+
+    async def fake_run_authoring_agent(
+        *, prompt: str, settings: Settings, **kwargs: Any
+    ) -> AgentResult:
+        with open(bad_path, "w", encoding="utf-8") as handle:
+            handle.write(bad_script)
+        return AgentResult(
+            text="STATUS=authored\n",
+            duration_ms=10,
+            command="opencode -m test",
+            returncode=0,
+            stdout_excerpt="ok",
+            report=AgentReport(
+                status="authored",
+                target_url="https://baddraft.test/prayer-times",
+                target_kind=AuthoringTargetKind.HTML,
+                script_path=bad_path,
+            ),
+        )
+
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.discovery.fetch_url",
+            new=AsyncMock(return_value=_ok_fetch()),
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
+            return_value=True,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
+            new=fake_run_authoring_agent,
+        ),
+    ):
+        await run_overnight_orchestrator(
+            session=db_session,
+            settings=settings,
+            source_id=source.id,
+            concurrency=1,
+            dry_run=False,
+        )
+    await db_session.commit()
+
+    task = (
+        await db_session.execute(
+            select(ExtractorAuthoringTask).where(
+                ExtractorAuthoringTask.source_id == source.id
+            )
+        )
+    ).scalar_one_or_none()
+    assert task is not None
+    assert task.status == AuthoringTaskStatus.FAILED.value
+    assert task.validation_issues
+    _cleanup_orphan_scripts()
