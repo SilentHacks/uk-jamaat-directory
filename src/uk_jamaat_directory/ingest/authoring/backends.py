@@ -126,9 +126,38 @@ class ClaudeCodeBackend(AgentBackend):
             env.setdefault("ANTHROPIC_BASE_URL", settings.ai_agent_base_url)
 
 
+class PiBackend(AgentBackend):
+    """Pi CLI non-interactive mode (https://pi.dev/docs/latest/usage).
+
+    ``pi --model <model> -p <prompt> --mode json`` runs one non-interactive
+    session (``-p``/``--print``), emitting all events as JSON lines
+    (``--mode json``) for the orchestrator's diagnostics. The model pattern
+    supports ``provider/id`` syntax, which also selects the provider.
+
+    Pi resolves credentials from the provider-native environment variables
+    (e.g. ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``). The configured key is
+    injected under both common names so the chosen provider finds it.
+    """
+
+    name = "pi"
+    binary = "pi"
+    default_model = "anthropic/claude-haiku-4-5-20251001"
+
+    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
+        return [bin_path, "--model", model, "-p", prompt, "--mode", "json"]
+
+    def apply_env(self, env: dict[str, str], settings: Settings) -> None:
+        if settings.ai_agent_api_key:
+            env.setdefault("ANTHROPIC_API_KEY", settings.ai_agent_api_key)
+            env.setdefault("OPENAI_API_KEY", settings.ai_agent_api_key)
+        if settings.ai_agent_base_url:
+            env.setdefault("OPENAI_BASE_URL", settings.ai_agent_base_url)
+
+
 AGENT_BACKENDS: dict[str, type[AgentBackend]] = {
     OpenCodeBackend.name: OpenCodeBackend,
     ClaudeCodeBackend.name: ClaudeCodeBackend,
+    PiBackend.name: PiBackend,
 }
 
 
