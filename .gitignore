@@ -70,3 +70,6 @@ out/
 
 # Downloaded system packages
 *.deb
+
+# Editor/agent local files
+.cursor/

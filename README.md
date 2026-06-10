@@ -2,9 +2,9 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–11 are in place. Phase 12 adds GitHub publishing hygiene (Dependabot, license docs, security policy). HTML/PDF crawlers and admin web UI remain planned. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–12 are in place, plus repo-owned deterministic extractor scripts and an overnight AI authoring orchestrator (ADR 0016/0017). Admin web UI remains planned. The long-term product plan is in [PLAN.md](PLAN.md).
 
-**Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) (private)
+**Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory)
 
 ## Purpose
 
@@ -199,6 +199,24 @@ Crawl is **opt-in** (`CRAWL_ENABLED=false` by default). Requires MinIO/S3 for ar
 
 Celery beat (when worker/beat containers run) registers sources daily and enqueues hourly due fetches. MyLocalMasjid is **not** crawled in Phase 9.
 
+## Extractor scripts and overnight authoring
+
+Timetable extraction from mosque websites uses repo-owned deterministic extractor scripts
+under `src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts/`, authored by an
+overnight AI orchestrator and gated by static validation, an execution smoke test, and
+semantic output checks before deployment.
+
+```bash
+.venv/bin/uk-jamaat-directory orchestrate-authoring            # author scripts for pending sources
+.venv/bin/uk-jamaat-directory smoke-test-repo-extractor \
+  --extractor-key <key> --source-url <url>                     # run one script end to end
+.venv/bin/uk-jamaat-directory prune-repo-extractors --apply    # retire broken/disallowed scripts
+```
+
+See [docs/adr/0016](docs/adr/0016-repo-owned-extractor-scripts.md),
+[docs/adr/0017](docs/adr/0017-overnight-extractor-authoring-orchestrator.md), and
+[AGENTS.md](AGENTS.md) for commands and conventions.
+
 ## Bulk exports (Phase 10)
 
 After publishing, generate reproducible snapshot files for the latest (or specified) **published** dataset version. Files are stored in MinIO/S3 and manifest URLs/checksums are written to `dataset_versions.manifest.exports`.
@@ -343,7 +361,7 @@ Raw fetched artifacts, extraction runs, claim contact details, private admin not
 
 | Artifact | Document |
 |----------|----------|
-| Application code (private) | [LICENSE.md](LICENSE.md) — proprietary |
+| Application code | [LICENSE.md](LICENSE.md) — AGPL-3.0-or-later |
 | Public normalized data (when released) | [DATA_LICENSE.md](DATA_LICENSE.md) — intended ODbL 1.0 |
 | Attribution requirements | [ATTRIBUTION.md](ATTRIBUTION.md) |
 | Security reports | [SECURITY.md](SECURITY.md) |

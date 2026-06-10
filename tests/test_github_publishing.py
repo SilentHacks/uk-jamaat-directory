@@ -21,9 +21,10 @@ def test_data_license_references_odbl() -> None:
     assert "private_use_only" in text or "public_redistribution_allowed" in text
 
 
-def test_license_marks_code_proprietary() -> None:
+def test_license_marks_code_agpl() -> None:
     text = (ROOT / "LICENSE.md").read_text()
-    assert "proprietary" in text.lower() or "All rights reserved" in text
+    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in text
+    assert "Version 3" in text
 
 
 def test_dependabot_config_present() -> None:

@@ -20,3 +20,4 @@ This directory records project decisions that are expensive to rediscover later.
 - [0015: AI Extraction Profiles](0015-ai-extraction-profiles.md)
 - [0016: Repo-Owned Extractor Scripts](0016-repo-owned-extractor-scripts.md)
 - [0017: Overnight Extractor Authoring Orchestrator](0017-overnight-extractor-authoring-orchestrator.md)
+- [0018: Public Release And AGPL Relicensing](0018-public-release-agpl.md)

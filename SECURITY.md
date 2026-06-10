@@ -11,8 +11,7 @@ Security fixes are applied on the `master` branch. Deploy from tagged releases o
 
 ## Reporting a vulnerability
 
-This repository is **private**. Please do **not** open public GitHub issues for
-security-sensitive reports.
+Please do **not** open public GitHub issues for security-sensitive reports.
 
 Report vulnerabilities privately to the repository maintainers:
 

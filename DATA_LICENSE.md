@@ -2,9 +2,9 @@
 
 This document describes the intended license for **public normalized Directory data** —
 mosque identity facts, published jamaat occurrences, freshness metadata, change feeds,
-and bulk export files — when those datasets are published outside this private repository.
+and bulk export files — when those datasets are published.
 
-Application source code remains proprietary. See [LICENSE.md](LICENSE.md).
+Application source code is licensed separately under AGPL-3.0-or-later. See [LICENSE.md](LICENSE.md).
 
 ## Default license: Open Database License (ODbL) 1.0
 
@@ -35,7 +35,7 @@ Full legal terms: [https://opendatacommons.org/licenses/odbl/1-0/](https://opend
 
 OpenAPI specifications and JSON Schema files under `docs/api/` are intended for public
 reuse under [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
-when published separately from this private repository.
+when published separately from this repository.
 
 ## What is **not** public data
 
@@ -74,7 +74,7 @@ dataset version.
 
 ## Pre-release notice
 
-This repository is private and **no public data release has occurred yet**. This document
+**No public data release has occurred yet.** This document
 describes the intended license before any external publication. When the first public dataset
 is published, the effective date and version will be recorded in export metadata and an ADR
 update.

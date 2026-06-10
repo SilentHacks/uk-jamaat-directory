@@ -1,17 +1,17 @@
 # GitHub Publishing Workflow
 
-Phase 12 setup for the private `SilentHacks/uk-jamaat-directory` repository.
+Phase 12 setup for the `SilentHacks/uk-jamaat-directory` repository.
 
 ## Already in place
 
 | Item | Status | Location |
 |------|--------|----------|
-| Private GitHub repository | Done | [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) |
+| Public GitHub repository | Done | [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory) |
 | CI on `master` and PRs | Done | [.github/workflows/ci.yml](../../.github/workflows/ci.yml) |
 | PostGIS service container (no secrets) | Done | CI workflow `services.postgres` |
 | Dependabot | Done | [.github/dependabot.yml](../../.github/dependabot.yml) |
 | PR dependency review | Done | [.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml) |
-| Code license (proprietary) | Done | [LICENSE.md](../../LICENSE.md) |
+| Code license (AGPL-3.0-or-later) | Done | [LICENSE.md](../../LICENSE.md) |
 | Public data license (ODbL intent) | Done | [DATA_LICENSE.md](../../DATA_LICENSE.md) |
 | Attribution policy | Done | [ATTRIBUTION.md](../../ATTRIBUTION.md) |
 | Security reporting | Done | [SECURITY.md](../../SECURITY.md) |
@@ -45,12 +45,6 @@ Enable branch protection on `master` once CI is reliable:
 - Disallow force pushes to `master`
 - Optionally require branches to be up to date before merge
 
-### GitHub Free private repositories
-
-Branch protection rules for **private** repositories require **GitHub Pro**, GitHub Team,
-or GitHub Enterprise on the account that owns the repository. If the API returns HTTP 403,
-use the process below until the plan is upgraded or the repository is made public.
-
 ### Manual setup (GitHub UI)
 
 1. Repository → **Settings** → **Branches**
@@ -59,7 +53,7 @@ use the process below until the plan is upgraded or the repository is made publi
 4. Select the **CI** workflow job
 5. Save the rule
 
-### CLI setup (when plan supports it)
+### CLI setup
 
 ```bash
 gh api \
@@ -87,8 +81,7 @@ monthly schedule.
 
 ## Before a public data release
 
-Even if the repository stays private, publish or link these documents when releasing public
-dataset files:
+Publish or link these documents when releasing public dataset files:
 
 - [DATA_LICENSE.md](../../DATA_LICENSE.md)
 - [ATTRIBUTION.md](../../ATTRIBUTION.md)

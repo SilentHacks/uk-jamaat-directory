@@ -28,10 +28,10 @@ Log out and back in so the `docker` group applies.
 
 ## First-time setup
 
-1. Clone the repository on the server (private repo — use deploy keys or HTTPS with a token):
+1. Clone the repository on the server:
 
 ```bash
-git clone git@github.com:SilentHacks/uk-jamaat-directory.git
+git clone https://github.com/SilentHacks/uk-jamaat-directory.git
 cd uk-jamaat-directory
 ```
 
