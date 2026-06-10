@@ -8,7 +8,6 @@ agent did — no parsing of the agent's free-form text output is required.
 from __future__ import annotations
 
 import json
-import shutil
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,10 +25,6 @@ RESULT_SCHEMA_VERSION = "1.0"
 
 # Allowed statuses the agent may report.
 VALID_STATUSES: frozenset[str] = frozenset({"authored", "skipped_review", "failed"})
-
-
-class OpenCodeNotInstalledError(RuntimeError):
-    """Raised when the ``opencode`` binary is not on ``PATH``."""
 
 
 @dataclass
@@ -53,21 +48,6 @@ class AgentResult:
     returncode: int
     stdout_excerpt: str
     report: AgentReport = field(default_factory=AgentReport)
-
-
-def is_opencode_available() -> bool:
-    return shutil.which("opencode") is not None
-
-
-def _resolve_opencode_bin() -> str:
-    path = shutil.which("opencode")
-    if not path:
-        msg = (
-            "opencode binary 'opencode' not found on PATH. "
-            "Install OpenCode or set the opencode executable on PATH."
-        )
-        raise OpenCodeNotInstalledError(msg)
-    return path
 
 
 class AuthoringResultJson(BaseModel):

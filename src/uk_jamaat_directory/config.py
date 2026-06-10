@@ -83,7 +83,10 @@ class Settings(BaseSettings):
     repo_extractor_ocr_timeout_seconds: float = 120.0
     repo_extractor_auto_approve_candidates: bool = True
 
-    ai_agent_model: str = "opencode-go/deepseek-v4-flash"
+    # Authoring agent backend: "opencode" or "claude_code" (see authoring/backends.py).
+    ai_agent_backend: str = "opencode"
+    # None = use the selected backend's default model.
+    ai_agent_model: str | None = None
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
     authoring_concurrency: int = 8

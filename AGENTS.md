@@ -16,7 +16,7 @@
 - PostGIS tests: `make test-postgres` (runs preflight first) — see **PostGIS integration tests** below
 - Export OpenAPI/JSON schemas: `make export-contracts`
 - Repo extractor flow: `list-repo-extractors`, `validate-repo-extractor(s)`, `sync-repo-extractors`, `process-source --source-id <uuid>`
-- Overnight authoring: `orchestrate-authoring [--concurrency N --limit N --source-id UUID --dry-run]`. Requires the `opencode` binary on PATH. The agent runs with network access and navigates the source's registrable domain on its own; PDF/Image/OCR targets are skipped to the review queue automatically. Set `OPENAI_BASE_URL` / `OPENAI_API_KEY` (auto-populated from `ai_agent_base_url` / `ai_agent_api_key`) to route the OpenCode agent to a real provider.
+- Overnight authoring: `orchestrate-authoring [--concurrency N --limit N --source-id UUID --dry-run]`. The agent CLI is pluggable via `AI_AGENT_BACKEND` (`ingest/authoring/backends.py`): `opencode` (default; requires the `opencode` binary, routes via `OPENAI_BASE_URL`/`OPENAI_API_KEY`) or `claude_code` (requires the `claude` binary; runs `claude -p --model claude-haiku-4-5-20251001 --permission-mode bypassPermissions`, routes via `ANTHROPIC_API_KEY`). `AI_AGENT_MODEL` overrides the backend's default model; credentials auto-populate from `ai_agent_api_key` / `ai_agent_base_url`. The agent runs with network access and navigates the source's registrable domain on its own; PDF/Image/OCR targets are skipped to the review queue automatically.
 
 ## Current Scope (implemented)
 

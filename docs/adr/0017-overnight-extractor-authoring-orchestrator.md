@@ -105,6 +105,14 @@ to a real network sandbox is a follow-up.
 - New settings: `authoring_concurrency`, `authoring_per_source_timeout_seconds`,
   `authoring_global_timeout_seconds`, `ai_agent_model`, `ai_agent_base_url`
   (optional), `ai_agent_api_key` (optional).
+- Update (2026-06-10): the agent CLI is pluggable. `ai_agent_backend` selects an
+  `AgentBackend` in `ingest/authoring/backends.py` — `opencode` (default) or
+  `claude_code` (Claude Code headless: `claude -p --model
+  claude-haiku-4-5-20251001 --permission-mode bypassPermissions`, suitable
+  because the unattended run cannot answer permission prompts and authored
+  scripts are gated by the validator/smoke/semantic checks afterwards).
+  `ai_agent_model` is now optional and defaults per backend; credentials map to
+  `OPENAI_*` or `ANTHROPIC_*` environment variables per backend.
 - New CLI `orchestrate-authoring` (and `orchestrate-authoring --source-id` for
   one-off debugging).
 - New Celery task `authoring.run_overnight` for scheduled runs.

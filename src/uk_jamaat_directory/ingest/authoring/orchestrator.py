@@ -60,8 +60,8 @@ from uk_jamaat_directory.ingest.authoring.authoring_result import (
     AgentResult,
     authoring_result_path,
     clean_authoring_result,
-    is_opencode_available,
 )
+from uk_jamaat_directory.ingest.authoring.backends import get_agent_backend
 from uk_jamaat_directory.ingest.authoring.discovery import preflight_source
 from uk_jamaat_directory.ingest.authoring.failure_taxonomy import classify_failure
 from uk_jamaat_directory.ingest.authoring.smoke_test import smoke_test_extractor
@@ -575,10 +575,11 @@ async def _process_source(
             extractor_version=extractor_version,
         )
 
-    if not is_opencode_available():
+    backend = get_agent_backend(settings)
+    if not backend.is_available():
         return _SourceProcessResult(
             status=AuthoringTaskStatus.FAILED.value,
-            error="opencode binary not found on PATH",
+            error=f"agent binary {backend.binary!r} (backend {backend.name!r}) not found on PATH",
             failure_category=AuthoringFailureCategory.AGENT_ERROR.value,
             discovered_url=source.source_url,
             target_kind=preflight.predicted_kind.value,
@@ -614,6 +615,7 @@ async def _process_source(
                 settings=settings,
                 result_path=result_path,
                 cwd=_repo_root(),
+                backend=backend,
             )
         except TimeoutError as exc:
             return _SourceProcessResult(
@@ -633,7 +635,7 @@ async def _process_source(
             extractor_key=extractor_key,
             scripts_dir=scripts_dir,
         )
-        result.agent_model = settings.ai_agent_model
+        result.agent_model = backend.resolve_model(settings)
         result.repair_attempts = repair_attempts
 
         issues: list[str] = []

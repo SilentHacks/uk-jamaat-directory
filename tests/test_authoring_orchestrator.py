@@ -32,6 +32,19 @@ from uk_jamaat_directory.models.core import (
 
 SCRIPTS_DIR = _scripts_filesystem_path()
 
+
+class _FakeBackend:
+    """Stands in for an AgentBackend; always available, never spawns anything."""
+
+    name = "fake"
+    binary = "fake-agent"
+
+    def is_available(self) -> bool:
+        return True
+
+    def resolve_model(self, settings: Settings) -> str:
+        return settings.ai_agent_model or "fake-model"
+
 # Scripts that existed before the test session started. The cleanup helper
 # must NEVER touch these: this directory holds real, repo-owned extractor
 # scripts, and tests may only delete files they created themselves.
@@ -213,8 +226,8 @@ async def test_orchestrator_marks_skipped_review_when_agent_skips(
             new=AsyncMock(return_value=_ok_fetch()),
         ),
         patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=True,
+            "uk_jamaat_directory.ingest.authoring.orchestrator.get_agent_backend",
+            return_value=_FakeBackend(),
         ),
         patch(
             "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
@@ -291,8 +304,8 @@ async def test_orchestrator_deploys_draft_when_agent_authored(db_session, test_s
             new=AsyncMock(return_value=_ok_fetch()),
         ),
         patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=True,
+            "uk_jamaat_directory.ingest.authoring.orchestrator.get_agent_backend",
+            return_value=_FakeBackend(),
         ),
         patch(
             "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
@@ -357,8 +370,8 @@ async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
             new=AsyncMock(return_value=_ok_fetch()),
         ),
         patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=True,
+            "uk_jamaat_directory.ingest.authoring.orchestrator.get_agent_backend",
+            return_value=_FakeBackend(),
         ),
         patch(
             "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
@@ -439,8 +452,8 @@ async def test_orchestrator_marks_failed_when_validation_fails(db_session, test_
             new=AsyncMock(return_value=_ok_fetch()),
         ),
         patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator.is_opencode_available",
-            return_value=True,
+            "uk_jamaat_directory.ingest.authoring.orchestrator.get_agent_backend",
+            return_value=_FakeBackend(),
         ),
         patch(
             "uk_jamaat_directory.ingest.authoring.orchestrator.run_authoring_agent",
