@@ -1706,6 +1706,7 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
         eta = avg * remaining if avg else 0
         line = (
             f"[{processed}/{total}] {pct:.1f}% "
+            f"running={summary.in_flight} "
             f"elapsed={elapsed:.0f}s eta={eta:.0f}s "
             f"ok={summary.preflight_ok} "
             f"authored={summary.authored} "

@@ -129,6 +129,9 @@ def build_authoring_prompt(
             )
             table_keywords = ("date", "fajr")     # all must appear in the header
             date_column = "date"                  # header keyword or column index
+            # Use an index (e.g. date_column = 0) when the date column has a
+            # blank header. Bare day numbers ("1", "21st") are handled — the
+            # base fills in the current month/year.
             prayer_columns = {{                    # JAMAAT columns only
                 Prayer.FAJR: "fajr",
                 Prayer.DHUHR: "zuhr",

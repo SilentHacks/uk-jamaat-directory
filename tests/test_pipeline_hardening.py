@@ -20,6 +20,7 @@ from uk_jamaat_directory.ingest.domain_policy import (
 from uk_jamaat_directory.ingest.extract.helpers.dates import (
     add_months,
     parse_date_flexible,
+    parse_day_of_month,
 )
 from uk_jamaat_directory.ingest.extract.helpers.html import (
     extract_tables,
@@ -220,6 +221,39 @@ def test_declarative_table_extractor() -> None:
     # 10:00 isha disambiguated to PM
     assert isha[0].jamaat_time == time(22, 0)
     assert all(r.evidence.raw_text for r in result.rows)
+
+
+def test_declarative_table_extractor_bare_day_numbers() -> None:
+    """Monthly tables often print only the day-of-month in the date column
+    (and repeat the header as the first body row); both must be handled."""
+    today = date.today()
+    html = """
+    <table>
+      <tr><th>Date</th><th>Day</th><th>Fajr Iqamah</th><th>Isha Iqamah</th></tr>
+      <tr><td>Date</td><td>Day</td><td>Fajr Iqamah</td><td>Isha Iqamah</td></tr>
+      <tr><td>1</td><td>Mon</td><td>4:10</td><td>10:30</td></tr>
+      <tr><td>2</td><td>Tue</td><td>4:10</td><td>10:30</td></tr>
+    </table>
+    """
+    result = _DemoExtractor().extract(_ctx(html))
+    assert len(result.rows) == 4
+    assert {r.date for r in result.rows} == {
+        date(today.year, today.month, 1),
+        date(today.year, today.month, 2),
+    }
+
+
+def test_parse_day_of_month() -> None:
+    assert parse_day_of_month("1") == 1
+    assert parse_day_of_month("21st") == 21
+    assert parse_day_of_month("Mon 1st") == 1
+    assert parse_day_of_month("1 Tue") == 1
+    assert parse_day_of_month("32") is None
+    assert parse_day_of_month("0") is None
+    assert parse_day_of_month("1 6") is None  # ambiguous two numbers
+    assert parse_day_of_month("1 June") is None  # full date, not a bare day
+    assert parse_day_of_month("Date") is None
+    assert parse_day_of_month("") is None
 
 
 def test_declarative_table_extractor_no_table() -> None:

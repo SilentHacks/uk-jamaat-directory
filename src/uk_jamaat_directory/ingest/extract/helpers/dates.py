@@ -39,6 +39,7 @@ MONTHS: dict[str, int] = {
 }
 
 _ORDINAL = re.compile(r"(\d{1,2})(?:st|nd|rd|th)?", re.IGNORECASE)
+_WEEKDAYS = frozenset({"mon", "tue", "wed", "thu", "fri", "sat", "sun"})
 _NUMERIC_DATE = re.compile(r"^(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?$")
 
 
@@ -82,6 +83,26 @@ def parse_day_month(value: str, *, year: int) -> date | None:
         return date(year, month, day)
     except ValueError:
         return None
+
+
+def parse_day_of_month(value: str) -> int | None:
+    """Parse a bare day-of-month cell ("1", "01", "1st", "21st") to 1..31.
+
+    Monthly timetables commonly print only the day number in the date
+    column; combine with the table's month/year to build a full date.
+    """
+    day: int | None = None
+    for token in re.split(r"[\s,]+", value.strip()):
+        if not token:
+            continue
+        m = _ORDINAL.fullmatch(token)
+        if m:
+            if day is not None:
+                return None  # ambiguous: two numbers ("1 6")
+            day = int(m.group(1))
+        elif token.lower().rstrip(".")[:3] not in _WEEKDAYS:
+            return None  # non-weekday text means this is not a bare day cell
+    return day if day is not None and 1 <= day <= 31 else None
 
 
 def parse_date_flexible(value: str, *, default_year: int) -> date | None:

@@ -106,6 +106,7 @@ class OrchestrationSummary:
     timed_out_global: int = 0
     start_time: float = field(default_factory=time.monotonic)
     processed: int = 0
+    in_flight: int = 0
 
     def as_dict(self) -> dict[str, object]:
         elapsed = time.monotonic() - self.start_time
@@ -117,6 +118,7 @@ class OrchestrationSummary:
             "skipped_review": self.skipped_review,
             "failed": self.failed,
             "processed": self.processed,
+            "in_flight": self.in_flight,
             "elapsed_seconds": round(elapsed, 1),
             "errors": list(self.errors),
             "errors_total": self.errors_total,
@@ -400,6 +402,8 @@ async def _process_one(
     on_progress: Callable[[OrchestrationSummary], Awaitable[None]] | None,
 ) -> None:
     async with semaphore:
+        async with progress_lock:
+            summary.in_flight += 1
         started = time.monotonic()
         task_status = AuthoringTaskStatus.FAILED.value
         task_error: str | None = None
@@ -486,7 +490,12 @@ async def _process_one(
                     "failed to persist failure task for source %s", source.id
                 )
 
+        # The per-source result JSON is fully captured on the task row; drop
+        # the file so data/authoring_results does not accumulate stale state.
+        clean_authoring_result(authoring_result_path(source.id))
+
         async with progress_lock:
+            summary.in_flight -= 1
             if task_status == AuthoringTaskStatus.DEPLOYED.value:
                 summary.deployed += 1
                 summary.preflight_ok += 1
@@ -739,9 +748,25 @@ async def run_overnight_orchestrator(
         )
         for source in sources
     ]
+    heartbeat: asyncio.Task | None = None
+    if on_progress is not None:
+
+        async def _heartbeat() -> None:
+            # Sources take minutes each; emit progress between completions so
+            # operators can see the run is alive (in_flight, elapsed, eta).
+            while True:
+                await asyncio.sleep(30)
+                async with progress_lock:
+                    await on_progress(summary)
+
+        heartbeat = asyncio.create_task(_heartbeat())
+
     done, pending = await asyncio.wait(
         tasks, timeout=cfg.authoring_global_timeout_seconds or None
     )
+    if heartbeat is not None:
+        heartbeat.cancel()
+        await asyncio.gather(heartbeat, return_exceptions=True)
     if pending:
         for task in pending:
             task.cancel()

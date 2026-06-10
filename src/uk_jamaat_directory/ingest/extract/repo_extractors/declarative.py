@@ -32,10 +32,13 @@ from datetime import date, datetime
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
 from uk_jamaat_directory.ingest.extract.helpers import pdf as pdf_helpers
-from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
+from uk_jamaat_directory.ingest.extract.helpers.dates import (
+    parse_date_flexible,
+    parse_day_of_month,
+)
 from uk_jamaat_directory.ingest.extract.helpers.html import Table
 from uk_jamaat_directory.ingest.extract.helpers.rows import carry_forward
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -71,8 +74,22 @@ class _TabularTimetableMixin:
     def current_year(self, ctx: ExtractContext) -> int:
         return datetime.now().year
 
-    def parse_date_cell(self, value: str, *, year: int) -> date | None:
-        return parse_date_flexible(value, default_year=year)
+    def current_month(self, ctx: ExtractContext) -> int:
+        """Month assumed when the date column holds only a day number."""
+        return datetime.now().month
+
+    def parse_date_cell(self, value: str, *, year: int, month: int) -> date | None:
+        parsed = parse_date_flexible(value, default_year=year)
+        if parsed is not None:
+            return parsed
+        # Monthly tables often print just the day number ("1", "21st").
+        day = parse_day_of_month(value)
+        if day is None:
+            return None
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
 
     # --- implementation ---
     def _column_index(self, header: list[str], spec: str | int) -> int | None:
@@ -135,11 +152,12 @@ class _TabularTimetableMixin:
             body = [list(row) for row in zip(*columns, strict=True)]
 
         year = self.current_year(ctx)
+        month = self.current_month(ctx)
         rows: list[ExtractorRow] = []
         for row_number, row in enumerate(body, start=1):
             if date_idx >= len(row):
                 continue
-            row_date = self.parse_date_cell(row[date_idx], year=year)
+            row_date = self.parse_date_cell(row[date_idx], year=year, month=month)
             if row_date is None or not self.accept_row(row, row_date):
                 continue
             for prayer, idx in prayer_idx.items():
@@ -152,6 +170,18 @@ class _TabularTimetableMixin:
                         ExtractorWarning(
                             code="unparseable_time",
                             message=f"{row_date} {prayer.value}: {raw!r}",
+                            target_label=self.target_label,
+                        )
+                    )
+                    continue
+                window = PLAUSIBLE_WINDOWS.get(prayer.value)
+                if window and not (window[0] <= jamaat <= window[1]):
+                    # Bad upstream cell (e.g. a 23:30 "Fajr"); drop the row
+                    # rather than publish it or fail the whole source.
+                    warnings.append(
+                        ExtractorWarning(
+                            code="implausible_time",
+                            message=f"{row_date} {prayer.value}: {raw!r} outside plausible window",
                             target_label=self.target_label,
                         )
                     )
