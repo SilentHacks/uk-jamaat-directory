@@ -7,8 +7,6 @@ URL, waits for network idle, and returns the fully-rendered HTML.
 
 from __future__ import annotations
 
-from playwright.async_api import async_playwright
-
 from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.ingest.fetch.types import FetchResult
 
@@ -47,6 +45,8 @@ async def fetch_rendered_html(
     user_agent = cfg.crawl_user_agent if cfg else None
 
     try:
+        from playwright.async_api import async_playwright
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
