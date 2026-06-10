@@ -98,6 +98,32 @@ class AuthoringTaskStatus(StrEnum):
     FAILED = "failed"
 
 
+class AuthoringFailureCategory(StrEnum):
+    """Why an authoring task failed; drives resume/retry behaviour."""
+
+    PERMANENT_NO_JAMAAT = "permanent_no_jamaat"
+    DEAD_SITE = "dead_site"
+    BLOCKED_ROBOTS = "blocked_robots"
+    AGGREGATOR = "aggregator"
+    UMBRELLA_REVIEW = "umbrella_review"
+    TRANSIENT_NETWORK = "transient_network"
+    AGENT_ERROR = "agent_error"
+    VALIDATION_FAILED = "validation_failed"
+    TIMEOUT = "timeout"
+
+
+#: categories that should never be retried automatically
+PERMANENT_FAILURE_CATEGORIES: frozenset[str] = frozenset(
+    {
+        AuthoringFailureCategory.PERMANENT_NO_JAMAAT.value,
+        AuthoringFailureCategory.DEAD_SITE.value,
+        AuthoringFailureCategory.BLOCKED_ROBOTS.value,
+        AuthoringFailureCategory.AGGREGATOR.value,
+        AuthoringFailureCategory.UMBRELLA_REVIEW.value,
+    }
+)
+
+
 class AuthoringTargetKind(StrEnum):
     HTML = "html"
     RENDERED_HTML = "rendered_html"

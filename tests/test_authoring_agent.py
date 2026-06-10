@@ -51,8 +51,9 @@ def test_read_authoring_result_valid_json(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    result = read_authoring_result(path)
+    result, error = read_authoring_result(path)
     assert result is not None
+    assert error is None
     assert result.status == "authored"
     assert result.target_url == "https://example.com/prayer-times"
     assert result.target_kind == "html"
@@ -64,13 +65,17 @@ def test_read_authoring_result_valid_json(tmp_path) -> None:
 
 def test_read_authoring_result_missing_file(tmp_path) -> None:
     path = tmp_path / "missing.json"
-    assert read_authoring_result(path) is None
+    result, error = read_authoring_result(path)
+    assert result is None
+    assert "did not write" in error
 
 
 def test_read_authoring_result_invalid_json(tmp_path) -> None:
     path = tmp_path / "result.json"
     path.write_text("not json", encoding="utf-8")
-    assert read_authoring_result(path) is None
+    result, error = read_authoring_result(path)
+    assert result is None
+    assert "not valid JSON" in error
 
 
 def test_read_authoring_result_bad_status(tmp_path) -> None:
@@ -86,7 +91,9 @@ def test_read_authoring_result_bad_status(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    assert read_authoring_result(path) is None
+    result, error = read_authoring_result(path)
+    assert result is None
+    assert "schema validation" in error
 
 
 def test_read_authoring_result_bad_kind(tmp_path) -> None:
@@ -102,7 +109,9 @@ def test_read_authoring_result_bad_kind(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    assert read_authoring_result(path) is None
+    result, error = read_authoring_result(path)
+    assert result is None
+    assert "schema validation" in error
 
 
 def test_write_authoring_result_roundtrip(tmp_path) -> None:
@@ -114,8 +123,9 @@ def test_write_authoring_result_roundtrip(tmp_path) -> None:
         target_kind="pdf",
         reason="pdf target — ocr not yet implemented",
     )
-    result = read_authoring_result(path)
+    result, error = read_authoring_result(path)
     assert result is not None
+    assert error is None
     assert result.status == "skipped_review"
     assert result.target_kind == "pdf"
     assert result.reason == "pdf target — ocr not yet implemented"

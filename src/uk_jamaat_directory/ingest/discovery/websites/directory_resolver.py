@@ -18,7 +18,7 @@ Architecture
 
 Adding a new aggregator
 -------------------------
-1. Add the domain to ``_KNOWN_AGGREGATOR_DOMAINS``.
+1. Add the domain to ``AGGREGATOR_DOMAINS`` in ``ingest.domain_policy``.
 2. Write a small ``_extract_from_<domain>(html) -> str | None`` helper.
 3. Register it in ``_DOMAIN_EXTRACTORS``.
 4. (Optional) Run the ``analyse-discovery-leads`` CLI to see the domain in the
@@ -36,50 +36,11 @@ from urllib.parse import urljoin, urlparse
 # ---------------------------------------------------------------------------
 
 
-_KNOWN_AGGREGATOR_DOMAINS: frozenset[str] = frozenset(
-    {
-        # Prayer times / directory platforms
-        "praysalat.com",
-        "www.praysalat.com",
-        "nearestmosque.com",
-        "www.nearestmosque.com",
-        "mosquedirectory.co.uk",
-        "www.mosquedirectory.co.uk",
-        "islamicfinder.org",
-        "www.islamicfinder.org",
-        "islamicfinder.com",
-        "www.islamicfinder.com",
-        "masjidway.com",
-        "www.masjidway.com",
-        "masjidway.org",
-        "www.masjidway.org",
-        "mosquepay.com",
-        "www.mosquepay.com",
-        "alfafaa.com",
-        "www.alfafaa.com",
-        "mosquefinder.com",
-        "www.mosquefinder.com",
-        "mosquefinder.co.uk",
-        "www.mosquefinder.co.uk",
-        # UK-specific directories
-        "salah.com",
-        "www.salah.com",
-        "mosques.muslimsinbritain.org",  # MiB sub-pages (already denied at top-level)
-        "mosque.uk",
-        "www.mosque.uk",
-        # Other aggregators seen in search results
-        "getprayer.com",
-        "www.getprayer.com",
-        "mosques.org.uk",
-        "www.mosques.org.uk",
-    }
-)
-
-
 def is_aggregator_domain(url: str) -> bool:
     """Return True if the URL's hostname is a known directory / aggregator."""
-    host = (urlparse(url).hostname or "").lower()
-    return host in _KNOWN_AGGREGATOR_DOMAINS
+    from uk_jamaat_directory.ingest.domain_policy import is_aggregator_url
+
+    return is_aggregator_url(url)
 
 
 def resolve_directory_url(page_url: str, html_text: str) -> str | None:

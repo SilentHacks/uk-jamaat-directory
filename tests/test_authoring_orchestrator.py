@@ -32,15 +32,20 @@ from uk_jamaat_directory.models.core import (
 
 SCRIPTS_DIR = _scripts_filesystem_path()
 
+# Scripts that existed before the test session started. The cleanup helper
+# must NEVER touch these: this directory holds real, repo-owned extractor
+# scripts, and tests may only delete files they created themselves.
+_PREEXISTING_SCRIPTS = frozenset(
+    os.path.basename(path) for path in glob.glob(os.path.join(SCRIPTS_DIR, "*.py"))
+)
+
 
 def _cleanup_orphan_scripts() -> None:
-    """Remove ``*.py`` files left in the scripts directory by previous
-    test runs (except ``__init__.py`` and ``synthetic_html_table.py``).
-    """
+    """Remove ``*.py`` files that tests created in the scripts directory."""
 
     for path in glob.glob(os.path.join(SCRIPTS_DIR, "*.py")):
         name = os.path.basename(path)
-        if name in {"__init__.py", "synthetic_html_table.py"}:
+        if name == "__init__.py" or name in _PREEXISTING_SCRIPTS:
             continue
         os.unlink(path)
 
@@ -245,7 +250,9 @@ async def test_orchestrator_deploys_draft_when_agent_authored(db_session, test_s
     _cleanup_orphan_scripts()
     source = await _seed_source(db_session, name="Draft Masjid", domain="draft.test")
     await db_session.flush()
-    settings = _settings(crawl_enabled=True)
+    # The stub draft returns no rows, so the execution smoke test is disabled
+    # here; smoke behaviour is covered by its own tests.
+    settings = _settings(crawl_enabled=True, authoring_smoke_test_enabled=False)
 
     # The agent writes the script to the canonical scripts directory
     # under the orchestrator's computed key. The orchestrator reads,
@@ -374,7 +381,7 @@ async def test_orchestrator_marks_failed_when_agent_does_not_emit_status(
     ).scalar_one_or_none()
     assert task is not None
     assert task.status == AuthoringTaskStatus.FAILED.value
-    assert "STATUS" in (task.error or "")
+    assert "status" in (task.error or "")
     assert summary.failed == 1
 
 

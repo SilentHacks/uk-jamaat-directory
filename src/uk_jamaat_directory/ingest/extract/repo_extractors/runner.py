@@ -10,8 +10,40 @@ from typing import Any
 
 from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    ExtractorArtifact,
     ExtractorResult,
 )
+
+
+def build_sandbox_payload(
+    *,
+    extractor_key: str,
+    source_id: str,
+    mosque_name: str,
+    mosque_id: str | None,
+    source_url: str,
+    timezone: str,
+    artifacts: dict[str, ExtractorArtifact],
+) -> dict[str, Any]:
+    """Serialise extraction inputs for the sandbox subprocess."""
+    return {
+        "extractor_key": extractor_key,
+        "source_id": source_id,
+        "mosque_name": mosque_name,
+        "mosque_id": mosque_id,
+        "source_url": source_url,
+        "timezone": timezone,
+        "artifacts": {
+            label: {
+                "target_label": artifact.target_label,
+                "target_url": artifact.target_url,
+                "content_type": artifact.content_type,
+                "body_hex": artifact.body.hex(),
+                "content_hash": artifact.content_hash,
+            }
+            for label, artifact in artifacts.items()
+        },
+    }
 
 
 @dataclass(frozen=True)

@@ -12,6 +12,7 @@ from uk_jamaat_directory.ingest.extract.helpers.capabilities import (
     render_html_available,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    CONTRACT_ID,
     TARGET_KINDS,
     BaseMosqueWebsiteExtractor,
     ExtractorResult,
@@ -58,11 +59,8 @@ ALLOWED_MODULES: frozenset[str] = frozenset(
     {
         "uk_jamaat_directory.domain",
         "uk_jamaat_directory.ingest.extract.repo_extractors.contract",
-        "uk_jamaat_directory.ingest.extract.helpers.html",
-        "uk_jamaat_directory.ingest.extract.helpers.pdf",
-        "uk_jamaat_directory.ingest.extract.helpers.times",
-        "uk_jamaat_directory.ingest.extract.helpers.prayers",
-        "uk_jamaat_directory.ingest.extract.helpers.relative",
+        "uk_jamaat_directory.ingest.extract.repo_extractors.declarative",
+        "uk_jamaat_directory.ingest.extract.helpers",
     }
 )
 
@@ -142,16 +140,30 @@ _HOST_PATTERN = re.compile(r"^[a-z0-9.\-]+$")
 
 
 def check_target_url(url: str, *, allowed_domain: str | None) -> str | None:
+    from uk_jamaat_directory.ingest.domain_policy import (
+        is_aggregator_url,
+        is_trusted_widget_url,
+        is_umbrella_url,
+    )
+
     if not url:
         return "target url is empty"
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         return f"unsupported target url scheme: {parsed.scheme}"
-    if not parsed.netloc:
+    host = (parsed.hostname or "").lower()
+    if not host:
         return "target url missing host"
+    # Aggregators are rejected even when they are the source's own domain:
+    # they publish calculated prayer-start times, not jamaat times.
+    if is_aggregator_url(url):
+        return f"target url {host} is a directory/aggregator site"
+    if is_umbrella_url(url):
+        return f"target url {host} is a multi-mosque umbrella site (needs review)"
+    if is_trusted_widget_url(url):
+        return None
     if allowed_domain is None:
         return "no allowed domain for source"
-    host = parsed.netloc.lower()
     allowed = allowed_domain.lower()
     if not (host == allowed or host.endswith(f".{allowed}")):
         return f"target url {host} is outside allowed domain {allowed}"
@@ -207,8 +219,8 @@ def check_extractor_result(result: ExtractorResult) -> tuple[str, ...]:
         if key in seen:
             issues.append(f"duplicate row for {key}")
         seen.add(key)
-        if row.evidence.contract != "repo_site_extractor/v1":
-            issues.append("row evidence missing repo_site_extractor/v1 contract")
+        if row.evidence.contract != CONTRACT_ID:
+            issues.append(f"row evidence missing {CONTRACT_ID} contract")
         if not row.evidence.gate_passed:
             issues.append("row evidence marked gate_passed=false")
     return tuple(issues)

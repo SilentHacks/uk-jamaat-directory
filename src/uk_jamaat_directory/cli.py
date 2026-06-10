@@ -399,22 +399,36 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
     sync_extractors.add_argument("--extractor-key", default=None)
     sync_extractors.add_argument("--dry-run", action="store_true")
 
-    author_extractor = subparsers.add_parser(
-        "author-repo-extractor",
-        help="Build an authoring prompt for one mosque_website source",
+    smoke_test = subparsers.add_parser(
+        "smoke-test-repo-extractor",
+        help=(
+            "Fetch an extractor's targets, run it in the sandbox, and check "
+            "the output is a plausible jamaat timetable (DB-free)"
+        ),
     )
-    author_extractor.add_argument("--source-id", required=True, type=uuid.UUID)
-    author_extractor.add_argument(
-        "--extractor-key",
-        default=None,
-        help="Override the suggested extractor key (defaults to domain-based slug)",
-    )
+    smoke_test.add_argument("--extractor-key", required=True)
+    smoke_test.add_argument("--source-url", required=True)
+    smoke_test.add_argument("--mosque-name", default="")
+    smoke_test.add_argument("--json", action="store_true", dest="as_json")
 
-    author_extractors = subparsers.add_parser(
-        "author-repo-extractors",
-        help="Build authoring prompts for sources without an active repo extractor",
+    prune = subparsers.add_parser(
+        "prune-repo-extractors",
+        help=(
+            "Delete aggregator/orphaned extractor scripts and smoke-test "
+            "deployed ones; resets the matching authoring tasks"
+        ),
     )
-    author_extractors.add_argument("--limit", type=int, default=20)
+    prune.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually delete files and update the DB (default: dry-run)",
+    )
+    prune.add_argument(
+        "--skip-smoke",
+        action="store_true",
+        help="Skip smoke-testing deployed scripts (faster; only prunes aggregators/orphans)",
+    )
+    prune.add_argument("--concurrency", type=int, default=4)
 
     orchestrate = subparsers.add_parser(
         "orchestrate-authoring",
@@ -438,9 +452,26 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Override authoring_per_source_timeout_seconds",
     )
     orchestrate.add_argument(
-        "--skip-failed",
+        "--retry-failed",
         action="store_true",
-        help="Skip sources that previously failed (default: retry them)",
+        help="Retry ALL failed sources, ignoring the failure taxonomy",
+    )
+    orchestrate.add_argument(
+        "--retry-category",
+        action="append",
+        default=None,
+        help="Retry failed sources with this failure_category (repeatable)",
+    )
+    orchestrate.add_argument(
+        "--max-attempts",
+        type=int,
+        default=None,
+        help="Max attempts for retryable failures (default: settings.authoring_max_attempts)",
+    )
+    orchestrate.add_argument(
+        "--no-smoke-test",
+        action="store_true",
+        help="Skip the execution smoke test before deploying (debugging only)",
     )
 
 
@@ -821,10 +852,10 @@ def main() -> None:
     if args.command == "sync-repo-extractors":
         raise SystemExit(asyncio.run(_run_sync_repo_extractors(args, settings)))
 
-    if args.command == "author-repo-extractor":
-        raise SystemExit(asyncio.run(_run_author_repo_extractor(args, settings)))
-    if args.command == "author-repo-extractors":
-        raise SystemExit(asyncio.run(_run_author_repo_extractors(args, settings)))
+    if args.command == "smoke-test-repo-extractor":
+        raise SystemExit(asyncio.run(_run_smoke_test_repo_extractor(args, settings)))
+    if args.command == "prune-repo-extractors":
+        raise SystemExit(asyncio.run(_run_prune_repo_extractors(args, settings)))
     if args.command == "orchestrate-authoring":
         raise SystemExit(asyncio.run(_run_orchestrate_authoring(args, settings)))
 
@@ -1600,123 +1631,47 @@ async def _run_sync_repo_extractors(args: argparse.Namespace, settings: Settings
     return 0
 
 
-def _suggest_extractor_key(domain: str | None) -> str:
-    if not domain:
-        return "site_extractor"
-    cleaned = domain.replace("www.", "").replace(".", "_")
-    return f"{cleaned}_extractor"
+async def _run_smoke_test_repo_extractor(args: argparse.Namespace, settings: Settings) -> int:
+    from uk_jamaat_directory.ingest.authoring.smoke_test import smoke_test_extractor
 
-
-async def _build_authoring_prompt_for_source(
-    session, source_id: uuid.UUID, *, extractor_key: str | None
-) -> tuple[str, str, str] | None:
-
-    from uk_jamaat_directory.ingest.extract.repo_extractors.authoring_prompt import (
-        build_authoring_prompt,
+    report = await smoke_test_extractor(
+        extractor_key=args.extractor_key,
+        source_url=args.source_url,
+        mosque_name=args.mosque_name,
+        settings=settings,
     )
-    from uk_jamaat_directory.ingest.normalize import normalize_domain
-    from uk_jamaat_directory.models.core import Mosque, MosqueSource
+    if args.as_json:
+        print(json.dumps(report.as_dict(), indent=2, sort_keys=True))
+    else:
+        print(f"ok: {report.ok}")
+        print(f"rows: {report.rows}")
+        if report.no_schedule_reason:
+            print(f"no_schedule_reason: {report.no_schedule_reason}")
+        for warning in report.warnings:
+            print(f"warning: {warning}")
+        for issue in report.issues:
+            print(f"issue: {issue}")
+    return 0 if report.ok else 1
 
-    source = await session.get(MosqueSource, source_id)
-    if source is None or source.source_url is None:
-        return None
-    mosque = await session.get(Mosque, source.mosque_id) if source.mosque_id else None
-    domain = normalize_domain(source.source_url)
-    key = extractor_key or _suggest_extractor_key(domain)
-    prompt = build_authoring_prompt(
-        source_id=str(source.id),
-        mosque_name=mosque.name if mosque else "(unknown)",
-        website_url=source.source_url,
-        extractor_key=key,
-        max_pages=10,
+
+async def _run_prune_repo_extractors(args: argparse.Namespace, settings: Settings) -> int:
+    from uk_jamaat_directory.ingest.extract.repo_extractors.prune import (
+        prune_repo_extractors,
     )
-    return key, source.source_url, prompt
-
-
-async def _record_authoring_attempt(session, source_id: uuid.UUID, *, extractor_key: str) -> None:
-    import uuid as _uuid
-    from datetime import UTC, datetime
-
-    from uk_jamaat_directory.domain import ExtractionKind
-    from uk_jamaat_directory.models.core import ExtractionRun
-
-    run = ExtractionRun(
-        id=_uuid.uuid4(),
-        artifact_id=None,
-        source_id=source_id,
-        kind=ExtractionKind.AI,
-        extractor_version=f"author-draft/{extractor_key}",
-        status="succeeded",
-        started_at=datetime.now(UTC),
-        finished_at=datetime.now(UTC),
-        metadata_={
-            "phase": "authoring",
-            "extractor_key": extractor_key,
-            "contract": "repo_site_extractor/v1",
-            "gate_passed": False,
-            "notes": "Authoring prompt emitted; community or AI author writes the script.",
-        },
-    )
-    session.add(run)
-    await session.flush()
-
-
-async def _run_author_repo_extractor(args: argparse.Namespace, settings: Settings) -> int:
-    async with cli_db_session(settings) as session:
-        result = await _build_authoring_prompt_for_source(
-            session, args.source_id, extractor_key=args.extractor_key
-        )
-        if result is None:
-            print(
-                f"error: source not found or has no source_url: {args.source_id}",
-                file=sys.stderr,
-            )
-            return 2
-        key, url, prompt = result
-        await _record_authoring_attempt(session, args.source_id, extractor_key=key)
-        await session.commit()
-
-    print(f"extractor_key: {key}")
-    print(f"website_url: {url}")
-    print()
-    print(prompt)
-    return 0
-
-
-async def _run_author_repo_extractors(args: argparse.Namespace, settings: Settings) -> int:
-    from sqlalchemy import select
-
-    from uk_jamaat_directory.domain import SourceType
-    from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
-        SourceExtractorAssignment,
-    )
-    from uk_jamaat_directory.models.core import MosqueSource
 
     async with cli_db_session(settings) as session:
-        stmt = (
-            select(MosqueSource)
-            .where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
-            .where(MosqueSource.source_url.is_not(None))
-            .limit(args.limit)
+        report = await prune_repo_extractors(
+            session,
+            settings=settings,
+            apply=args.apply,
+            run_smoke=not args.skip_smoke,
+            concurrency=args.concurrency,
         )
-        sources = (await session.execute(stmt)).scalars().all()
-        produced: list[str] = []
-        for source in sources:
-            assignment = await session.get(SourceExtractorAssignment, source.id)
-            if assignment is not None and assignment.status == "active":
-                continue
-            result = await _build_authoring_prompt_for_source(
-                session, source.id, extractor_key=None
-            )
-            if result is None:
-                continue
-            key, _url, prompt = result
-            await _record_authoring_attempt(session, source.id, extractor_key=key)
-            produced.append(f"{source.id}={key}")
-        await session.commit()
-
-    for entry in produced:
-        print(entry)
+        if args.apply:
+            await session.commit()
+    print(json.dumps(report.as_dict(), indent=2, sort_keys=True))
+    if not args.apply:
+        print("dry-run: nothing was deleted; re-run with --apply", file=sys.stderr)
     return 0
 
 
@@ -1731,6 +1686,8 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
         settings = settings.model_copy(
             update={"authoring_per_source_timeout_seconds": float(args.per_source_timeout)}
         )
+    if args.no_smoke_test:
+        settings = settings.model_copy(update={"authoring_smoke_test_enabled": False})
 
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -1756,6 +1713,9 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
             f"skipped={summary.skipped_review} "
             f"failed={summary.failed}"
         )
+        if summary.failure_categories:
+            cats = ",".join(f"{k}={v}" for k, v in sorted(summary.failure_categories.items()))
+            line += f" [{cats}]"
         if summary.errors:
             line += f" | last_err={summary.errors[-1][:60]}"
         progress_line = line
@@ -1772,7 +1732,9 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
             limit=args.limit,
             concurrency=args.concurrency,
             dry_run=args.dry_run,
-            skip_failed=args.skip_failed,
+            retry_failed=args.retry_failed,
+            retry_categories=set(args.retry_category) if args.retry_category else None,
+            max_attempts=args.max_attempts,
             on_progress=_on_progress,
         )
         await session.commit()
@@ -1780,7 +1742,14 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
     if isatty:
         print()
     print(json.dumps(summary.as_dict(), indent=2, sort_keys=True))
-    return 0 if summary.failed == 0 else 1
+    # Permanent, classified failures are an expected outcome; only infra
+    # problems (agent errors, timeouts, unhandled exceptions) fail the run.
+    infra_failures = sum(
+        count
+        for category, count in summary.failure_categories.items()
+        if category in {"agent_error", "timeout"}
+    )
+    return 0 if infra_failures == 0 else 1
 
 
 if __name__ == "__main__":

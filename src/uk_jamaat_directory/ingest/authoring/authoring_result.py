@@ -123,25 +123,29 @@ def authoring_result_path(source_id: uuid.UUID) -> Path:
     return RESULTS_DIR / f"{source_id}.json"
 
 
-def read_authoring_result(path: Path) -> AuthoringResultJson | None:
+def read_authoring_result(
+    path: Path,
+) -> tuple[AuthoringResultJson | None, str | None]:
     """Read and validate the JSON file at *path*.
 
-    Returns ``None`` if the file is missing, unreadable, or invalid.
+    Returns ``(result, None)`` on success, or ``(None, reason)`` describing
+    exactly why the file could not be used (missing / unreadable / invalid
+    JSON / schema violation) so failures stay debuggable.
     """
     if not path.is_file():
-        return None
+        return None, "agent did not write the JSON result file"
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
+    except OSError as exc:
+        return None, f"result file unreadable: {exc}"
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        return None
+    except json.JSONDecodeError as exc:
+        return None, f"result file is not valid JSON: {exc}"
     try:
-        return AuthoringResultJson.model_validate(data)
-    except Exception:
-        return None
+        return AuthoringResultJson.model_validate(data), None
+    except Exception as exc:  # noqa: BLE001
+        return None, f"result file failed schema validation: {exc}"
 
 
 def clean_authoring_result(path: Path) -> None:

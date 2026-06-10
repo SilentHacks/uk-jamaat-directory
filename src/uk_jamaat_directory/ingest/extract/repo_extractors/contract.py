@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from uk_jamaat_directory.domain import Prayer
 
 TARGET_KINDS = ("html", "pdf", "image", "json", "rendered_html")
+CONTRACT_ID = "repo_site_extractor/v1"
 SUPPORTED_FREQUENCIES = (
     "hourly",
     "daily",
@@ -128,7 +129,7 @@ class ExtractorEvidence(BaseModel):
     artifact_id: str | None = None
     extractor_key: str
     extractor_version: str
-    contract: str = "repo_site_extractor/v1"
+    contract: str = CONTRACT_ID
     gate_passed: bool = True
     raw_text: str | None = None
     selector: str | None = None

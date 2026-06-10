@@ -93,18 +93,18 @@ async def run_authoring_agent(
     stderr = stderr_b.decode("utf-8", errors="replace")
     excerpt = (stderr or stdout).strip()[:2000]
 
-    result = read_authoring_result(result_path)
+    result, read_error = read_authoring_result(result_path)
     if result is None:
+        reason = read_error or "agent did not write the JSON result file"
+        if process.returncode:
+            reason = f"{reason} (agent exited rc={process.returncode})"
         return AgentResult(
             text="",
             duration_ms=duration_ms,
             command=command_repr,
             returncode=process.returncode or 0,
             stdout_excerpt=excerpt,
-            report=AgentReport(
-                status="failed",
-                reason="agent did not write the JSON result file",
-            ),
+            report=AgentReport(status="failed", reason=reason),
         )
 
     return AgentResult(

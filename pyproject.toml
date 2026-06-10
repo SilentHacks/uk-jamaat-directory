@@ -54,3 +54,5 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]
 "src/uk_jamaat_directory/api/**" = ["B008"]
+# Prompt templates contain one-line commands the agent must copy verbatim.
+"src/uk_jamaat_directory/ingest/authoring/authoring_prompt.py" = ["E501"]

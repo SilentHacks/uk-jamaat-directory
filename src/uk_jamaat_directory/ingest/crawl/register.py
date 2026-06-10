@@ -14,6 +14,10 @@ from uk_jamaat_directory.domain import (
     SourcePublicationPolicy,
     SourceType,
 )
+from uk_jamaat_directory.ingest.domain_policy import (
+    is_aggregator_domain,
+    is_umbrella_domain,
+)
 from uk_jamaat_directory.ingest.normalize import canonical_homepage, normalize_domain
 from uk_jamaat_directory.models.core import Mosque, MosqueSource, SourceHealth
 
@@ -26,6 +30,7 @@ class RegisterResult:
     skipped_existing: int = 0
     skipped_mlm: int = 0
     skipped_no_domain: int = 0
+    skipped_aggregator: int = 0
     synced: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -96,6 +101,10 @@ async def ensure_crawl_sources(
         domain = normalize_domain(mosque.website_url)
         if domain is None:
             result.skipped_no_domain += 1
+            continue
+
+        if is_aggregator_domain(domain, settings=cfg) or is_umbrella_domain(domain, settings=cfg):
+            result.skipped_aggregator += 1
             continue
 
         existing = await _existing_crawl_source_for_mosque(session, mosque.id)

@@ -69,24 +69,44 @@ class Table:
 
 
 class _TableParser(HTMLParser):
+    """Parses each ``<table>`` element into its own row list.
+
+    Nested tables are flattened into their outermost table (rare on mosque
+    sites; keeps the parser simple and the row stream intact).
+    """
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self._rows: list[list[str]] = []
+        self.tables: list[list[list[str]]] = []
+        self._table_depth = 0
+        self._current_rows: list[list[str]] | None = None
         self._current_row: list[str] | None = None
         self._current_cell: list[str] | None = None
         self._skip_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "tr":
+        if tag == "table":
+            self._table_depth += 1
+            if self._table_depth == 1:
+                self._current_rows = []
+        elif tag == "tr" and self._table_depth:
             self._current_row = []
-        elif tag in {"td", "th"}:
+        elif tag in {"td", "th"} and self._table_depth:
             self._current_cell = []
         elif tag in {"script", "style"}:
             self._skip_depth += 1
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "tr" and self._current_row is not None:
-            self._rows.append([normalize_whitespace("".join(c)) for c in self._current_row])
+        if tag == "table" and self._table_depth:
+            self._table_depth -= 1
+            if self._table_depth == 0 and self._current_rows is not None:
+                self.tables.append(self._current_rows)
+                self._current_rows = None
+                self._current_row = None
+                self._current_cell = None
+        elif tag == "tr" and self._current_row is not None:
+            if self._current_rows is not None:
+                self._current_rows.append(self._current_row)
             self._current_row = None
         elif tag in {"td", "th"} and self._current_cell is not None:
             if self._current_row is None:
@@ -104,18 +124,28 @@ class _TableParser(HTMLParser):
 
 
 def extract_tables(html: str) -> list[Table]:
+    """Return one ``Table`` per ``<table>`` element on the page."""
     parser = _TableParser()
     parser.feed(html)
-    rows = [row[:] for row in parser._rows if any(cell.strip() for cell in row)]
-    return [Table(rows)]
+    tables: list[Table] = []
+    for raw_rows in parser.tables:
+        rows = [row for row in raw_rows if any(cell.strip() for cell in row)]
+        if rows:
+            tables.append(Table(rows))
+    return tables
+
+
+def header_matches(header: Sequence[str], keywords: Sequence[str]) -> bool:
+    """Fuzzy header check: every keyword appears (case/whitespace tolerant)
+    as a substring of some header cell."""
+    cells = [normalize_whitespace(cell).lower() for cell in header]
+    return all(any(keyword.lower() in cell for cell in cells) for keyword in keywords)
 
 
 def find_table(html: str, *, header_keywords: Sequence[str]) -> Table | None:
+    """Return the first table whose header row matches all keywords."""
     for table in extract_tables(html):
-        header = [cell.lower() for cell in table.header]
-        if not header:
-            continue
-        if all(any(keyword.lower() in cell for cell in header) for keyword in header_keywords):
+        if table.header and header_matches(table.header, header_keywords):
             return table
     return None
 

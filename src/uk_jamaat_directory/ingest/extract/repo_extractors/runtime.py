@@ -12,6 +12,7 @@ from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.domain import ExtractionKind, SourceType
 from uk_jamaat_directory.ingest.artifacts import record_fetched_artifact
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    CONTRACT_ID,
     ExtractorArtifact,
     ExtractorRow,
     RunFrequency,
@@ -23,6 +24,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.registry import (
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.runner import (
     SandboxRunResult,
+    build_sandbox_payload,
     run_sandbox,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.validator import (
@@ -191,28 +193,19 @@ async def _build_sandbox_payload(
     mosque: Mosque | None,
     artifacts: dict[str, ExtractorArtifact],
 ) -> dict:
-    return {
-        "extractor_key": extractor.extractor.key,
-        "source_id": str(source.id),
-        "mosque_name": mosque.name if mosque else "",
-        "mosque_id": str(mosque.id) if mosque else None,
-        "source_url": source.source_url or "",
-        "timezone": (
+    return build_sandbox_payload(
+        extractor_key=extractor.extractor.key,
+        source_id=str(source.id),
+        mosque_name=mosque.name if mosque else "",
+        mosque_id=str(mosque.id) if mosque else None,
+        source_url=source.source_url or "",
+        timezone=(
             (source.metadata_ or {}).get("timezone", "Europe/London")
             if source.metadata_
             else "Europe/London"
         ),
-        "artifacts": {
-            label: {
-                "target_label": artifact.target_label,
-                "target_url": artifact.target_url,
-                "content_type": artifact.content_type,
-                "body_hex": artifact.body.hex(),
-                "content_hash": artifact.content_hash,
-            }
-            for label, artifact in artifacts.items()
-        },
-    }
+        artifacts=artifacts,
+    )
 
 
 def _row_to_candidate_input(row: ExtractorRow) -> ScheduleCandidateInput:
@@ -379,7 +372,7 @@ async def run_extractor_for_source(
             "artifact_ids": [str(aid) for aid in artifact_ids],
             "target_urls": [t.url for t in registered.extractor.targets],
             "target_labels": [t.label for t in registered.extractor.targets],
-            "contract": "repo_site_extractor/v1",
+            "contract": CONTRACT_ID,
             "gate_passed": True,
             "warnings": [w.message for w in sandbox_result.result.warnings],
             "duration_ms": sandbox_result.duration_ms,
@@ -402,7 +395,7 @@ async def run_extractor_for_source(
             "extractor_key": registered.extractor.key,
             "extractor_version": registered.extractor.version,
             "artifact_id": artifact_id or "",
-            "contract": "repo_site_extractor/v1",
+            "contract": CONTRACT_ID,
             "gate_passed": True,
         }
         if row.evidence.derivation is not None:

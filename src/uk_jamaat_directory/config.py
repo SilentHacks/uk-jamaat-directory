@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     authoring_max_candidate_links: int = 5
     authoring_max_sample_bytes: int = 16_000
     authoring_keyword_boost: float = 2.0
+    authoring_smoke_test_enabled: bool = True
+    authoring_max_repair_attempts: int = 2
+    authoring_max_attempts: int = 3
+
+    extra_aggregator_domains: list[str] = []
+    extra_umbrella_domains: list[str] = []
+    extra_trusted_widget_hosts: list[str] = []
 
     osm_overpass_url: str = "https://overpass-api.de/api/interpreter"
     osm_overpass_timeout_seconds: float = 180.0

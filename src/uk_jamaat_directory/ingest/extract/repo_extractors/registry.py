@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import pkgutil
 from dataclasses import dataclass
 
@@ -9,6 +10,8 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 )
 
 _SCRIPT_PACKAGE = "uk_jamaat_directory.ingest.extract.repo_extractors.scripts"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,14 +30,28 @@ def iter_script_modules() -> list[str]:
     return names
 
 
-def load_all_extractors() -> list[RegisteredExtractor]:
+def load_all_extractors(*, reload: bool = False) -> list[RegisteredExtractor]:
+    """Load every extractor script.
+
+    ``reload=True`` re-imports already-loaded script modules so freshly
+    rewritten scripts (authoring repair loop) are picked up.
+    """
+    importlib.invalidate_caches()
     registered: list[RegisteredExtractor] = []
     for module_name in iter_script_modules():
-        module = importlib.import_module(module_name)
-        extractor_cls = getattr(module, "Extractor", None)
-        if extractor_cls is None:
+        # A broken script (e.g. a draft an agent is still repairing) must not
+        # take down the whole registry; skip it.
+        try:
+            module = importlib.import_module(module_name)
+            if reload:
+                module = importlib.reload(module)
+            extractor_cls = getattr(module, "Extractor", None)
+            if extractor_cls is None:
+                continue
+            instance = extractor_cls()
+        except Exception:  # noqa: BLE001
+            logger.warning("skipping unloadable extractor module %s", module_name)
             continue
-        instance = extractor_cls()
         if not isinstance(instance, BaseMosqueWebsiteExtractor):
             continue
         registered.append(RegisteredExtractor(module_name=module_name, extractor=instance))
