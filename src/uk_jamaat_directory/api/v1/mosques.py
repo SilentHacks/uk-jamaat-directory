@@ -6,6 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.cache import cache_control
 from uk_jamaat_directory.api.rate_limit import limit_community_submissions
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.schemas.contributions import (
@@ -20,8 +21,10 @@ from uk_jamaat_directory.services.errors import MosqueNotFoundError
 
 router = APIRouter(prefix="/mosques", tags=["mosques"])
 
+PUBLIC_READ_CACHE = "public, max-age=60"
 
-@router.get("", response_model=MosqueListResponse)
+
+@router.get("", response_model=MosqueListResponse, dependencies=[cache_control(PUBLIC_READ_CACHE)])
 async def list_mosques(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -38,7 +41,9 @@ async def list_mosques(
     )
 
 
-@router.get("/search", response_model=MosqueListResponse)
+@router.get(
+    "/search", response_model=MosqueListResponse, dependencies=[cache_control(PUBLIC_READ_CACHE)]
+)
 async def search_mosques(
     q: str | None = Query(default=None),
     postcode: str | None = Query(default=None),
@@ -60,7 +65,11 @@ async def search_mosques(
     )
 
 
-@router.get("/{directory_mosque_id}", response_model=MosqueDetailPublic)
+@router.get(
+    "/{directory_mosque_id}",
+    response_model=MosqueDetailPublic,
+    dependencies=[cache_control(PUBLIC_READ_CACHE)],
+)
 async def get_mosque(
     directory_mosque_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
@@ -71,7 +80,11 @@ async def get_mosque(
     return mosque
 
 
-@router.get("/{directory_mosque_id}/times", response_model=TimesResponse)
+@router.get(
+    "/{directory_mosque_id}/times",
+    response_model=TimesResponse,
+    dependencies=[cache_control(PUBLIC_READ_CACHE)],
+)
 async def get_mosque_times(
     directory_mosque_id: uuid.UUID,
     from_date: date | None = Query(default=None, alias="from"),

@@ -3,11 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.cache import cache_control
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.schemas.public import SnapshotResponse
 from uk_jamaat_directory.services import public_reads
 
-router = APIRouter(prefix="/snapshots", tags=["snapshots"])
+router = APIRouter(
+    prefix="/snapshots", tags=["snapshots"], dependencies=[cache_control("public, max-age=300")]
+)
 
 
 @router.get("/latest", response_model=SnapshotResponse)

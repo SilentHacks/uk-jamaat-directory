@@ -48,9 +48,10 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["localhost", "127.0.0.1"]
     )
-    cors_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"]
-    )
+    # Public read API: any origin may call it. Safe only because credentials are
+    # never allowed (see create_app) and admin routes are gated by X-Admin-Key,
+    # not by CORS.
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
     # Documented operator intent; production VPS enforces proxy headers via
     # uvicorn --proxy-headers in docker-compose.production.yml, not app middleware.
     trust_proxy_headers: bool = False

@@ -3,11 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.cache import cache_control
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.schemas.public import ChangeFeedResponse
 from uk_jamaat_directory.services import public_reads
 
-router = APIRouter(prefix="/changes", tags=["changes"])
+router = APIRouter(
+    prefix="/changes", tags=["changes"], dependencies=[cache_control("public, max-age=60")]
+)
 
 
 @router.get("", response_model=ChangeFeedResponse)
