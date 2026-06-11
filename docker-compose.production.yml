@@ -1,16 +1,28 @@
 # Production stack for Ubuntu VPS.
 #
+# Images are built and pushed to GHCR by CI; the server pulls them (it never builds).
+# Pin the tag via IMAGE_TAG in .env (deploy.sh manages this); defaults to latest.
+#
 # Usage:
-#   docker compose -f docker-compose.production.yml up -d --build
+#   docker compose -f docker-compose.production.yml up -d
 #
 # Optional host-specific overrides (gitignored):
-#   docker compose -f docker-compose.production.yml -f docker-compose.local.yml up -d --build
+#   docker compose -f docker-compose.production.yml -f docker-compose.local.yml up -d
 #
 # Requires .env on the server (copy from .env.example). Never commit .env.
 
+x-app-image: &app-image ghcr.io/silenthacks/uk-jamaat-directory:${IMAGE_TAG:-latest}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   api:
-    build: .
+    image: *app-image
+    logging: *default-logging
     expose:
       - "8000"
     env_file:
@@ -46,7 +58,8 @@ services:
     restart: unless-stopped
 
   worker:
-    build: .
+    image: *app-image
+    logging: *default-logging
     env_file:
       - .env
     environment:
@@ -65,11 +78,17 @@ services:
         condition: service_started
     command: celery -A uk_jamaat_directory.worker.celery_app worker --loglevel=INFO
     healthcheck:
-      disable: true
+      test:
+        ["CMD-SHELL", "celery -A uk_jamaat_directory.worker.celery_app inspect ping -t 10 || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   beat:
-    build: .
+    image: *app-image
+    logging: *default-logging
     env_file:
       - .env
     environment:
@@ -85,7 +104,9 @@ services:
     command: >
       celery -A uk_jamaat_directory.worker.celery_app beat
       --loglevel=INFO
-      --schedule=/tmp/celerybeat-schedule
+      --schedule=/data/celerybeat-schedule
+    volumes:
+      - beat_data:/data
     healthcheck:
       disable: true
     restart: unless-stopped
@@ -146,5 +167,6 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  beat_data:
   caddy_data:
   caddy_config:

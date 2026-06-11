@@ -132,13 +132,33 @@ def test_smoke_test_checks_public_surface() -> None:
 def test_deploy_script_order_matches_checklist() -> None:
     deploy = (ROOT / "scripts" / "deploy" / "deploy.sh").read_text()
     backup_idx = deploy.index("backup-postgres.sh")
-    build_idx = deploy.index('build "${build_services[@]}"')
+    pull_idx = deploy.index("pull api worker beat")
     migrate_idx = deploy.index("migrate.sh")
     smoke_idx = deploy.index("smoke-test.sh")
-    assert backup_idx < build_idx < migrate_idx < smoke_idx
+    assert backup_idx < pull_idx < migrate_idx < smoke_idx
     assert "health_ok" in deploy
     assert "SKIP_BACKUP" in deploy and "WARNING" in deploy
     assert "compose-args.sh" in deploy
+
+
+def test_deploy_script_pulls_image_and_does_not_build() -> None:
+    deploy = (ROOT / "scripts" / "deploy" / "deploy.sh").read_text()
+    assert "IMAGE_TAG" in deploy
+    assert "build " not in deploy
+
+
+def test_production_compose_uses_ghcr_image_not_build() -> None:
+    text = (ROOT / "docker-compose.production.yml").read_text()
+    assert "ghcr.io/silenthacks/uk-jamaat-directory" in text
+    assert "${IMAGE_TAG:-latest}" in text
+    assert "build: ." not in text
+
+
+def test_production_compose_has_log_rotation_and_worker_healthcheck() -> None:
+    text = (ROOT / "docker-compose.production.yml").read_text()
+    assert "max-size" in text and "max-file" in text
+    assert "inspect ping" in text  # worker healthcheck is no longer disabled
+    assert "/data/celerybeat-schedule" in text  # beat schedule persisted off /tmp
 
 
 def test_env_example_documents_production_keys() -> None:

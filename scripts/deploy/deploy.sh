@@ -20,7 +20,9 @@ if [[ "$SKIP_BACKUP" == "1" || "$SKIP_MIGRATE" == "1" || "$SKIP_SMOKE" == "1" ]]
   echo "WARNING: break-glass deploy skips enabled — SKIP_BACKUP=$SKIP_BACKUP SKIP_MIGRATE=$SKIP_MIGRATE SKIP_SMOKE=$SKIP_SMOKE" >&2
 fi
 
-echo "==> Deploy checklist: pull, backup, build, migrate, restart, smoke test"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+
+echo "==> Deploy checklist: source, backup, pull image ($IMAGE_TAG), migrate, restart, smoke test"
 echo "    compose: ${COMPOSE_ARGS[*]}"
 
 echo "==> Pull latest source (if using git on the server)"
@@ -43,13 +45,15 @@ else
   echo "==> Skipping backup (SKIP_BACKUP=1)"
 fi
 
-build_services=(api worker beat)
-if ! docker compose "${COMPOSE_ARGS[@]}" config 2>/dev/null | grep -A12 '^  caddy:' | grep -q 'profiles:'; then
-  build_services+=(caddy)
+# Pin the image tag in .env so any later `docker compose up` keeps this version.
+if grep -q '^IMAGE_TAG=' .env; then
+  sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env
+else
+  echo "IMAGE_TAG=$IMAGE_TAG" >> .env
 fi
 
-echo "==> Build application images"
-docker compose "${COMPOSE_ARGS[@]}" build "${build_services[@]}"
+echo "==> Pull application image ($IMAGE_TAG)"
+docker compose "${COMPOSE_ARGS[@]}" pull api worker beat
 
 if [[ "$SKIP_MIGRATE" != "1" ]]; then
   echo "==> Apply database migrations"
