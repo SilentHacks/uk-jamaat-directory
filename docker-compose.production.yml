@@ -23,7 +23,6 @@ services:
       S3_ENDPOINT_URL: http://minio:9000
       PYTHONPATH: /app/src
       ENVIRONMENT: production
-      DOCS_ENABLED: "false"
       TRUST_PROXY_HEADERS: "true"
     depends_on:
       postgres:
