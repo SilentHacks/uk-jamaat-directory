@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /v1/admin/
+Disallow: /internal/
+
+Sitemap: https://directory.example.com/sitemap.xml
+

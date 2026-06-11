@@ -134,6 +134,7 @@ services:
       S3_BUCKET: ${S3_BUCKET}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web/public:/srv/www:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

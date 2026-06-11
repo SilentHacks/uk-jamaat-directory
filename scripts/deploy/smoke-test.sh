@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 
 cd "$ROOT_DIR"
 
@@ -43,5 +42,29 @@ echo "$ready_json" | grep -q '"database":"ok"' || {
 
 echo "Smoke test: GET $BASE_URL/v1/mosques?limit=1"
 curl -fsS "$BASE_URL/v1/mosques?limit=1" >/dev/null
+
+echo "Smoke test: GET $BASE_URL/v1/openapi.json"
+openapi_json="$(curl -fsS "$BASE_URL/v1/openapi.json")"
+echo "$openapi_json" | grep -q '"openapi"' || {
+  echo "error: /v1/openapi.json missing openapi field" >&2
+  exit 1
+}
+
+echo "Smoke test: GET $BASE_URL/ (landing page)"
+curl -fsS "$BASE_URL/" | grep -qi '<html' || {
+  echo "error: landing page did not return HTML" >&2
+  exit 1
+}
+
+echo "Smoke test: security headers on $BASE_URL/"
+headers="$(curl -fsSI "$BASE_URL/")"
+echo "$headers" | grep -qi 'strict-transport-security' || {
+  echo "error: HSTS header missing on landing page" >&2
+  exit 1
+}
+echo "$headers" | grep -qi 'x-content-type-options' || {
+  echo "error: X-Content-Type-Options header missing on landing page" >&2
+  exit 1
+}
 
 echo "All smoke checks passed."

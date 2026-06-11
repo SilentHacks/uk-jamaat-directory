@@ -1,4 +1,4 @@
-.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down export-contracts export-osm export-mib compose-production-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
+.PHONY: install lint format test test-postgres test-postgres-preflight migrate dev compose-up compose-down web-dev export-contracts export-osm export-mib compose-production-config deploy-migrate deploy-backup-postgres deploy-backup-minio deploy-smoke deploy
 
 VENV := .venv
 BIN := $(VENV)/bin
@@ -55,6 +55,11 @@ compose-up:
 
 compose-down:
 	docker compose down
+
+# Serve the static site + API behind Caddy locally at http://localhost:8080,
+# mirroring production routing/headers (TLS off). Verify the landing/docs/data pages.
+web-dev:
+	docker compose --profile web up caddy
 
 compose-production-config:
 	@test -f .env || cp .env.example .env

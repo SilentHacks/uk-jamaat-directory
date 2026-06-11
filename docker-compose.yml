@@ -92,7 +92,7 @@ services:
       - redis_data:/data
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -102,6 +102,20 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+
+  # Optional: exercise the production routing/headers/static site locally.
+  #   docker compose --profile web up caddy   (or `make web-dev`)
+  # Serves the site + proxies /v1/* to the API at http://localhost:8080.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["web"]
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./web/public:/srv/www:ro
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

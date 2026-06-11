@@ -45,6 +45,53 @@ def test_caddyfile_proxies_exports_to_minio() -> None:
     assert "{$S3_BUCKET}" in text
 
 
+def test_caddyfile_serves_static_site_with_hardening() -> None:
+    text = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
+    assert "encode zstd gzip" in text
+    assert "root * /srv/www" in text
+    assert "file_server" in text
+    assert "handle_errors" in text
+    assert "Strict-Transport-Security" in text
+    assert "X-Content-Type-Options" in text
+    assert "Content-Security-Policy" in text
+    assert "request_body" in text
+    # The API is routed explicitly so unknown paths fall through to the static 404.
+    assert "path /v1/*" in text
+
+
+def test_caddyfile_does_not_expose_internal_docs_publicly() -> None:
+    text = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
+    assert "/internal/*" not in text
+
+
+def test_production_compose_mounts_static_site() -> None:
+    text = (ROOT / "docker-compose.production.yml").read_text()
+    assert "./web/public:/srv/www:ro" in text
+
+
+def test_static_site_has_required_pages() -> None:
+    web = ROOT / "web" / "public"
+    for rel in (
+        "index.html",
+        "docs/index.html",
+        "data/index.html",
+        "404.html",
+        "robots.txt",
+        "sitemap.xml",
+        "favicon.svg",
+        "assets/site.css",
+        "assets/data.js",
+        "assets/vendor/scalar.standalone.js",
+    ):
+        assert (web / rel).is_file(), rel
+
+
+def test_docs_page_points_at_public_openapi_spec() -> None:
+    text = (ROOT / "web" / "public" / "docs" / "index.html").read_text()
+    assert 'data-url="/v1/openapi.json"' in text
+    assert "/assets/vendor/scalar.standalone.js" in text
+
+
 def test_deploy_scripts_exist_and_are_executable() -> None:
     script_dir = ROOT / "scripts" / "deploy"
     for name in (
@@ -71,6 +118,15 @@ def test_smoke_test_asserts_readiness_response_fields() -> None:
     assert '"status":"ok"' in text
     assert '"database":"ok"' in text
     assert '"ready"' not in text
+
+
+def test_smoke_test_checks_public_surface() -> None:
+    text = (ROOT / "scripts" / "deploy" / "smoke-test.sh").read_text()
+    # No stale compose-file default that points at a non-existent file.
+    assert "docker-compose.vps.yml" not in text
+    assert "/v1/openapi.json" in text
+    assert "<html" in text
+    assert "strict-transport-security" in text
 
 
 def test_deploy_script_order_matches_checklist() -> None:

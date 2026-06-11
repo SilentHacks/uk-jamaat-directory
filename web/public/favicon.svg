@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="UK Jamaat Directory">
+  <rect width="64" height="64" rx="12" fill="#0f1115"/>
+  <!-- Dome -->
+  <path d="M32 14c7 4 11 10 11 17H21c0-7 4-13 11-17z" fill="#4f9d69"/>
+  <!-- Finial -->
+  <circle cx="32" cy="11" r="2.4" fill="#4f9d69"/>
+  <!-- Base -->
+  <rect x="19" y="33" width="26" height="17" fill="#3f8a59"/>
+  <!-- Door -->
+  <path d="M32 38c2.2 0 4 1.8 4 4v8h-8v-8c0-2.2 1.8-4 4-4z" fill="#0f1115"/>
+  <!-- Minarets -->
+  <rect x="14" y="26" width="4" height="24" rx="2" fill="#4f9d69"/>
+  <rect x="46" y="26" width="4" height="24" rx="2" fill="#4f9d69"/>
+</svg>
