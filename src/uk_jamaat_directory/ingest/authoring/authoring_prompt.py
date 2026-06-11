@@ -89,6 +89,7 @@ def build_authoring_prompt(
           `uk_jamaat_directory.ingest.extract.repo_extractors.declarative`,
           `uk_jamaat_directory.domain`. No network/file libraries — the
           runtime fetches the target URLs and passes them in as artifacts.
+        - Use the `.venv` environment for all Python invocations.
 
         # Steps
 
