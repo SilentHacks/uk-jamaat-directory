@@ -57,6 +57,7 @@ TRUSTED_WIDGET_HOSTS: frozenset[str] = frozenset(
         "mawaqit.net",
         "masjidbox.com",
         "masjidal.com",
+        "athanplus.com",
     }
 )
 

@@ -106,14 +106,26 @@ class TestCapabilityAndTargetGates:
 
     def test_check_extractor_flags_no_targets(self) -> None:
         entry = load_all_extractors()[0]
-        # Mutate to remove targets for the check.
-        original = entry.extractor.targets
-        try:
-            entry.extractor.targets = ()
-            issues = check_extractor(entry.extractor, allowed_domain="synthetic.example")
-            assert any("no targets" in i for i in issues)
-        finally:
-            entry.extractor.targets = original
+        ext = entry.extractor
+        # Some extractors use a @property for targets (dynamic URLs).
+        # Handle both attribute and property cases.
+        is_property = isinstance(type(ext).__dict__.get("targets"), property)
+        if is_property:
+            own_targets = ext.targets
+            type(ext).targets = property(lambda self: ())
+            try:
+                issues = check_extractor(ext, allowed_domain="synthetic.example")
+                assert any("no targets" in i for i in issues)
+            finally:
+                type(ext).targets = property(lambda self: own_targets)
+        else:
+            original = ext.targets
+            try:
+                ext.targets = ()
+                issues = check_extractor(ext, allowed_domain="synthetic.example")
+                assert any("no targets" in i for i in issues)
+            finally:
+                ext.targets = original
 
     def test_check_capabilities_unknown_kind(self) -> None:
         from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
