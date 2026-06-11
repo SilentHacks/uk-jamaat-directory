@@ -104,7 +104,9 @@ replace it with the public coverage report.
 Phases 0–12 are implemented (see README progress table): scaffold, schema, public read
 API, MLM/OSM/MiB imports, identity matching, validation/publication, admin moderation,
 crawl, bulk exports, VPS deployment, GitHub hygiene — plus the repo-owned extractor
-pipeline and overnight authoring orchestrator (ADRs 0016/0017).
+pipeline and overnight authoring orchestrator (ADRs 0016/0017), and the public-facing
+deployment layer: static landing/docs/data site, public API reference, edge + app
+hardening, and a GHCR build/deploy pipeline (ADR 0019).
 
 Forward roadmap, in order:
 
@@ -120,8 +122,10 @@ Forward roadmap, in order:
 5. **Sirat sync adapter** (in `sirat-api`): consumes changes/snapshots; first proof of
    the consumer contract. Decide then whether generated API clients warrant a separate
    contracts package (see open decisions).
-6. **Frontend**: public directory website and admin/moderation UI (Next.js per original
-   intent — revalidate the stack when work starts; nothing is built).
+6. **Frontend**: full directory-browsing website and admin/moderation UI (Next.js per
+   original intent — revalidate the stack when work starts). The static landing page,
+   API reference, and bulk-data listing already exist (ADR 0019); this item is now the
+   interactive mosque search/browse experience and the moderation UI only.
 7. **Platform feed adapters** (Takbeer Time, Mawaqit direct) where terms permit.
 
 ## Open Decisions
@@ -132,14 +136,16 @@ Explicitly undecided — decide when the trigger fires, then ADR it:
   until a real external consumer needs a typed client. Then decide: generated package
   from this repo vs. separate `uk-jamaat-contracts` repo (relevant if clients should be
   Apache-2.0 while the service is AGPL).
-- **API versioning/deprecation policy**: needed before the first external consumer
-  depends on `/v1`. Define compatibility guarantees, deprecation window, and how dataset
-  schema versions evolve.
-- **Public rate-limit policy**: current limits are operational defaults; publish a policy
-  (and optional API-key tier) before promoting the API.
-- **Observability**: Sentry/Prometheus/OTel were aspirational and none are wired up.
-  Decide a minimal production observability set when the first public deployment carries
-  real traffic; JSON logs exist today.
+- **API versioning/deprecation policy**: decided — `/v1` is stable and additive-only;
+  breaking changes get a new prefix with a ≥90-day parallel window; dataset schema
+  versions ride snapshot metadata (ADR 0019, [docs/api/README.md](docs/api/README.md)).
+  An optional API-key tier is still open.
+- **Public rate-limit policy**: decided and published — 120 req/min/IP public, 10/min
+  submissions (ADR 0019). The in-process limiter must move to a shared store before
+  scaling to multiple workers/instances.
+- **Observability**: minimal set decided (ADR 0019) — Sentry (optional via DSN) plus
+  external uptime monitoring on `/v1/health/ready`; JSON logs as before. A `/metrics`
+  endpoint and OTel remain deferred until traffic justifies them.
 
 ## Test Expectations
 
