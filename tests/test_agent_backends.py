@@ -47,6 +47,26 @@ def test_opencode_argv_shape() -> None:
     ]
 
 
+def test_opencode_argv_with_agent_name() -> None:
+    argv = OpenCodeBackend().build_argv(
+        bin_path="/usr/bin/opencode",
+        model="opencode-go/deepseek-v4-flash",
+        prompt="PROMPT",
+        agent_name="default",
+    )
+    assert argv == [
+        "/usr/bin/opencode",
+        "-m",
+        "opencode-go/deepseek-v4-flash",
+        "run",
+        "--format",
+        "json",
+        "--agent",
+        "default",
+        "PROMPT",
+    ]
+
+
 def test_claude_code_argv_uses_headless_flags() -> None:
     backend = ClaudeCodeBackend()
     argv = backend.build_argv(bin_path="/usr/bin/claude", model="claude-haiku-4-5-20251001", prompt="PROMPT")
@@ -65,6 +85,16 @@ def test_backend_default_models() -> None:
 def test_explicit_model_overrides_backend_default() -> None:
     settings = _settings(ai_agent_model="claude-sonnet-4-6")
     assert ClaudeCodeBackend().resolve_model(settings) == "claude-sonnet-4-6"
+
+
+def test_agent_name_resolved_from_settings() -> None:
+    settings = _settings(ai_agent_name="default")
+    assert OpenCodeBackend().resolve_agent_name(settings) == "default"
+
+
+def test_agent_name_defaults_to_none() -> None:
+    settings = _settings()
+    assert OpenCodeBackend().resolve_agent_name(settings) is None
 
 
 def test_opencode_env_maps_openai_variables() -> None:

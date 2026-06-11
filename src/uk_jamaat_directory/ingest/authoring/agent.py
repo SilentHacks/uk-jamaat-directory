@@ -55,6 +55,7 @@ async def run_authoring_agent(
     backend = backend or get_agent_backend(settings)
     bin_path = backend.resolve_binary()
     model = backend.resolve_model(settings)
+    agent_name = backend.resolve_agent_name(settings)
     timeout = timeout_seconds or settings.authoring_per_source_timeout_seconds
     workdir = cwd or os.getcwd()
 
@@ -63,11 +64,11 @@ async def run_authoring_agent(
         env.update(extra_env)
     backend.apply_env(env, settings)
 
-    command_repr = backend.describe(model=model, prompt=prompt)
+    command_repr = backend.describe(model=model, prompt=prompt, agent_name=agent_name)
 
     start = time.monotonic()
     process = await asyncio.create_subprocess_exec(
-        *backend.build_argv(bin_path=bin_path, model=model, prompt=prompt),
+        *backend.build_argv(bin_path=bin_path, model=model, prompt=prompt, agent_name=agent_name),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=workdir,

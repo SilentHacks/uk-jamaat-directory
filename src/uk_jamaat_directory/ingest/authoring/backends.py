@@ -55,10 +55,20 @@ class AgentBackend(ABC):
     def resolve_model(self, settings: Settings) -> str:
         return settings.ai_agent_model or self.default_model
 
-    @abstractmethod
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
-        """Return the full subprocess argv for one non-interactive run."""
+    def resolve_agent_name(self, settings: Settings) -> str | None:
+        return settings.ai_agent_name
 
+    @abstractmethod
+    def build_argv(
+        self,
+        *,
+        bin_path: str,
+        model: str,
+        prompt: str,
+        agent_name: str | None = None,
+    ) -> list[str]:
+        """Return the full subprocess argv for one non-interactive run."""
+    
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         """Inject credentials/routing into the subprocess environment.
 
@@ -67,9 +77,9 @@ class AgentBackend(ABC):
         """
         return None
 
-    def describe(self, *, model: str, prompt: str) -> str:
+    def describe(self, *, model: str, prompt: str, agent_name: str | None = None) -> str:
         """Loggable command summary that never includes the prompt body."""
-        argv = self.build_argv(bin_path=self.binary, model=model, prompt="")
+        argv = self.build_argv(bin_path=self.binary, model=model, prompt="", agent_name=agent_name)
         rendered = " ".join(part for part in argv if part)
         return f"{rendered} <prompt:{len(prompt)} chars>"
 
@@ -81,8 +91,14 @@ class OpenCodeBackend(AgentBackend):
     binary = "opencode"
     default_model = "opencode-go/deepseek-v4-flash"
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
-        return [bin_path, "-m", model, "run", "--format", "json", prompt]
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
+        argv = [bin_path, "-m", model, "run", "--format", "json"]
+        if agent_name:
+            argv.extend(["--agent", agent_name])
+        argv.append(prompt)
+        return argv
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         # OpenCode routes through OpenAI-compatible provider variables.
@@ -106,7 +122,9 @@ class ClaudeCodeBackend(AgentBackend):
     binary = "claude"
     default_model = "claude-haiku-4-5-20251001"
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
         return [
             bin_path,
             "-p",
@@ -143,7 +161,9 @@ class PiBackend(AgentBackend):
     binary = "pi"
     default_model = "anthropic/claude-haiku-4-5-20251001"
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
         return [bin_path, "--model", model, "-p", prompt, "--mode", "json"]
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:

@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     ai_agent_backend: str = "opencode"
     # None = use the selected backend's default model.
     ai_agent_model: str | None = None
+    # None = use the backend's default primary agent (e.g. opencode "build").
+    ai_agent_name: str | None = None
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
     authoring_concurrency: int = 8
