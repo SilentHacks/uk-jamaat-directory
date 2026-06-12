@@ -197,10 +197,12 @@ async def test_batch_preflight_filters_only_permanent_failures() -> None:
             error="HTTP 503",
         )
 
-    persisted: list[tuple[str, str]] = []
+    persisted: list[tuple[str, str, str]] = []
 
-    async def fake_persist(*, session_factory, source, error, failure_category, predicted_kind):
-        persisted.append((source.source_url, failure_category))
+    async def fake_persist(
+        *, session_factory, source, status, error, failure_category, predicted_kind
+    ):
+        persisted.append((source.source_url, status, failure_category))
 
     summary = OrchestrationSummary()
     with (
@@ -209,7 +211,7 @@ async def test_batch_preflight_filters_only_permanent_failures() -> None:
             new=fake_preflight,
         ),
         patch(
-            "uk_jamaat_directory.ingest.authoring.orchestrator._persist_preflight_failure",
+            "uk_jamaat_directory.ingest.authoring.orchestrator._persist_preflight_outcome",
             new=fake_persist,
         ),
     ):
@@ -228,12 +230,89 @@ async def test_batch_preflight_filters_only_permanent_failures() -> None:
     assert summary.failed == 2
     assert summary.processed == 2
     assert summary.preflight_done == 4
-    assert dict(persisted) == {
-        "https://dead.test": "dead_site",
-        "https://robots.test": "blocked_robots",
+    assert {(url, cat) for url, _status, cat in persisted} == {
+        ("https://dead.test", "dead_site"),
+        ("https://robots.test", "blocked_robots"),
     }
+    assert all(status == "failed" for _url, status, _cat in persisted)
     assert summary.failure_categories == {"dead_site": 1, "blocked_robots": 1}
     assert summary.phase == "authoring"
+
+
+async def test_batch_preflight_applies_domain_policy() -> None:
+    """Aggregator/umbrella domains are decided in pre-flight without a fetch:
+    aggregator -> FAILED, umbrella -> SKIPPED_REVIEW, and neither calls the
+    network probe."""
+    from uk_jamaat_directory.ingest.authoring.orchestrator import (
+        OrchestrationSummary,
+        _batch_preflight,
+    )
+
+    sources = [
+        types.SimpleNamespace(id=uuid.uuid4(), source_url=url)
+        for url in ("https://aggregator.test", "https://umbrella.test", "https://plain.test")
+    ]
+
+    fetched: list[str] = []
+
+    async def fake_preflight(*, source_url: str, settings: Settings):
+        fetched.append(source_url)
+        from uk_jamaat_directory.domain import AuthoringTargetKind
+        from uk_jamaat_directory.ingest.authoring.discovery import PreFlightResult
+
+        return PreFlightResult(
+            source_url, "plain.test", True, 200, "text/html", 100, AuthoringTargetKind.HTML
+        )
+
+    persisted: list[tuple[str, str, str]] = []
+
+    async def fake_persist(
+        *, session_factory, source, status, error, failure_category, predicted_kind
+    ):
+        persisted.append((source.source_url, status, failure_category))
+
+    summary = OrchestrationSummary()
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_aggregator_domain",
+            new=lambda domain, *, settings: domain == "aggregator.test",
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.is_umbrella_domain",
+            new=lambda domain, *, settings: domain == "umbrella.test",
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.normalize_domain",
+            new=lambda url: url.replace("https://", ""),
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.preflight_source",
+            new=fake_preflight,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator._persist_preflight_outcome",
+            new=fake_persist,
+        ),
+    ):
+        survivors = await _batch_preflight(
+            session_factory=None,
+            sources=sources,
+            settings=Settings(_env_file=None),
+            summary=summary,
+            progress_lock=asyncio.Lock(),
+            on_progress=None,
+            concurrency=4,
+        )
+
+    assert {s.source_url for s in survivors} == {"https://plain.test"}
+    assert fetched == ["https://plain.test"]  # policy verdicts never hit the network
+    assert dict((url, (status, cat)) for url, status, cat in persisted) == {
+        "https://aggregator.test": ("failed", "aggregator"),
+        "https://umbrella.test": ("skipped_review", "umbrella_review"),
+    }
+    assert summary.failed == 1
+    assert summary.skipped_review == 1
+    assert summary.preflight_filtered == 2
 
 
 def _ok_fetch() -> FetchResult:

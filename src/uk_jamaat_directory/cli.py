@@ -474,12 +474,13 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="Skip the execution smoke test before deploying (debugging only)",
     )
     orchestrate.add_argument(
-        "--skip-preflight",
+        "--preflight",
         action="store_true",
         help=(
-            "Skip the batch reachability pre-flight that filters out sources "
-            "with deterministic permanent failures (dead DNS, robots, 4xx) "
-            "before any agent is spawned"
+            "Run the batch pre-flight first: filter out sources with a "
+            "deterministic verdict (aggregator/umbrella domain, dead DNS, "
+            "robots, 4xx) before any agent is spawned. Only needs to run once "
+            "for a corpus"
         ),
     )
     orchestrate.add_argument(
@@ -1772,7 +1773,7 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
             retry_failed=args.retry_failed,
             retry_categories=set(args.retry_category) if args.retry_category else None,
             max_attempts=args.max_attempts,
-            skip_preflight=args.skip_preflight,
+            run_preflight=args.preflight,
             preflight_concurrency=args.preflight_concurrency,
             on_progress=_on_progress,
         )
