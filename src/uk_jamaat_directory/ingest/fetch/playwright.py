@@ -15,7 +15,7 @@ async def fetch_rendered_html(
     url: str,
     *,
     settings: Settings | None = None,
-    wait_until: str = "networkidle",
+    wait_until: str = "domcontentloaded",
     timeout_seconds: float = 30.0,
 ) -> FetchResult:
     """Fetch *url* via a headless Chromium browser and return the rendered
@@ -60,6 +60,10 @@ async def fetch_rendered_html(
                 timeout=timeout_seconds * 1000,
             )
             status_code = response.status if response else 200
+            # Give common mosque JS timetable widgets (AJAX monthly tables) a
+            # brief moment to populate after DOM ready. 2500ms matches what
+            # manual renders used successfully for this class of site.
+            await page.wait_for_timeout(2500)
             html = await page.content()
             await browser.close()
     except Exception as exc:
@@ -68,6 +72,9 @@ async def fetch_rendered_html(
             body=b"",
             content_type=None,
             error=f"playwright failed: {exc}",
+            etag=None,
+            last_modified=None,
+            unchanged=False,
         )
 
     return FetchResult(

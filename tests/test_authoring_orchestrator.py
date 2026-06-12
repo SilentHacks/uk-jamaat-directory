@@ -166,17 +166,35 @@ async def test_batch_preflight_filters_only_permanent_failures() -> None:
             )
         if "dead.test" in source_url:
             return PreFlightResult(
-                source_url, "dead.test", False, 404, None, 0,
-                AuthoringTargetKind.UNKNOWN, error="HTTP 404",
+                source_url,
+                "dead.test",
+                False,
+                404,
+                None,
+                0,
+                AuthoringTargetKind.UNKNOWN,
+                error="HTTP 404",
             )
         if "robots.test" in source_url:
             return PreFlightResult(
-                source_url, "robots.test", False, None, None, 0,
-                AuthoringTargetKind.UNKNOWN, error="robots.txt disallows fetch",
+                source_url,
+                "robots.test",
+                False,
+                None,
+                None,
+                0,
+                AuthoringTargetKind.UNKNOWN,
+                error="robots.txt disallows fetch",
             )
         return PreFlightResult(
-            source_url, "flaky.test", False, 503, None, 0,
-            AuthoringTargetKind.UNKNOWN, error="HTTP 503",
+            source_url,
+            "flaky.test",
+            False,
+            503,
+            None,
+            0,
+            AuthoringTargetKind.UNKNOWN,
+            error="HTTP 503",
         )
 
     persisted: list[tuple[str, str]] = []

@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     crawl_user_agent: str = (
         "UKJamaatDirectoryBot/0.1 (+https://github.com/SilentHacks/uk-jamaat-directory)"
     )
-    crawl_timeout_seconds: float = 20.0
+    crawl_timeout_seconds: float = 120.0
     crawl_max_bytes: int = 5_000_000
     crawl_per_domain_delay_seconds: float = 2.0
     crawl_interval_hours: int = 24

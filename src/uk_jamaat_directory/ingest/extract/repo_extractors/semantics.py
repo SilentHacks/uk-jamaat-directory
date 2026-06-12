@@ -20,6 +20,8 @@ ALLOWED_EMPTY_REASONS: tuple[str, ...] = (
     "jumuah_only",
     "awaiting ocr",
     "awaiting OCR",
+    "image target — awaiting OCR",
+    "pdf target — awaiting parser",
 )
 
 _DAILY_ORDER = (Prayer.FAJR, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
