@@ -33,7 +33,7 @@ PRAYER_COL_MAP = [
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "maidenhead_central_mosque_ef8b9620"
-    version = "2026.06.11.1"
+    version = "2026.06.12.1"
     source_match = SourceMatch(domains=("maidenheadmosque.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (

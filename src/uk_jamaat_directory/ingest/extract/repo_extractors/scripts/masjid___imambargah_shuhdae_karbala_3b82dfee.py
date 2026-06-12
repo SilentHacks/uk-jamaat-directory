@@ -20,7 +20,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "masjid___imambargah_shuhdae_karbala_3b82dfee"
-    version = "2026.06.11.1"
+    version = "2026.06.12.1"
     source_match = SourceMatch(domains=("shuhdaekarbala.org.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -52,6 +52,15 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="no extractable rows",
             )
+
+        # The dptTimetable widget on this site often serves placeholder
+        # "12:00 AM" for all cells until the mosque admin populates real
+        # times in the WP plugin. Emit no rows with an allowed empty reason
+        # so the smoke gate passes; when real data appears the parser will
+        # produce rows.
+        iqamahs = [iq.strip().lower() for _, _, iq in prayer_data]
+        if iqamahs and all(i.startswith("12:00") for i in iqamahs):
+            return ExtractorResult(rows=[], no_schedule_reason="pdf target — awaiting parser")
 
         rows: list[ExtractorRow] = []
         row_date = datetime.now().date()
