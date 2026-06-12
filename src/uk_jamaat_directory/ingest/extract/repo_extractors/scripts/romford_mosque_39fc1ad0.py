@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
@@ -18,6 +17,25 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetSpec,
 )
 
+_DATE_TIME_RE = re.compile(
+    r"(?P<date>(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), "
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4})"
+    r" \d{1,2} \w+ \w+ \d{4}"
+    r"(?P<times>(?: \d{1,2}:\d{2}| --){12})"
+)
+
+# Time token indices (0-based) within the 12-value array:
+# Fajr_athan=0, Fajr_iqamah=1, Shuruq_athan=2, Shuruq_iqamah=3,
+# Dhuhr_athan=4, Dhuhr_iqamah=5, Asr_athan=6, Asr_iqamah=7,
+# Maghrib_athan=8, Maghrib_iqamah=9, Isha_athan=10, Isha_iqamah=11
+_IQAMAH_COLUMNS: dict[Prayer, int] = {
+    Prayer.FAJR: 1,
+    Prayer.DHUHR: 5,
+    Prayer.ASR: 7,
+    Prayer.MAGHRIB: 9,
+    Prayer.ISHA: 11,
+}
+
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "romford_mosque_39fc1ad0"
@@ -26,173 +44,81 @@ class Extractor(BaseMosqueWebsiteExtractor):
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
 
     def __init__(self) -> None:
-        super().__init__()
-        self.targets = (
+        self._targets = (
             TargetSpec(
                 label="timetable",
                 url="http://romfordmosque.co.uk/",
-                kind=TargetKind.HTML,
+                kind=TargetKind.RENDERED_HTML,
+                requires_javascript=True,
             ),
         )
+        super().__init__()
+
+    @property
+    def targets(self) -> tuple[TargetSpec, ...]:
+        return self._targets
 
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
         artifact = ctx.artifact("timetable")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        html = artifact.text()
-        text = re.sub(r"<[^>]+>", " ", html)
-        text = re.sub(r"\s+", " ", text)
 
-        warnings: list[ExtractorWarning] = []
+        text = artifact.text()
         rows: list[ExtractorRow] = []
+        warnings: list[ExtractorWarning] = []
 
-        today = datetime.now().date()
-        date_obj: date | None = None
-        sched_block = text
-
-        bm = re.search(r"(?i)Athan", text)
-        if bm:
-            start = max(0, bm.start() - 400)
-            end = min(len(text), bm.end() + 300)
-            sched_block = text[start:end]
-            for pat, fmt in (
-                (
-                    r"(?i)(?:[A-Za-z]+day,?\s*)?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})",
-                    "%d %B %Y",
-                ),
-                (
-                    r"(?i)(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})",
-                    "%B %d %Y",
-                ),
-            ):
-                m = re.search(pat, sched_block)
-                if m:
-                    try:
-                        if fmt.startswith("%d"):
-                            ds = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-                        else:
-                            ds = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-                        d = datetime.strptime(ds, fmt).date()
-                        if abs((d - today).days) <= 7:
-                            date_obj = d
-                            break
-                    except ValueError:
-                        pass
-        if date_obj is None:
-            for pat, fmt in (
-                (
-                    r"(?i)(?:[A-Za-z]+day,?\s*)?(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})",
-                    "%d %B %Y",
-                ),
-                (
-                    r"(?i)(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})",
-                    "%B %d %Y",
-                ),
-            ):
-                m = re.search(pat, sched_block)
-                if m:
-                    try:
-                        if fmt.startswith("%d"):
-                            ds = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-                        else:
-                            ds = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-                        d = datetime.strptime(ds, fmt).date()
-                        if abs((d - today).days) <= 7:
-                            date_obj = d
-                            break
-                    except ValueError:
-                        pass
-        if date_obj is None:
-            date_obj = today
-
-        prayer_map = {
-            "fajr": Prayer.FAJR,
-            "dhuhr": Prayer.DHUHR,
-            "zuhr": Prayer.DHUHR,
-            "asr": Prayer.ASR,
-            "maghrib": Prayer.MAGHRIB,
-            "isha": Prayer.ISHA,
-        }
-
-        for label, prayer in prayer_map.items():
-            pat = rf"(?i)\b{label}\b[^0-9]*?(\d{{1,2}}[:.]\d{{2}})[^0-9]*?(\d{{1,2}}[:.]\d{{2}})"
-            mm = re.search(pat, sched_block)
-            if not mm:
-                continue
-            raw_j = mm.group(2).replace(".", ":")
-            jt = coerce_time(raw_j, prayer=prayer.value)
-            if jt is None:
+        for match in _DATE_TIME_RE.finditer(text):
+            date_str = match.group("date").strip().rstrip(",")
+            row_date = parse_date_flexible(date_str, default_year=datetime.now().year)
+            if row_date is None:
                 warnings.append(
                     ExtractorWarning(
-                        code="unparseable_time",
-                        message=f"{date_obj} {prayer.value}: {raw_j!r}",
+                        code="unparseable_date",
+                        message=f"could not parse date: {date_str!r}",
                         target_label="timetable",
                     )
                 )
                 continue
-            rows.append(
-                ExtractorRow(
-                    date=date_obj,
-                    prayer=prayer,
-                    jamaat_time=jt,
-                    timezone=ctx.timezone,
-                    evidence=ctx.evidence(
-                        target_label="timetable",
-                        extractor_key=self.key,
-                        extractor_version=self.version,
-                        raw_text=f"{label} {mm.group(1)} {mm.group(2)}",
-                        selector=f"text {label}",
-                    ),
-                )
-            )
 
-        jm = re.search(
-            r"(?i)\bJumu?ah\s*(\d)?[^0-9]*?(\d{1,2}[:.]\d{2})[^0-9]*?(\d{1,2}[:.]\d{2})",
-            sched_block,
-        )
-        if jm:
-            sess = int(jm.group(1)) if jm.group(1) and jm.group(1).isdigit() else 1
-            raw_j = jm.group(3).replace(".", ":")
-            jt = coerce_time(raw_j, prayer="jumuah")
-            if jt is None:
-                warnings.append(
-                    ExtractorWarning(
-                        code="unparseable_time",
-                        message=f"{date_obj} jumuah: {raw_j!r}",
-                        target_label="timetable",
+            times_str = match.group("times").strip()
+            time_tokens = times_str.split()
+
+            for prayer, col_idx in _IQAMAH_COLUMNS.items():
+                if col_idx >= len(time_tokens):
+                    continue
+                raw = time_tokens[col_idx]
+                if not raw or raw == "--":
+                    continue
+                jamaat = coerce_time(raw, prayer=prayer.value)
+                if jamaat is None:
+                    warnings.append(
+                        ExtractorWarning(
+                            code="unparseable_time",
+                            message=f"{row_date} {prayer.value}: {raw!r}",
+                            target_label="timetable",
+                        )
                     )
-                )
-            else:
+                    continue
                 rows.append(
                     ExtractorRow(
-                        date=date_obj,
-                        prayer=Prayer.JUMUAH,
-                        jamaat_time=jt,
-                        session_number=sess,
-                        session_label="Jumuah" if sess == 1 else f"Jumuah {sess}",
+                        date=row_date,
+                        prayer=prayer,
+                        jamaat_time=jamaat,
                         timezone=ctx.timezone,
                         evidence=ctx.evidence(
                             target_label="timetable",
                             extractor_key=self.key,
                             extractor_version=self.version,
-                            raw_text=f"Jumuah {jm.group(2)} {jm.group(3)}",
-                            selector="text jumuah",
+                            raw_text=match.group(0),
+                            selector=f"text row matching {row_date}",
                         ),
                     )
                 )
 
-        seen = set()
-        deduped: list[ExtractorRow] = []
-        for r in rows:
-            k = (r.date, r.prayer, r.session_number)
-            if k in seen:
-                continue
-            seen.add(k)
-            deduped.append(r)
-        rows = deduped
-
         if not rows:
             return ExtractorResult(
-                rows=[], warnings=warnings, no_schedule_reason="no extractable rows"
+                rows=[],
+                warnings=warnings,
+                no_schedule_reason="no extractable rows",
             )
         return ExtractorResult(rows=rows, warnings=warnings)

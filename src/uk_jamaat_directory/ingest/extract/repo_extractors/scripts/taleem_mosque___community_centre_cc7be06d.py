@@ -18,19 +18,6 @@ class Extractor(StubbedPdfExtractor):
 
     def __init__(self) -> None:
         super().__init__()
-        # Verified on homepage, /time-table/, /about-us/, /services/, /services/prayer-facilities/
-        # (up to 8 pages, stayed on taleemmosque.com):
-        # - No HTML table of multi-day jamaat/iqamah times.
-        # - "Timetable" nav links to /time-table/ which advertises "Download 2026 timetable"
-        #   pointing at the yearly PDF (Final-Taleem-<YEAR>-salaah-calendar-D2.pdf).
-        # - Embedded widget is my-masjid (time.my-masjid.com) — not an allowed embed
-        #   domain (only athanplus/masjidal/masjidbox/mawaqit permitted).
-        # - Pre-flight suggested HTML; we verified: the authoritative jamaat timetable
-        #   is the PDF. Per rules, target the stable HTML landing page that links it,
-        #   declare kind=HTML + requires_pdf=True, use StubbedPdfExtractor (stub records
-        #   target; still counts as authored, no PDF parsing attempted here).
-        # The PDF filename uses the year in the path; we do not hardcode it in the target
-        # URL because the landing page is stable and sufficient for the stub.
         self._targets = (
             TargetSpec(
                 label="timetable",

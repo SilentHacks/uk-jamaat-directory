@@ -18,11 +18,10 @@ class Extractor(StubbedPdfExtractor):
 
     def __init__(self) -> None:
         super().__init__()
-        # The /prayers page links the published Prayer Timetable PDF. No HTML table
-        # of jamaat times is present on the site (Wix-rendered; static fetch shows
-        # no <table> and no allowed timetable widgets). The timetable lives in the
-        # linked PDF (requires_pdf) but the PDF exceeds fetch byte limits and PDF
-        # parsing is out of scope, so we target the small landing page and stub.
+        # The /prayers page links a 27 MB PDF timetable with Fajr/Zuhr/Asr/
+        # Maghrib/Isha jamaat (Jamā'ah) columns. The PDF exceeds the 5 MB
+        # fetch limit, so we target the landing page with requires_pdf=True
+        # to record the source for future PDF parsing.
         self.targets = (
             TargetSpec(
                 label="timetable",
