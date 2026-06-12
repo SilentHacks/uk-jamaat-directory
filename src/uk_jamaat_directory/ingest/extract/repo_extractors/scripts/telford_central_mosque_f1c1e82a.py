@@ -27,7 +27,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         super().__init__()
         now = datetime.now()
         current_month_num = now.month
-        current_month_name = now.strftime('%B')
+        current_month_name = now.strftime("%B")
         current_year = now.year
 
         # The PDF is stored in the previous month's directory
@@ -78,7 +78,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             current_year = now.year
             current_month = now.month
 
-            lines = text.split('\n')
+            lines = text.split("\n")
             last_day_num = None
 
             # Process data lines
@@ -88,7 +88,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     continue
 
                 # Skip header lines
-                if 'DATE' in line and 'START' in line and 'JAMAT' in line:
+                if "DATE" in line and "START" in line and "JAMAT" in line:
                     continue
 
                 # Parse the line

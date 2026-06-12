@@ -38,7 +38,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         html_content = artifact.text()
 
         # Extract prayerData JSON from the HTML
-        match = re.search(r'const prayerData = (\{.*?\});', html_content, re.DOTALL)
+        match = re.search(r"const prayerData = (\{.*?\});", html_content, re.DOTALL)
         if not match:
             return ExtractorResult(
                 rows=[],

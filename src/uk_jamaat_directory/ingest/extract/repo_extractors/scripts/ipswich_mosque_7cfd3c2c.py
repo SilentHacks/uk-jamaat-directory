@@ -7,7 +7,11 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
-    RefreshPolicy, RunFrequency, SourceMatch, TargetKind, TargetSpec,
+    RefreshPolicy,
+    RunFrequency,
+    SourceMatch,
+    TargetKind,
+    TargetSpec,
 )
 
 PRAYER_COL_MAP = [
@@ -56,7 +60,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if header_row_idx is None:
             return ExtractorResult(rows=[], no_schedule_reason="header row not found")
 
-        body_rows = rows[header_row_idx + 1:]
+        body_rows = rows[header_row_idx + 1 :]
 
         result_rows = []
         seen = set()

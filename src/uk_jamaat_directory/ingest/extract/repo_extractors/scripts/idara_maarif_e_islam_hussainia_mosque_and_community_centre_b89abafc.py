@@ -11,14 +11,14 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 
 class Extractor(StubbedOcrExtractor):
-    key = "al_ansaar_welfare_and_education_7876a54a"
-    version = "2026.06.11.1"
-    source_match = SourceMatch(domains=("alansaar.org.uk",))
-    refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
+    key = "idara_maarif_e_islam_hussainia_mosque_and_community_centre_b89abafc"
+    version = "2026.06.12.1"
+    source_match = SourceMatch(domains=("hussainia.org.uk",))
+    refresh_policy = RefreshPolicy(frequency=RunFrequency.MONTHLY)
     targets = (
         TargetSpec(
             label="timetable",
-            url="https://alansaar.org.uk/wp-content/uploads/2019/03/Prayer-timetable-widget.png",
+            url="https://hussainia.org.uk/wp-content/uploads/2026/03/IMG_5080.jpeg",
             kind=TargetKind.IMAGE,
             requires_ocr=True,
         ),

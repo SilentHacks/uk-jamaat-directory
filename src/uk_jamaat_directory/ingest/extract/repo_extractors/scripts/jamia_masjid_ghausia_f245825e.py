@@ -19,9 +19,11 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 def _url_decode(encoded: str) -> str:
     """Decode URL-encoded string (%XX format)."""
+
     def replace_hex(match):
         return chr(int(match.group(1), 16))
-    return re.sub(r'%([0-9A-Fa-f]{2})', replace_hex, encoded)
+
+    return re.sub(r"%([0-9A-Fa-f]{2})", replace_hex, encoded)
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -42,7 +44,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
 
-        html = artifact.body.decode('utf-8', errors='ignore') if isinstance(artifact.body, bytes) else artifact.body
+        html = (
+            artifact.body.decode("utf-8", errors="ignore")
+            if isinstance(artifact.body, bytes)
+            else artifact.body
+        )
 
         # Extract REDUX_STATE from the HTML
         redux_match = re.search(r'window\.REDUX_STATE\s*=\s*["\']([^"\']*)["\']', html)
@@ -60,7 +66,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if timetable_start < 0:
             return ExtractorResult(rows=[], no_schedule_reason="could not find timetable")
 
-        bracket_start = state_json.find('[', timetable_start)
+        bracket_start = state_json.find("[", timetable_start)
         if bracket_start < 0:
             return ExtractorResult(rows=[], no_schedule_reason="could not find timetable bracket")
 
@@ -85,11 +91,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
             # Extract prayer times and jamaat (iqamah) times
             prayer_map = {
-                'fajr': Prayer.FAJR,
-                'dhuhr': Prayer.DHUHR,
-                'asr': Prayer.ASR,
-                'maghrib': Prayer.MAGHRIB,
-                'isha': Prayer.ISHA,
+                "fajr": Prayer.FAJR,
+                "dhuhr": Prayer.DHUHR,
+                "asr": Prayer.ASR,
+                "maghrib": Prayer.MAGHRIB,
+                "isha": Prayer.ISHA,
             }
 
             # Check if this is Friday
@@ -112,7 +118,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 try:
                     time_str = iqamah_prayer.group(1)
                     # Extract HH:MM from ISO format: "2026-06-10T03:45:00+01:00"
-                    time_match = re.search(r'T(\d{2}):(\d{2})', time_str)
+                    time_match = re.search(r"T(\d{2}):(\d{2})", time_str)
                     if not time_match:
                         continue
 
@@ -160,6 +166,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     continue
 
         if not rows:
-            return ExtractorResult(rows=[], no_schedule_reason="could not extract any prayer times", warnings=warnings)
+            return ExtractorResult(
+                rows=[], no_schedule_reason="could not extract any prayer times", warnings=warnings
+            )
 
         return ExtractorResult(rows=rows, warnings=warnings)

@@ -19,8 +19,18 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 )
 
 MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ]
 
 DAY_TRIGRAMS = frozenset({"mon", "tue", "wed", "thu", "fri", "sat", "sun"})
@@ -60,9 +70,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             f"https://blackpool-mosque.co.uk/namaz-timings/"
             f"{start_name}%20{end_name}%20{now.year}.pdf"
         )
-        self._targets = (
-            TargetSpec(label="timetable", url=url, kind=TargetKind.PDF),
-        )
+        self._targets = (TargetSpec(label="timetable", url=url, kind=TargetKind.PDF),)
 
     @property
     def targets(self) -> tuple[TargetSpec, ...]:
@@ -115,11 +123,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 month = self._months[page_idx] if page_idx < 2 else self._months[0]
 
             for raw_table in tables_on_page:
-                cleaned = [
-                    [(cell or "") for cell in row]
-                    for row in raw_table
-                    if row
-                ]
+                cleaned = [[(cell or "") for cell in row] for row in raw_table if row]
                 if len(cleaned) < 3:
                     continue
 
@@ -138,8 +142,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 # Carry forward merged jamaat cells
                 for col_idx in range(8, 13):
                     vals = carry_forward(
-                        row[col_idx] if col_idx < len(row) else ""
-                        for row in data_rows
+                        row[col_idx] if col_idx < len(row) else "" for row in data_rows
                     )
                     for i, v in enumerate(vals):
                         data_rows[i][col_idx] = v
@@ -170,53 +173,55 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             continue
                         t = coerce_time(raw, prayer=prayer.value)
                         if t is None:
-                            warnings.append(ExtractorWarning(
-                                code="unparseable_time",
-                                message=f"{d} {prayer.value}: {raw!r}",
-                                target_label="timetable",
-                            ))
+                            warnings.append(
+                                ExtractorWarning(
+                                    code="unparseable_time",
+                                    message=f"{d} {prayer.value}: {raw!r}",
+                                    target_label="timetable",
+                                )
+                            )
                             continue
 
                         if prayer == Prayer.ASR and is_weekend:
-                            override = coerce_time(
-                                WEEKEND_ASAR, prayer=prayer.value
-                            )
+                            override = coerce_time(WEEKEND_ASAR, prayer=prayer.value)
                             if override:
                                 t = override
 
-                        all_rows.append(ExtractorRow(
-                            date=d,
-                            prayer=prayer,
-                            jamaat_time=t,
-                            timezone=ctx.timezone or "Europe/London",
-                            evidence=ctx.evidence(
-                                target_label="timetable",
-                                extractor_key=self.key,
-                                extractor_version=self.version,
-                                raw_text=" | ".join(row_data),
-                                selector=f"PDF page {page_idx + 1}",
-                            ),
-                        ))
+                        all_rows.append(
+                            ExtractorRow(
+                                date=d,
+                                prayer=prayer,
+                                jamaat_time=t,
+                                timezone=ctx.timezone or "Europe/London",
+                                evidence=ctx.evidence(
+                                    target_label="timetable",
+                                    extractor_key=self.key,
+                                    extractor_version=self.version,
+                                    raw_text=" | ".join(row_data),
+                                    selector=f"PDF page {page_idx + 1}",
+                                ),
+                            )
+                        )
 
                     if is_friday:
                         for session_num, raw_time, label in JUMUAH_SESSIONS:
-                            jt = coerce_time(
-                                raw_time, prayer=Prayer.JUMUAH.value
-                            )
+                            jt = coerce_time(raw_time, prayer=Prayer.JUMUAH.value)
                             if jt:
-                                all_rows.append(ExtractorRow(
-                                    date=d,
-                                    prayer=Prayer.JUMUAH,
-                                    jamaat_time=jt,
-                                    session_number=session_num,
-                                    session_label=label,
-                                    timezone=ctx.timezone or "Europe/London",
-                                    evidence=ctx.evidence(
-                                        target_label="timetable",
-                                        extractor_key=self.key,
-                                        extractor_version=self.version,
-                                    ),
-                                ))
+                                all_rows.append(
+                                    ExtractorRow(
+                                        date=d,
+                                        prayer=Prayer.JUMUAH,
+                                        jamaat_time=jt,
+                                        session_number=session_num,
+                                        session_label=label,
+                                        timezone=ctx.timezone or "Europe/London",
+                                        evidence=ctx.evidence(
+                                            target_label="timetable",
+                                            extractor_key=self.key,
+                                            extractor_version=self.version,
+                                        ),
+                                    )
+                                )
 
         if not all_rows:
             return ExtractorResult(

@@ -90,9 +90,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="date not found in table header",
             )
-        row_date = parse_date_flexible(
-            date_match.group(1), default_year=datetime.now().year
-        )
+        row_date = parse_date_flexible(date_match.group(1), default_year=datetime.now().year)
         if row_date is None:
             return ExtractorResult(
                 rows=[],

@@ -27,7 +27,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
     def __init__(self) -> None:
         super().__init__()
         now = datetime.now()
-        month_name = now.strftime('%B')
+        month_name = now.strftime("%B")
         year = now.year
         url = f"https://alfalahcentre.org/{month_name}{year}.pdf"
         self._targets = (
@@ -52,7 +52,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
 
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
         now = datetime.now()
         current_month = now.month
         current_year = now.year
@@ -67,7 +67,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             if i + 14 > len(lines):
                 break
 
-            cells = lines[i:i+14]
+            cells = lines[i : i + 14]
 
             try:
                 day_num = int(cells[0])
@@ -76,7 +76,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     continue
 
                 day_name = cells[2].lower()
-                if day_name not in ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'):
+                if day_name not in ("mon", "tue", "wed", "thu", "fri", "sat", "sun"):
                     i += 1
                     continue
 
@@ -94,7 +94,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             }
 
             for prayer, (start_raw, jamaat_raw) in prayer_data.items():
-                if not jamaat_raw or jamaat_raw in ('', '-'):
+                if not jamaat_raw or jamaat_raw in ("", "-"):
                     continue
 
                 jamaat = coerce_time(jamaat_raw, prayer=prayer.value)

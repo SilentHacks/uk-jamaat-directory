@@ -123,11 +123,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             joined = " ".join(c.strip().lower() for c in row if c.strip())
             if "jumu" in joined:
                 next_row = all_rows[idx + 1] if idx + 1 < len(all_rows) else []
-                jumuah_times = [
-                    t.strip()
-                    for t in next_row
-                    if t.strip() and ":" in t.strip()
-                ]
+                jumuah_times = [t.strip() for t in next_row if t.strip() and ":" in t.strip()]
                 break
 
         all_dates = dates_for_month(year, month)

@@ -28,6 +28,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             label="timetable",
             url="https://shuhdaekarbala.org.uk/",
             kind=TargetKind.RENDERED_HTML,
+            requires_javascript=True,
         ),
     )
 
@@ -110,7 +111,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         prayer_rows = re.findall(
             r'<th[^>]*class="prayerName[^"]*">([^<]+)</th>\s*<td[^>]*class="begins[^"]*">([^<]+)</td>\s*<td[^>]*class="jamah[^"]*">([^<]+)</td>',
             html,
-            re.DOTALL
+            re.DOTALL,
         )
 
         for prayer_label, begins, iqamah in prayer_rows:

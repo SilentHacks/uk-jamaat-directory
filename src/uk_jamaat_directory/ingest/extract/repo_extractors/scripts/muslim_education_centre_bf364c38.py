@@ -81,9 +81,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="date not found on page",
             )
-        row_date = parse_date_flexible(
-            date_match.group(1), default_year=datetime.now().year
-        )
+        row_date = parse_date_flexible(date_match.group(1), default_year=datetime.now().year)
         if row_date is None:
             return ExtractorResult(
                 rows=[],
@@ -136,9 +134,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 )
                 continue
             start_raw = data.get("start", "")
-            start = (
-                coerce_time(start_raw, prayer=prayer.value) if start_raw else None
-            )
+            start = coerce_time(start_raw, prayer=prayer.value) if start_raw else None
             rows.append(
                 ExtractorRow(
                     date=row_date,

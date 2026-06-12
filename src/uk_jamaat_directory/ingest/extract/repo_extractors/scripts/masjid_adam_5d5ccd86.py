@@ -36,7 +36,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows = []
         current_year = datetime.now().year
 
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
 
         # PDF extracts columns vertically. Find key markers and work from there.
         # Dates: Look for "Date" header and collect following digit lines
@@ -44,7 +44,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         dates_list = []
         for i in range(len(lines)):
-            if lines[i] == 'Date':
+            if lines[i] == "Date":
                 for j in range(i + 1, len(lines)):
                     if lines[j].isdigit():
                         day_num = int(lines[j])

@@ -78,10 +78,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Use second row as header (first row has prayer names)
         header = [cell.strip() for cell in target_table.rows[1]]
-        body = [
-            [cell.strip() for cell in row]
-            for row in target_table.rows[2:]
-        ]
+        body = [[cell.strip() for cell in row] for row in target_table.rows[2:]]
 
         date_idx = None
         for idx, cell in enumerate(header):

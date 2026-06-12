@@ -8,7 +8,11 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
-    RefreshPolicy, RunFrequency, SourceMatch, TargetKind, TargetSpec,
+    RefreshPolicy,
+    RunFrequency,
+    SourceMatch,
+    TargetKind,
+    TargetSpec,
 )
 
 
@@ -38,12 +42,16 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
 
-        html = artifact.body.decode('utf-8', errors='ignore') if isinstance(artifact.body, bytes) else artifact.body
+        html = (
+            artifact.body.decode("utf-8", errors="ignore")
+            if isinstance(artifact.body, bytes)
+            else artifact.body
+        )
         rows: list[ExtractorRow] = []
 
         # Find all <tr> elements containing prayer times
         # Pattern: <tr ...><td ...>(\d+)</td> (date) followed by time cells
-        tr_pattern = r'<tr[^>]*>.*?</tr>'
+        tr_pattern = r"<tr[^>]*>.*?</tr>"
         tr_matches = list(re.finditer(tr_pattern, html, re.DOTALL))
 
         current_year = datetime.now().year
@@ -53,7 +61,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             tr_html = tr_match.group(0)
 
             # Extract all <td> contents
-            td_pattern = r'<td[^>]*>(.*?)</td>'
+            td_pattern = r"<td[^>]*>(.*?)</td>"
             td_matches = re.findall(td_pattern, tr_html, re.DOTALL)
 
             if not td_matches or len(td_matches) < 12:
@@ -63,8 +71,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
             cells = []
             for td in td_matches:
                 # Remove HTML tags and normalize
-                cell_text = re.sub(r'<[^>]+>', '', td)
-                cell_text = cell_text.strip().replace('&nbsp;', '').strip()
+                cell_text = re.sub(r"<[^>]+>", "", td)
+                cell_text = cell_text.strip().replace("&nbsp;", "").strip()
                 cells.append(cell_text)
 
             # First cell should be a date (1-31)
