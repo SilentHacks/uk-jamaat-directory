@@ -86,8 +86,7 @@ def check_result_semantics(result: ExtractorResult, *, today: date | None = None
     distinct_dates = len(dates)
     if distinct_dates >= 7:
         starts_equal = all(
-            row.start_time is not None and row.start_time == row.jamaat_time
-            for row in result.rows
+            row.start_time is not None and row.start_time == row.jamaat_time for row in result.rows
         )
         if starts_equal:
             pair_counts = Counter((row.prayer.value, row.jamaat_time) for row in result.rows)

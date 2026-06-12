@@ -61,9 +61,7 @@ async def smoke_test_extractor(
     settings: Settings | None = None,
 ) -> SmokeReport:
     cfg = settings or get_settings()
-    entries = [
-        e for e in load_all_extractors(reload=True) if e.extractor.key == extractor_key
-    ]
+    entries = [e for e in load_all_extractors(reload=True) if e.extractor.key == extractor_key]
     if not entries:
         return SmokeReport(ok=False, issues=[f"extractor not found: {extractor_key}"])
     extractor = entries[0].extractor
