@@ -8,6 +8,7 @@ from uk_jamaat_directory.ingest.authoring.backends import (
     AgentNotInstalledError,
     ClaudeCodeBackend,
     OpenCodeBackend,
+    PiBackend,
     UnknownAgentBackendError,
     get_agent_backend,
 )
@@ -32,10 +33,14 @@ def test_unknown_backend_raises() -> None:
         get_agent_backend(_settings(ai_agent_backend="cursor"))
 
 
-def test_opencode_argv_shape() -> None:
+def test_opencode_passes_prompt_on_stdin_not_argv() -> None:
+    # The prompt is piped on stdin, so it must never appear in argv (no
+    # quoting/escaping of the prompt body).
     argv = OpenCodeBackend().build_argv(
         bin_path="/usr/bin/opencode", model="opencode-go/deepseek-v4-flash", prompt="PROMPT"
     )
+    assert OpenCodeBackend.prompt_via_stdin is True
+    assert "PROMPT" not in argv
     assert argv == [
         "/usr/bin/opencode",
         "-m",
@@ -43,7 +48,6 @@ def test_opencode_argv_shape() -> None:
         "run",
         "--format",
         "json",
-        "PROMPT",
     ]
 
 
@@ -54,6 +58,7 @@ def test_opencode_argv_with_agent_name() -> None:
         prompt="PROMPT",
         agent_name="default",
     )
+    assert "PROMPT" not in argv
     assert argv == [
         "/usr/bin/opencode",
         "-m",
@@ -63,17 +68,40 @@ def test_opencode_argv_with_agent_name() -> None:
         "json",
         "--agent",
         "default",
-        "PROMPT",
     ]
 
 
 def test_claude_code_argv_uses_headless_flags() -> None:
     backend = ClaudeCodeBackend()
-    argv = backend.build_argv(bin_path="/usr/bin/claude", model="claude-haiku-4-5-20251001", prompt="PROMPT")
+    argv = backend.build_argv(
+        bin_path="/usr/bin/claude", model="claude-haiku-4-5-20251001", prompt="PROMPT"
+    )
     assert argv[:3] == ["/usr/bin/claude", "-p", "PROMPT"]
     assert argv[argv.index("--model") + 1] == "claude-haiku-4-5-20251001"
     assert argv[argv.index("--permission-mode") + 1] == "bypassPermissions"
     assert argv[argv.index("--output-format") + 1] == "json"
+
+
+def test_pi_argv_disables_skills_and_context_files() -> None:
+    argv = PiBackend().build_argv(
+        bin_path="/usr/bin/pi", model="anthropic/claude-haiku-4-5-20251001", prompt="PROMPT"
+    )
+    assert "--no-skills" in argv
+    assert "--no-context-files" in argv
+    assert argv[:6] == [
+        "/usr/bin/pi",
+        "--model",
+        "anthropic/claude-haiku-4-5-20251001",
+        "-p",
+        "PROMPT",
+        "--mode",
+    ]
+
+
+def test_only_opencode_uses_stdin() -> None:
+    assert OpenCodeBackend.prompt_via_stdin is True
+    assert PiBackend.prompt_via_stdin is False
+    assert ClaudeCodeBackend.prompt_via_stdin is False
 
 
 def test_backend_default_models() -> None:
@@ -105,7 +133,9 @@ def test_opencode_env_maps_openai_variables() -> None:
 
 def test_claude_code_env_maps_anthropic_variables() -> None:
     env: dict[str, str] = {}
-    ClaudeCodeBackend().apply_env(env, _settings(ai_agent_api_key="k", ai_agent_base_url="http://b"))
+    ClaudeCodeBackend().apply_env(
+        env, _settings(ai_agent_api_key="k", ai_agent_base_url="http://b")
+    )
     assert env == {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "http://b"}
 
 

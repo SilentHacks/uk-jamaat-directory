@@ -53,58 +53,46 @@ def build_authoring_prompt(
     return textwrap.dedent(
         f"""
         Write a deterministic prayer-timetable extractor for the mosque
-        **{mosque_name}** (source_id={source_id}).
+        **{mosque_name}** (source_id={source_id}). Work alone: do NOT spawn
+        subagents or use any task/agent-delegation tool — do every step
+        yourself.
 
         - Start URL: {website_url}
-        - Allowed domain: {domain} (you may visit up to {max_pages} pages on it)
-        - Also allowed as extractor targets: timetable widgets the mosque embeds
-          from {widget_hosts}
-        - Script path to write: {script_path}
-        - Result JSON path to write when done: {result_path}
-        - Extractor key: {extractor_key}   Extractor version: {today_version}
+        - Allowed domain: {domain} (visit up to {max_pages} pages on it; never
+          leave it — no web.archive.org, no social media)
+        - Also allowed as targets: timetable widgets embedded from {widget_hosts}
+        - Write the script to: {script_path}
+        - Write the result JSON to: {result_path}
+        - Extractor key: {extractor_key}   version: {today_version}
 
         {kind_hint}
 
-        # STOP conditions — check these FIRST
+        # Goal: JAMAAT (iqamah/congregation) times
 
-        - If the site is a mosque **directory/aggregator** (lists many mosques,
-          shows calculated prayer times): write the result JSON with
-          `status=failed`, `reason=aggregator listing`. Do not write a script.
-        - **JAMAAT (iqamah/congregation) times are the goal.** Adhan/start
-          times alone are NOT enough. Look for a jamaat/iqamah column, an
-          "jamaat = adhan + N minutes" rule, or a PDF/image timetable. If the
-          whole site only has adhan/start times: `status=failed`,
+        Adhan/start times alone are NOT the goal. You need a jamaat/iqamah
+        column, a "jamaat = adhan + N minutes" rule, or a PDF/image timetable.
+        Stop early and write the result JSON (no script) if:
+        - the site is a directory/**aggregator** (many mosques, calculated
+          times): `status=failed`, `reason=aggregator listing`.
+        - the whole site has only adhan/start times: `status=failed`,
           `reason=no jamaat times found`.
-        - Never visit other domains (no web.archive.org, no social media).
-
-        # Hard rules for the script
-
-        - NEVER hardcode clock times, dates, or years. Use
-          `datetime.now().year` / the `dates` helpers for the current year.
-        - NEVER invent rows. Only emit times that appear in the source. If the
-          page lists one Jumuah, emit one Jumuah row.
-        - Only import: `datetime`, `re`, and
-          `uk_jamaat_directory.ingest.extract.helpers.*`,
-          `uk_jamaat_directory.ingest.extract.repo_extractors.contract`,
-          `uk_jamaat_directory.ingest.extract.repo_extractors.declarative`,
-          `uk_jamaat_directory.domain`. No network/file libraries — the
-          runtime fetches the target URLs and passes them in as artifacts.
-        - Use the `.venv` environment for all Python invocations.
 
         # Steps
 
-        1. Find the timetable page on {domain}. If the homepage has no link,
-           try these paths: {common_paths}
-        2. Prefer the broadest timetable: monthly/yearly > weekly > today-only.
-           If the URL is month-specific (e.g. /june-2026), build it dynamically
-           from the current date in `targets` (compute in `__init__`).
-        3. Decide the kind: `html` (static), `rendered_html` (JS-rendered; set
-           `requires_javascript=True`), `pdf` (set `requires_pdf=True`),
-           `image` (set `requires_ocr=True`), or `json` (do NOT author —
-           `status=skipped_review`).
-        4. Write the script. **Default to the declarative base classes** —
-           only subclass `BaseMosqueWebsiteExtractor` directly if the page
-           cannot be expressed as a table. Example of a complete, good script:
+        1. Find the broadest timetable on {domain} (monthly/yearly > weekly >
+           today-only). If the homepage has no link, try: {common_paths}
+        2. Pick the base class for what you found and write the script:
+           - HTML table -> `TableTimetableExtractor` (`kind=TargetKind.HTML`)
+           - JS-rendered -> same, `kind=TargetKind.RENDERED_HTML`,
+             `requires_javascript=True`
+           - PDF -> `StubbedPdfExtractor`, `kind=TargetKind.PDF`,
+             `requires_pdf=True`. Do NOT parse the PDF — the stub just records
+             the target; that still counts as `status=authored`.
+           - image -> `StubbedOcrExtractor`, `kind=TargetKind.IMAGE`,
+             `requires_ocr=True` (stubbed, also `status=authored`).
+           - JSON feed -> do NOT author; `status=skipped_review`.
+           If a month-specific URL (e.g. /june-2026), build it from the current
+           date in `__init__`.
 
         ```python
         from uk_jamaat_directory.domain import Prayer
@@ -130,9 +118,8 @@ def build_authoring_prompt(
             )
             table_keywords = ("date", "fajr")     # all must appear in the header
             date_column = "date"                  # header keyword or column index
-            # Use an index (e.g. date_column = 0) when the date column has a
-            # blank header. Bare day numbers ("1", "21st") are handled — the
-            # base fills in the current month/year.
+            # Use an index (e.g. date_column = 0) when the date column header is
+            # blank. Bare day numbers ("1", "21st") are handled automatically.
             prayer_columns = {{                    # JAMAAT columns only
                 Prayer.FAJR: "fajr",
                 Prayer.DHUHR: "zuhr",
@@ -142,27 +129,34 @@ def build_authoring_prompt(
             }}
         ```
 
-           For PDFs use `PdfTableTimetableExtractor` (same config). For images
-           use `StubbedOcrExtractor` (no config beyond targets — OCR comes
-           later; that counts as `status=authored`). The bases handle date
-           parsing, am/pm inference, evidence, and warnings. Override the
-           `clean_cell` / `accept_row` hooks for site quirks. Other helpers:
-           `helpers.times.coerce_time(value, prayer=...)`,
-           `helpers.dates.parse_date_flexible/add_months/dates_for_month`,
-           `helpers.rows.carry_forward`, `helpers.html.find_table`,
-           `helpers.prayers.parse_prayer_label`,
-           `helpers.relative.jamaat_after_start` (for "jamaat = adhan + N min").
+           The bases handle date parsing, am/pm inference, evidence and
+           warnings — supply *configuration*, not parsing code. For site quirks
+           override the `clean_cell` / `accept_row` hooks. Useful helpers:
+           `helpers.times.coerce_time`, `helpers.dates.parse_date_flexible`,
+           `helpers.html.find_table`, `helpers.relative.jamaat_after_start`
+           (for "jamaat = adhan + N min").
 
-        5. **Self-test (mandatory).** Run:
+        # Hard rules for the script
 
-           `python -m uk_jamaat_directory.cli smoke-test-repo-extractor --extractor-key {extractor_key} --source-url {website_url}`
+        - NEVER hardcode clock times, dates, or years; use `datetime.now().year`
+          / the `dates` helpers for the current year.
+        - NEVER invent rows — only emit times present in the source (one Jumuah
+          listed -> one Jumuah row).
+        - Only import: `datetime`, `re`,
+          `uk_jamaat_directory.ingest.extract.helpers.*`,
+          `...repo_extractors.contract`, `...repo_extractors.declarative`,
+          `uk_jamaat_directory.domain`. No network/file libraries — the runtime
+          fetches the targets and passes them in as artifacts.
+        - Use the `.venv` for all Python invocations.
 
-           It fetches your target URLs, runs your script in the sandbox, and
-           checks the output is a plausible jamaat timetable. If it exits
-           non-zero, fix the script and re-run. Do NOT report
-           `status=authored` until it exits 0.
+        # Finish
 
-        6. Write the result JSON to exactly `{result_path}`:
+        Self-test (mandatory) — fix and re-run until it exits 0:
+
+        `python -m uk_jamaat_directory.cli smoke-test-repo-extractor --extractor-key {extractor_key} --source-url {website_url}`
+
+        Then write the result JSON to exactly `{result_path}` (the orchestrator
+        reads only this file; missing/invalid -> failed):
 
         ```json
         {{
@@ -174,9 +168,6 @@ def build_authoring_prompt(
           "version": "1.0"
         }}
         ```
-
-        The orchestrator only reads that file. If it is missing or invalid,
-        the task is marked failed.
         """
     ).strip()
 
@@ -195,7 +186,8 @@ def build_repair_prompt(
     return textwrap.dedent(
         f"""
         Your extractor script for **{mosque_name}** (key={extractor_key}) at
-        `{script_path}` failed validation (repair attempt {attempt}):
+        `{script_path}` failed validation (repair attempt {attempt}). Work
+        alone — do NOT spawn subagents:
 
         {issue_lines}
 

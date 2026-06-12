@@ -38,6 +38,9 @@ class AgentBackend(ABC):
     binary: ClassVar[str]
     #: model used when ``ai_agent_model`` is unset
     default_model: ClassVar[str]
+    #: when True, the prompt is delivered on the subprocess's stdin instead of
+    #: as an argv element, so nothing quotes or escapes the prompt body
+    prompt_via_stdin: ClassVar[bool] = False
 
     def is_available(self) -> bool:
         return shutil.which(self.binary) is not None
@@ -68,7 +71,7 @@ class AgentBackend(ABC):
         agent_name: str | None = None,
     ) -> list[str]:
         """Return the full subprocess argv for one non-interactive run."""
-    
+
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         """Inject credentials/routing into the subprocess environment.
 
@@ -85,11 +88,18 @@ class AgentBackend(ABC):
 
 
 class OpenCodeBackend(AgentBackend):
-    """OpenCode CLI: ``opencode -m <model> run --format json <prompt>``."""
+    """OpenCode CLI: ``opencode -m <model> run --format json`` with the prompt
+    piped on stdin.
+
+    OpenCode's ``run`` reads the message from stdin when no positional
+    ``message`` is given, so the prompt is passed verbatim — no argv quoting
+    or backslash-escaping of nested quotes touches the prompt body.
+    """
 
     name = "opencode"
     binary = "opencode"
     default_model = "opencode-go/deepseek-v4-flash"
+    prompt_via_stdin = True
 
     def build_argv(
         self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
@@ -97,7 +107,6 @@ class OpenCodeBackend(AgentBackend):
         argv = [bin_path, "-m", model, "run", "--format", "json"]
         if agent_name:
             argv.extend(["--agent", agent_name])
-        argv.append(prompt)
         return argv
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
@@ -164,7 +173,19 @@ class PiBackend(AgentBackend):
     def build_argv(
         self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
     ) -> list[str]:
-        return [bin_path, "--model", model, "-p", prompt, "--mode", "json"]
+        # ``--no-skills``/``--no-context-files`` keep the run focused on the
+        # authoring prompt: no ambient AGENTS.md/CLAUDE.md or skill discovery.
+        return [
+            bin_path,
+            "--model",
+            model,
+            "-p",
+            prompt,
+            "--mode",
+            "json",
+            "--no-skills",
+            "--no-context-files",
+        ]
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         if settings.ai_agent_api_key:
@@ -186,9 +207,6 @@ def get_agent_backend(settings: Settings) -> AgentBackend:
     name = settings.ai_agent_backend
     backend_cls = AGENT_BACKENDS.get(name)
     if backend_cls is None:
-        msg = (
-            f"unknown agent backend {name!r}; "
-            f"available: {', '.join(sorted(AGENT_BACKENDS))}"
-        )
+        msg = f"unknown agent backend {name!r}; available: {', '.join(sorted(AGENT_BACKENDS))}"
         raise UnknownAgentBackendError(msg)
     return backend_cls()

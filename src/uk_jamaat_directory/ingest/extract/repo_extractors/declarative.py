@@ -222,9 +222,7 @@ class TableTimetableExtractor(_TabularTimetableMixin, BaseMosqueWebsiteExtractor
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        table = html_helpers.find_table(
-            artifact.text(), header_keywords=list(self.table_keywords)
-        )
+        table = html_helpers.find_table(artifact.text(), header_keywords=list(self.table_keywords))
         if table is None:
             return ExtractorResult(
                 rows=[],
@@ -251,9 +249,7 @@ class PdfTableTimetableExtractor(_TabularTimetableMixin, BaseMosqueWebsiteExtrac
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
         for page_tables in pdf_helpers.extract_tables(artifact.body):
             for raw_table in page_tables:
-                cleaned = [
-                    [(cell or "") for cell in row] for row in raw_table if row
-                ]
+                cleaned = [[(cell or "") for cell in row] for row in raw_table if row]
                 if not cleaned:
                     continue
                 table = Table(cleaned)
@@ -280,6 +276,20 @@ class StubbedOcrExtractor(BaseMosqueWebsiteExtractor):
     """
 
     no_schedule_reason: str = "image target — awaiting OCR"
+
+    def extract(self, ctx: ExtractContext) -> ExtractorResult:
+        return ExtractorResult(rows=[], no_schedule_reason=self.no_schedule_reason)
+
+
+class StubbedPdfExtractor(BaseMosqueWebsiteExtractor):
+    """Extractor for PDF timetables, stubbed until PDF parsing is wired up.
+
+    PDFs are deliberately not parsed yet: authored scripts only declare the
+    target (with ``requires_pdf=True``) so the source is recorded and can be
+    revisited when a PDF parser lands. Mirrors :class:`StubbedOcrExtractor`.
+    """
+
+    no_schedule_reason: str = "pdf target — awaiting parser"
 
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
         return ExtractorResult(rows=[], no_schedule_reason=self.no_schedule_reason)

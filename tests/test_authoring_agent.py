@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import subprocess
+import time
 import uuid
 
 import pytest
 
+from uk_jamaat_directory.config import Settings
 from uk_jamaat_directory.domain import AuthoringTargetKind
+from uk_jamaat_directory.ingest.authoring.agent import run_authoring_agent
 from uk_jamaat_directory.ingest.authoring.authoring_result import (
     AuthoringResultJson,
     authoring_result_path,
@@ -13,6 +18,45 @@ from uk_jamaat_directory.ingest.authoring.authoring_result import (
     read_authoring_result,
     write_authoring_result,
 )
+from uk_jamaat_directory.ingest.authoring.backends import AgentBackend
+
+
+class _SpawnTreeBackend(AgentBackend):
+    """Backend that launches a bash process spawning a marked child."""
+
+    name = "spawn_tree"
+    binary = "bash"
+    default_model = "test"
+
+    def __init__(self, marker: str) -> None:
+        self._marker = marker
+
+    def build_argv(self, *, bin_path, model, prompt, agent_name=None):
+        # A child sleep carrying the marker, plus a foreground sleep so the
+        # parent stays alive long enough to hit the timeout.
+        return [bin_path, "-c", f"sleep 300 # {self._marker}\nsleep 300"]
+
+
+async def test_run_authoring_agent_timeout_kills_process_tree(tmp_path) -> None:
+    marker = f"agent-timeout-{uuid.uuid4().hex}"
+    backend = _SpawnTreeBackend(marker)
+    started = time.monotonic()
+    with pytest.raises(TimeoutError, match="timed out"):
+        await run_authoring_agent(
+            prompt="unused",
+            settings=Settings(_env_file=None),
+            result_path=tmp_path / "result.json",
+            backend=backend,
+            timeout_seconds=0.5,
+        )
+    # Returned promptly, not after the 300s sleep.
+    assert time.monotonic() - started < 30
+    # Give the SIGKILL a moment to propagate, then confirm no orphan child.
+    await asyncio.sleep(0.5)
+    leftover = subprocess.run(
+        ["pgrep", "-f", marker], capture_output=True, text=True
+    ).stdout.split()
+    assert not leftover, f"agent subprocess tree was orphaned: {leftover}"
 
 
 def test_authoring_result_path_is_deterministic() -> None:
