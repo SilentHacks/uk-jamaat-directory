@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import glob
 import os
+import types
 import uuid
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -44,6 +46,7 @@ class _FakeBackend:
 
     def resolve_model(self, settings: Settings) -> str:
         return settings.ai_agent_model or "fake-model"
+
 
 # Scripts that existed before the test session started. The cleanup helper
 # must NEVER touch these: this directory holds real, repo-owned extractor
@@ -132,6 +135,87 @@ async def _seed_source(
     session.add(source)
     await session.flush()
     return source
+
+
+@pytest.mark.asyncio
+async def test_batch_preflight_filters_only_permanent_failures() -> None:
+    """The batch filter drops dead/robots sources but keeps reachable and
+    transiently-broken ones for the agent phase. DB-free: persistence and the
+    network fetch are stubbed."""
+    from uk_jamaat_directory.domain import AuthoringTargetKind
+    from uk_jamaat_directory.ingest.authoring.discovery import PreFlightResult
+    from uk_jamaat_directory.ingest.authoring.orchestrator import (
+        OrchestrationSummary,
+        _batch_preflight,
+    )
+
+    sources = [
+        types.SimpleNamespace(id=uuid.uuid4(), source_url=url)
+        for url in (
+            "https://ok.test",
+            "https://dead.test",
+            "https://robots.test",
+            "https://flaky.test",
+        )
+    ]
+
+    async def fake_preflight(*, source_url: str, settings: Settings) -> PreFlightResult:
+        if "ok.test" in source_url:
+            return PreFlightResult(
+                source_url, "ok.test", True, 200, "text/html", 100, AuthoringTargetKind.HTML
+            )
+        if "dead.test" in source_url:
+            return PreFlightResult(
+                source_url, "dead.test", False, 404, None, 0,
+                AuthoringTargetKind.UNKNOWN, error="HTTP 404",
+            )
+        if "robots.test" in source_url:
+            return PreFlightResult(
+                source_url, "robots.test", False, None, None, 0,
+                AuthoringTargetKind.UNKNOWN, error="robots.txt disallows fetch",
+            )
+        return PreFlightResult(
+            source_url, "flaky.test", False, 503, None, 0,
+            AuthoringTargetKind.UNKNOWN, error="HTTP 503",
+        )
+
+    persisted: list[tuple[str, str]] = []
+
+    async def fake_persist(*, session_factory, source, error, failure_category, predicted_kind):
+        persisted.append((source.source_url, failure_category))
+
+    summary = OrchestrationSummary()
+    with (
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator.preflight_source",
+            new=fake_preflight,
+        ),
+        patch(
+            "uk_jamaat_directory.ingest.authoring.orchestrator._persist_preflight_failure",
+            new=fake_persist,
+        ),
+    ):
+        survivors = await _batch_preflight(
+            session_factory=None,
+            sources=sources,
+            settings=Settings(_env_file=None),
+            summary=summary,
+            progress_lock=asyncio.Lock(),
+            on_progress=None,
+            concurrency=4,
+        )
+
+    assert {s.source_url for s in survivors} == {"https://ok.test", "https://flaky.test"}
+    assert summary.preflight_filtered == 2
+    assert summary.failed == 2
+    assert summary.processed == 2
+    assert summary.preflight_done == 4
+    assert dict(persisted) == {
+        "https://dead.test": "dead_site",
+        "https://robots.test": "blocked_robots",
+    }
+    assert summary.failure_categories == {"dead_site": 1, "blocked_robots": 1}
+    assert summary.phase == "authoring"
 
 
 def _ok_fetch() -> FetchResult:

@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
     authoring_concurrency: int = 8
+    # Batch pre-flight (deterministic reachability filter) runs before any
+    # agent is spawned; it is network-bound and safe to run far wider than the
+    # agent concurrency.
+    authoring_preflight_concurrency: int = 16
+    authoring_preflight_enabled: bool = True
     authoring_per_source_timeout_seconds: float = 600.0
     authoring_global_timeout_seconds: float = 4 * 60 * 60.0
     authoring_drafts_dir: str = "data/authoring/drafts"
