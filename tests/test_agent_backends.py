@@ -7,6 +7,7 @@ from uk_jamaat_directory.ingest.authoring.backends import (
     AGENT_BACKENDS,
     AgentNotInstalledError,
     ClaudeCodeBackend,
+    KiroCliBackend,
     OpenCodeBackend,
     PiBackend,
     UnknownAgentBackendError,
@@ -98,16 +99,54 @@ def test_pi_argv_disables_skills_and_context_files() -> None:
     ]
 
 
+def test_kiro_cli_argv_uses_headless_flags() -> None:
+    argv = KiroCliBackend().build_argv(
+        bin_path="/usr/bin/kiro-cli", model="claude-sonnet-4-20250514", prompt="PROMPT"
+    )
+    assert argv == [
+        "/usr/bin/kiro-cli",
+        "chat",
+        "--no-interactive",
+        "--trust-all-tools",
+        "PROMPT",
+    ]
+
+
+def test_kiro_cli_argv_with_agent_name() -> None:
+    argv = KiroCliBackend().build_argv(
+        bin_path="/usr/bin/kiro-cli",
+        model="claude-sonnet-4-20250514",
+        prompt="PROMPT",
+        agent_name="my-agent",
+    )
+    assert argv == [
+        "/usr/bin/kiro-cli",
+        "chat",
+        "--no-interactive",
+        "--trust-all-tools",
+        "--agent",
+        "my-agent",
+        "PROMPT",
+    ]
+
+
+def test_kiro_cli_backend_selectable() -> None:
+    backend = get_agent_backend(_settings(ai_agent_backend="kiro-cli"))
+    assert isinstance(backend, KiroCliBackend)
+
+
 def test_only_opencode_uses_stdin() -> None:
     assert OpenCodeBackend.prompt_via_stdin is True
     assert PiBackend.prompt_via_stdin is False
     assert ClaudeCodeBackend.prompt_via_stdin is False
+    assert KiroCliBackend.prompt_via_stdin is False
 
 
 def test_backend_default_models() -> None:
     settings = _settings()
     assert OpenCodeBackend().resolve_model(settings) == "opencode-go/deepseek-v4-flash"
     assert ClaudeCodeBackend().resolve_model(settings) == "claude-haiku-4-5-20251001"
+    assert KiroCliBackend().resolve_model(settings) == "claude-sonnet-4-20250514"
 
 
 def test_explicit_model_overrides_backend_default() -> None:

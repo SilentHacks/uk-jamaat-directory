@@ -195,10 +195,40 @@ class PiBackend(AgentBackend):
             env.setdefault("OPENAI_BASE_URL", settings.ai_agent_base_url)
 
 
+class KiroCliBackend(AgentBackend):
+    """Kiro CLI headless mode (https://kiro.dev/docs/cli/reference/cli-commands/).
+
+    ``kiro-cli chat --no-interactive --trust-all-tools <prompt>`` runs one
+    non-interactive session, printing the first response to STDOUT.
+    ``--trust-all-tools`` bypasses all tool-permission prompts, which the
+    orchestrator requires (no human attached to approve tool use; authored
+    scripts are gated afterwards by the static validator, smoke test, and
+    semantic checks). ``--agent`` selects a custom agent configuration.
+
+    Kiro CLI does not expose a ``--model`` flag on the ``chat`` command;
+    model selection is done via ``kiro-cli settings chat.defaultModel``
+    beforehand. The ``default_model`` attribute is informational only.
+    """
+
+    name = "kiro-cli"
+    binary = "kiro-cli"
+    default_model = "claude-sonnet-4-20250514"
+
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
+        argv = [bin_path, "chat", "--no-interactive", "--trust-all-tools"]
+        if agent_name:
+            argv.extend(["--agent", agent_name])
+        argv.append(prompt)
+        return argv
+
+
 AGENT_BACKENDS: dict[str, type[AgentBackend]] = {
     OpenCodeBackend.name: OpenCodeBackend,
     ClaudeCodeBackend.name: ClaudeCodeBackend,
     PiBackend.name: PiBackend,
+    KiroCliBackend.name: KiroCliBackend,
 }
 
 
