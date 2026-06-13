@@ -1,7 +1,9 @@
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
+from uk_jamaat_directory.ingest.extract.helpers.html import html_to_text
 from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
@@ -15,129 +17,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetKind,
     TargetSpec,
 )
-
-
-def _double_unescape_js(s: str) -> str:
-    """Apply the double backslash unescape typical of NEXT.js chunk strings.
-    Turns  \\"  into "  and  \\\\  into \\ , repeatedly until stable.
-    """
-    prev = None
-    out = s
-    while prev != out:
-        prev = out
-        out = out.replace("\\\\", "\\").replace('\\"', '"')
-    return out
-
-
-def _find_timetable_objects(text: str) -> list[dict]:
-    """Find objects that look like {..., "days": [ {..jamaatFajr..}, ... ] } even when
-    they are serialized inside JS string literals (\\"-escaped).
-    Strategy:
-      1) Look for tokens like highfieldsTimetable":{  or any *Timetable":{
-         then balance the { ... } and double-unescape the captured body to get real JSON.
-      2) Also scan for any balanced "days":[ ... ] that contain a jamaatFajr sample,
-         double-unescape the array text and treat the recovered array as the days.
-    Returns a list of container dicts that have at least a "days" key with content.
-    """
-    containers: list[dict] = []
-
-    # --- 1) *Timetable" : { ... } style (the live shape we observed)
-    # The object lives inside a JS string literal, so the " after the key is written as \\"
-    # e.g.  highfieldsTimetable\\":{\\"_id\\":... \\"days\\":[...]
-    for m in re.finditer(r"[A-Za-z0-9_]*[Tt]imetable\\+\"?\s*:\s*\{", text):
-        start = text.find("{", m.start())
-        if start == -1:
-            continue
-        depth = 0
-        end = start
-        for i in range(start, len(text)):
-            c = text[i]
-            if c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-        raw = text[start:end]
-        un = _double_unescape_js(raw)
-        try:
-            obj = json.loads(un)
-            if isinstance(obj, dict) and isinstance(obj.get("days"), list):
-                containers.append(obj)
-        except Exception:
-            continue
-
-    # --- 2) direct "days":[...] arrays anywhere (possibly still escaped) ---
-    for m in re.finditer(r"\"days\"\s*:\s*\[", text):
-        start = text.find("[", m.start())
-        if start == -1:
-            continue
-        depth = 0
-        end = start
-        for i in range(start, len(text)):
-            c = text[i]
-            if c == "[":
-                depth += 1
-            elif c == "]":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-        arr_text = text[start:end]
-        un = _double_unescape_js(arr_text)
-        try:
-            arr = json.loads(un)
-            if isinstance(arr, list):
-                sample = next((x for x in arr if isinstance(x, dict) and "jamaatFajr" in x), None)
-                if sample:
-                    # fabricate a lightweight container
-                    pre = text[max(0, m.start() - 1500) : m.start()]
-                    my = re.search(r"\"parsedYear\"\s*:\s*(\d{4})", pre)
-                    mm = re.search(r"\"parsedMonth\"\s*:\s*(\d{1,2})", pre)
-                    ctitle = re.search(r"\"title\"\s*:\s*\"([^\"]+)\"", pre)
-                    ccentre = re.search(r"\"centre\"\s*:\s*\"([^\"]+)\"", pre)
-                    container: dict = {"days": [x for x in arr if isinstance(x, dict)]}
-                    if my:
-                        container["parsedYear"] = int(my.group(1))
-                    if mm:
-                        container["parsedMonth"] = int(mm.group(1))
-                    if ctitle:
-                        container["title"] = ctitle.group(1)
-                    if ccentre:
-                        container["centre"] = ccentre.group(1)
-                    containers.append(container)
-        except Exception:
-            continue
-
-    # Dedup by identity of the days list head
-    seen = set()
-    out: list[dict] = []
-    for c in containers:
-        days = c.get("days") or []
-        if not days:
-            continue
-        key = (len(days), (days[0].get("jamaatFajr") if days else None))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(c)
-    return out
-
-
-def _pick_best_container(containers: list[dict]) -> dict | None:
-    if not containers:
-        return None
-    # Prefer anything mentioning highfields and having a long month
-    for c in containers:
-        blob = " ".join(str(v) for v in (c.get("title"), c.get("centre"), c.get("_id"), "")).lower()
-        if "highfield" in blob and len(c.get("days") or []) >= 20:
-            return c
-    # Any reasonably complete month
-    for c in containers:
-        if len(c.get("days") or []) >= 20:
-            return c
-    return containers[0]
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -156,112 +35,109 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
         artifact = ctx.artifact("timetable")
-        if not artifact or not artifact.body:
+        if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
 
-        text = artifact.text()
-        containers = _find_timetable_objects(text)
-        picked = _pick_best_container(containers)
-        if picked is None:
-            return ExtractorResult(
-                rows=[],
-                no_schedule_reason="no embedded monthly jamaat timetable found",
-            )
-
-        days = picked.get("days") or []
-        year = picked.get("parsedYear") or datetime.now().year
-        month = picked.get("parsedMonth") or datetime.now().month
-
-        prayer_map = {
-            "jamaatFajr": Prayer.FAJR,
-            "jamaatZuhr": Prayer.DHUHR,
-            "jamaatAsr": Prayer.ASR,
-            "jamaatMaghrib": Prayer.MAGHRIB,
-            "jamaatIsha": Prayer.ISHA,
-        }
+        html = artifact.text()
+        text = html_to_text(html)
 
         warnings: list[ExtractorWarning] = []
+
+        # Parse visible date header, e.g. "Friday 12 June"
+        row_date = None
+        date_match = re.search(
+            r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+"
+            r"(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December))",
+            text,
+            re.IGNORECASE,
+        )
+        if date_match:
+            row_date = parse_date_flexible(date_match.group(1), default_year=datetime.now().year)
+        if row_date is None:
+            row_date = datetime.now().date()
+
+        # Focus on the schedule region if present
+        sched_match = re.search(
+            r"Today's Schedule.*?(?:Support Our Mission|Your Generosity|Quick Links|\Z)",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        sched = sched_match.group(0) if sched_match else text
+
+        # Label -> Prayer (handle Jumu'ah variants and Dhuhr/Zuhr)
+        prayer_map = {
+            "fajr": Prayer.FAJR,
+            "jumu": Prayer.JUMUAH,
+            "dhuhr": Prayer.DHUHR,
+            "zuhr": Prayer.DHUHR,
+            "asr": Prayer.ASR,
+            "maghrib": Prayer.MAGHRIB,
+            "isha": Prayer.ISHA,
+        }
+
+        # Match patterns like: "Fajr 01:10 Jamaat 04:00" or "Jumu’ah 13:12 Khutbah 13:30"
+        # Only emit when an explicit Jamaat/Khutbah value is present (adhan-only rows are skipped).
+        card_re = re.compile(
+            r"(?P<label>Fajr|Jumu[’']?ah|Dhuhr|Zuhr|Asr|Maghrib|Isha)\s+"
+            r"(?P<start>\d{1,2}:\d{2})"
+            r"(?:\s*(?P<meta>Jamaat|Khutbah)\s+(?P<j>\d{1,2}:\d{2}))?",
+            re.IGNORECASE,
+        )
+
         rows: list[ExtractorRow] = []
-
-        for idx, day in enumerate(days, start=1):
-            daynum = day.get("date")
-            if not isinstance(daynum, int):
+        seen = set()
+        for m in card_re.finditer(sched):
+            lab = m.group("label").lower().rstrip("’'")
+            prayer = None
+            for prefix, p in prayer_map.items():
+                if lab.startswith(prefix):
+                    prayer = p
+                    break
+            if prayer is None:
                 continue
-            try:
-                row_date = date(year, month, daynum)
-            except ValueError:
+            jraw = m.group("j")
+            if not jraw:
+                # No explicit jamaat/khutbah annotation for this card -> skip (adhan/start only)
                 continue
-
-            for key, prayer in prayer_map.items():
-                raw = day.get(key)
-                if not raw or not isinstance(raw, str):
-                    continue
-                jt = coerce_time(raw, prayer=prayer.value)
-                if jt is None:
-                    warnings.append(
-                        ExtractorWarning(
-                            code="unparseable_time",
-                            message=f"{row_date} {prayer.value}: {raw!r}",
-                            target_label="timetable",
-                        )
-                    )
-                    continue
-                rows.append(
-                    ExtractorRow(
-                        date=row_date,
-                        prayer=prayer,
-                        jamaat_time=jt,
-                        timezone=ctx.timezone,
-                        evidence=ctx.evidence(
-                            target_label="timetable",
-                            extractor_key=self.key,
-                            extractor_version=self.version,
-                            raw_text=json.dumps(
-                                {k: day.get(k) for k in ("date", key)}, separators=(",", ":")
-                            ),
-                            selector=f"days[{idx}] {key}",
-                        ),
+            jt = coerce_time(jraw, prayer=prayer.value)
+            if jt is None:
+                warnings.append(
+                    ExtractorWarning(
+                        code="unparseable_time",
+                        message=f"{row_date} {prayer.value}: {jraw!r}",
+                        target_label="timetable",
                     )
                 )
-
-            # Jumu'ah on Fridays if present (single session per current data shape)
-            if day.get("isFriday") and day.get("jumuah"):
-                raw_j = day.get("jumuah")
-                if isinstance(raw_j, str) and raw_j.strip():
-                    jt = coerce_time(raw_j, prayer="jumuah")
-                    if jt is None:
-                        warnings.append(
-                            ExtractorWarning(
-                                code="unparseable_time",
-                                message=f"{row_date} jumuah: {raw_j!r}",
-                                target_label="timetable",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            ExtractorRow(
-                                date=row_date,
-                                prayer=Prayer.JUMUAH,
-                                jamaat_time=jt,
-                                session_number=1,
-                                timezone=ctx.timezone,
-                                evidence=ctx.evidence(
-                                    target_label="timetable",
-                                    extractor_key=self.key,
-                                    extractor_version=self.version,
-                                    raw_text=json.dumps(
-                                        {"date": day.get("date"), "jumuah": raw_j},
-                                        separators=(",", ":"),
-                                    ),
-                                    selector=f"days[{idx}] jumuah",
-                                ),
-                            )
-                        )
+                continue
+            # Only emit rows inside the global plausible windows (semantics gate is authoritative)
+            win = PLAUSIBLE_WINDOWS.get(prayer.value)
+            if win and not (win[0] <= jt <= win[1]):
+                continue
+            # dedupe if any overlap on same (date, prayer)
+            dedup_key = (row_date, prayer)
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+            rows.append(
+                ExtractorRow(
+                    date=row_date,
+                    prayer=prayer,
+                    jamaat_time=jt,
+                    timezone=ctx.timezone,
+                    evidence=ctx.evidence(
+                        target_label="timetable",
+                        extractor_key=self.key,
+                        extractor_version=self.version,
+                        raw_text=m.group(0),
+                        selector="prayer card",
+                    ),
+                )
+            )
 
         if not rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
-                no_schedule_reason="no extractable jamaat rows",
+                no_schedule_reason="no extractable rows",
             )
         return ExtractorResult(rows=rows, warnings=warnings)

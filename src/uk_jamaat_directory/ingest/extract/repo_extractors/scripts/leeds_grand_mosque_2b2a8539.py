@@ -1,53 +1,101 @@
+from __future__ import annotations
+
+import re
+from datetime import date
+
+from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
+    ExtractContext,
+    ExtractorResult,
+    ExtractorRow,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
 )
-from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
-    StubbedPdfExtractor,
-)
 
 
-class Extractor(StubbedPdfExtractor):
+class Extractor(BaseMosqueWebsiteExtractor):
     key = "leeds_grand_mosque_2b2a8539"
-    version = "2026.06.12.1"
+    version = "2026.06.13.1"
     source_match = SourceMatch(domains=("leedsgrandmosque.com",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
+    targets = (
+        TargetSpec(
+            label="timetable",
+            url="https://leedsgrandmosque.com/prayer",
+            kind=TargetKind.HTML,
+        ),
+    )
 
-    def __init__(self) -> None:
-        super().__init__()
-        # Verified (start https://leedsgrandmosque.com/, stayed on leedsgrandmosque.com,
-        # visited <=8 pages: /, /services/friday-prayer, /prayer, /services/ramadan,
-        # and probe paths /prayer-times /prayer /salah /salat /namaz /timetable /time-table
-        # /schedule /jumuah /jumma /calendar /mosque-times — most 404 or non-timetable):
-        # - Homepage renders explicit JAMAAT ("jammah") times inline for today:
-        #   fajr adhan 03:17 jammah 04:00; dhuhr 13:06/13:30; asr 17:34/18:30;
-        #   maghrib 21:40/21:45; isha "Combined with Maghrib". Also "Friday Prayers (Jumu’ah)
-        #   start at 13:00".
-        # - Prominent "download timetable" link points to /uploads/files/A3_calendar2026_v2_(1).pdf
-        #   (confirmed 200 application/pdf; this is the yearly A3 calendar containing the
-        #   authoritative multi-month jamaat times).
-        # - No HTML <table> with multi-day (monthly/yearly) jamaat data on homepage or probed
-        #   subpages. The visible prayers-list is today-only (not the broadest timetable).
-        # - No embedded timetable widgets from allowed domains
-        #   (athanplus/masjidal/masjidbox/mawaqit).
-        # - Not an aggregator/directory site (single-mosque content and branding); has jamaat
-        #   times (inline + PDF), not adhan-only.
-        # - Preflight predicted html; verification: the durable timetable content is the PDF.
-        #   Target the stable homepage (always links the current calendar) as kind=HTML with
-        #   requires_pdf=True and use StubbedPdfExtractor (stub records the target for the
-        #   source; counts as authored; no PDF parsing in this script). This avoids embedding
-        #   a year-specific or versioned filename in the extractor and matches the pattern for
-        #   other sites with year-named PDF calendars linked from a stable landing page.
-        # - Direct PDF asset URL contains a calendar year and uploader suffix; using the
-        #   homepage keeps the script stable across annual updates.
-        self.targets = (
-            TargetSpec(
-                label="timetable",
-                url="https://leedsgrandmosque.com/",
-                kind=TargetKind.HTML,
-                requires_pdf=True,
-            ),
-        )
+    def extract(self, ctx: ExtractContext) -> ExtractorResult:
+        artifact = ctx.artifact("timetable")
+        if not artifact.body:
+            return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
+
+        html = artifact.text()
+        rows = []
+        today = date.today()
+
+        prayer_map = {
+            "fajr": Prayer.FAJR,
+            "dhuhr": Prayer.DHUHR,
+            "zuhr": Prayer.DHUHR,
+            "asr": Prayer.ASR,
+            "maghrib": Prayer.MAGHRIB,
+            "isha": Prayer.ISHA,
+        }
+
+        # Find each prayer block and extract from it
+        prayer_block_pattern = r'<div class="rsContent">.*?<span class="prayer-name">(\w+)</span>.*?<span class="date">([^<]+)</span>.*?<span class="jammah">([^<]*)</span>.*?<span class="jammah-date">([^<]*)</span>'
+
+        for match in re.finditer(prayer_block_pattern, html, re.DOTALL):
+            prayer_name = match.group(1).lower().strip()
+            jammah_str = match.group(4).strip()
+
+            # Skip "shurooq" (sunrise)
+            if prayer_name == "shurooq":
+                continue
+
+            prayer = prayer_map.get(prayer_name)
+            if prayer is None:
+                continue
+
+            # Skip if jammah time is empty or "Combined with Maghrib"
+            if not jammah_str or jammah_str.lower() == "combined with maghrib":
+                continue
+
+            # Parse jammah time
+            jammah_time = coerce_time(jammah_str, prayer=prayer_name)
+            if jammah_time is None:
+                continue
+
+            evidence = ctx.evidence(
+                target_label="timetable",
+                extractor_key=self.key,
+                extractor_version=self.version,
+                raw_text=match.group(0),
+                selector=f"prayer-name={prayer_name}",
+            )
+
+            rows.append(
+                ExtractorRow(
+                    date=today,
+                    prayer=prayer,
+                    jamaat_time=jammah_time,
+                    start_time=None,
+                    timezone="Europe/London",
+                    evidence=evidence,
+                )
+            )
+
+        if not rows:
+            return ExtractorResult(
+                rows=[],
+                no_schedule_reason="no jammah times found",
+            )
+
+        return ExtractorResult(rows=rows)

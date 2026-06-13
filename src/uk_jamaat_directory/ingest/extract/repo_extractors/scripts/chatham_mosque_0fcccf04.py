@@ -62,17 +62,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
             decoded = _pct_decode(raw)
             state = json.loads(decoded)
             timetable = (
-                state.get("azan", {})
-                .get("masjidMonthlyAzan", {})
-                .get("item", {})
-                .get("timetable")
+                state.get("azan", {}).get("masjidMonthlyAzan", {}).get("item", {}).get("timetable")
             )
             if not timetable:
                 timetable = (
-                    state.get("azan", {})
-                    .get("masjidAzan", {})
-                    .get("item", {})
-                    .get("timetable")
+                    state.get("azan", {}).get("masjidAzan", {}).get("item", {}).get("timetable")
                 )
             if not timetable:
                 return ExtractorResult(

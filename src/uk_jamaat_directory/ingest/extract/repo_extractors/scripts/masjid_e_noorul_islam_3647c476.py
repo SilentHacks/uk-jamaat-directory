@@ -114,7 +114,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
 
-        data_rows = body[header_row_idx + 1:]
+        data_rows = body[header_row_idx + 1 :]
         for row in data_rows:
             cells = [html_helpers.normalize_whitespace(c) for c in row]
             if not cells:
