@@ -30,6 +30,8 @@ def test_internal_docs_default_off_in_production_only() -> None:
     assert Settings(environment=Environment.PRODUCTION).internal_docs_active is False
     # Explicit override wins over the environment default.
     assert (
-        Settings(environment=Environment.PRODUCTION, internal_docs_enabled=True).internal_docs_active
+        Settings(
+            environment=Environment.PRODUCTION, internal_docs_enabled=True
+        ).internal_docs_active
         is True
     )

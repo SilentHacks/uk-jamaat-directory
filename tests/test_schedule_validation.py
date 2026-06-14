@@ -63,6 +63,13 @@ def _candidate(
     )
 
 
+def _next_friday() -> date:
+    # Use an upcoming Friday so the candidate falls inside the validator's
+    # allowed date window (anchored on today) rather than a hardcoded past date.
+    today = date.today()
+    return today + timedelta(days=(4 - today.weekday()) % 7)
+
+
 def test_rejects_missing_jamaat() -> None:
     candidate = _candidate(jamaat=None)
     result = validate_candidate(candidate, mosque=_mosque(), source=_source())
@@ -76,7 +83,7 @@ def test_rejects_jamaat_before_start() -> None:
 
 
 def test_rejects_jumuah_not_friday() -> None:
-    saturday = date(2026, 6, 6)
+    saturday = _next_friday() + timedelta(days=1)
     assert saturday.weekday() == 5
     candidate = _candidate(on_date=saturday, prayer=Prayer.JUMUAH, start=None, jamaat=time(13, 0))
     result = validate_candidate(candidate, mosque=_mosque(), source=_source())
@@ -84,7 +91,7 @@ def test_rejects_jumuah_not_friday() -> None:
 
 
 def test_accepts_jumuah_on_friday() -> None:
-    friday = date(2026, 6, 5)
+    friday = _next_friday()
     assert friday.weekday() == 4
     candidate = _candidate(on_date=friday, prayer=Prayer.JUMUAH, start=None, jamaat=time(13, 0))
     result = validate_candidate(candidate, mosque=_mosque(), source=_source())

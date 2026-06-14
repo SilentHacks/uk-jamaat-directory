@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -25,10 +26,25 @@ from uk_jamaat_directory.models.core import (
     ScheduleCandidate,
     ScheduleOccurrence,
 )
+from uk_jamaat_directory.schedules import validation as schedule_validation
 from uk_jamaat_directory.schedules.dataset import PUBLISHED_DATASET_STATUS
 from uk_jamaat_directory.schedules.publication import publish_candidates, validate_candidates
 
 FIXTURES = Path(__file__).resolve().parents[1] / "data/fixtures/mylocalmasjid"
+
+# The MyLocalMasjid fixtures (sample_export.json) are anchored to 2026-06-05.
+# Freeze the validator's notion of "today" to that date so the date-window gate
+# stays stable as real wall-clock time advances past the fixture dates.
+_FIXTURE_TODAY = date(2026, 6, 5)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_validation_today(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        schedule_validation,
+        "_today_in_timezone",
+        lambda _timezone_name: _FIXTURE_TODAY,
+    )
 
 
 @pytest.mark.asyncio
