@@ -1,30 +1,18 @@
-# TLS reverse proxy + static site for the Directory.
-# Set PUBLIC_DOMAIN and ACME_EMAIL in .env on the VPS.
-#
-# Caddy obtains and renews certificates automatically when PUBLIC_DOMAIN
-# resolves to this host and ports 80/443 are reachable.
+# Local dev mirror of the production Caddyfile: same routing, headers, and static
+# site, but plain HTTP on :80 (mapped to host :8080) with no TLS/ACME.
+# Use to verify routing, CSP, and the static pages before deploying.
 {
-	email {$ACME_EMAIL}
-	servers {
-		timeouts {
-			read_body 30s
-			read_header 10s
-			idle 2m
-		}
-	}
+	auto_https off
 }
 
-{$PUBLIC_DOMAIN} {
+:80 {
 	encode zstd gzip
 
-	# Cap request bodies (public contribution endpoints are small JSON).
 	request_body {
 		max_size 1MB
 	}
 
-	# Baseline security headers on every response.
 	header {
-		Strict-Transport-Security "max-age=15552000"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -32,14 +20,11 @@
 		-Server
 	}
 
-	# Public bulk export objects (MinIO path-style: /{bucket}/exports/...).
 	handle_path /exports/* {
-		rewrite * /{$S3_BUCKET}/exports{path}
+		rewrite * /{$S3_BUCKET:uk-jamaat-directory-local}/exports{path}
 		reverse_proxy minio:9000
 	}
 
-	# JSON API. The internal docs routes are intentionally not exposed here; they
-	# are a dev/local tool, reachable directly on the API service if enabled.
 	@api path /v1/*
 	handle @api {
 		reverse_proxy api:8000 {
@@ -48,8 +33,6 @@
 		}
 	}
 
-	# Interactive API reference (Scalar). Looser CSP: Scalar injects styles and may
-	# load remote images; scripts and API calls stay same-origin.
 	@docs path /docs /docs/*
 	handle @docs {
 		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'"
@@ -57,7 +40,6 @@
 		file_server
 	}
 
-	# Everything else: the static site (pages we fully control → strict CSP).
 	handle {
 		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		root * /srv/www

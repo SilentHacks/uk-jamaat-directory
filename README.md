@@ -34,8 +34,15 @@ make dev
 ```
 
 - API: http://localhost:8000
-- OpenAPI UI: http://localhost:8000/docs (non-production)
+- Public OpenAPI spec: http://localhost:8000/v1/openapi.json (all environments)
+- Full Swagger UI: http://localhost:8000/internal/docs (non-production only)
 - MinIO console: http://localhost:9001
+
+Run the public site (landing page, API reference, bulk-data listing) behind Caddy locally at http://localhost:8080:
+
+```bash
+make web-dev
+```
 
 PostGIS is published on host port **54324** by default (not 5432) so it is less likely to collide with other local Postgres containers. Inside Docker networks the service still listens on `5432`.
 
@@ -77,7 +84,11 @@ Operational admin route (requires `X-Admin-Key` when `ADMIN_API_KEY` is set):
 |--------|------|-------------|
 | `GET` | `/admin/health` | Admin-authenticated health check |
 
-Full request/response shapes: [docs/api/openapi.json](docs/api/openapi.json) or `/docs` when running locally.
+The public spec (admin routes excluded) is served at `/v1/openapi.json` in every
+environment and rendered as an interactive reference at `/docs/` (Scalar). The full
+spec including admin routes is available only outside production at `/internal/docs`.
+Committed contract: [docs/api/openapi.json](docs/api/openapi.json). Rate limits and the
+versioning policy: [docs/api/README.md](docs/api/README.md).
 
 Regenerate exported contracts after API changes:
 
@@ -244,20 +255,27 @@ Set `EXPORT_BASE_URL` to the public object-storage or CDN endpoint that serves e
 
 ## VPS deployment (Phase 11)
 
-Production uses a separate Compose file with Caddy for TLS, internal-only Postgres/Redis/MinIO, and named volumes.
+Production uses a separate Compose file with Caddy for TLS, the static public site,
+internal-only Postgres/Redis/MinIO, and named volumes. CI builds and pushes images to
+GHCR (`ghcr.io/silenthacks/uk-jamaat-directory`, tags `sha-<sha>` and `latest`); the
+server **pulls** them and never builds.
 
 ```bash
-# On the server (after copying .env.example → .env and setting production secrets)
-docker compose -f docker-compose.production.yml up -d --build
+# First time, on the server (after copying .env.example → .env and setting secrets)
+docker compose -f docker-compose.production.yml up -d
 ./scripts/deploy/migrate.sh
 ./scripts/deploy/smoke-test.sh
 ```
 
-Routine deploys:
+Routine deploys — trigger the **Deploy** GitHub Actions workflow (`workflow_dispatch`)
+with the image tag to roll out, or run the same ceremony on the server directly:
 
 ```bash
-./scripts/deploy/deploy.sh
+IMAGE_TAG=latest ./scripts/deploy/deploy.sh   # backup → pull → migrate → restart → smoke
 ```
+
+Rollback: re-run the deploy with a previous `sha-<sha>` tag. If a migration was applied,
+restore the pre-deploy `pg_dump` first (see [docs/deploy/restore.md](docs/deploy/restore.md)).
 
 Documentation:
 
@@ -339,7 +357,8 @@ AGENTS.md                  Agent/developer conventions
 | 10 | Bulk exports (NDJSON/CSV/changes/metadata) | Done |
 | 11 | Docker VPS deployment, backups, restore drills | Done |
 | 12 | GitHub publishing workflow (CI, Dependabot, license docs) | Done |
-| 13+ | Admin web UI, HTML/PDF crawlers | Planned |
+| 13 | Public-facing layer: static site, API reference, serve/deploy hardening, GHCR CD | Done |
+| 14+ | Interactive directory frontend, admin web UI, OCR crawlers | Planned |
 
 ## Data Publication Rules
 

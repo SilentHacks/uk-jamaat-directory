@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bulk data — UK Jamaat Directory</title>
+    <meta
+      name="description"
+      content="Download the latest UK Jamaat Directory bulk data snapshot (NDJSON and CSV), licensed under ODbL 1.0."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/site.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="/">UK Jamaat Directory</a>
+        <nav>
+          <a href="/docs/">API reference</a>
+          <a href="/data/">Bulk data</a>
+          <a href="https://github.com/SilentHacks/uk-jamaat-directory">Source</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap data-page">
+      <h1>Bulk data exports</h1>
+      <p class="lede">
+        Versioned, deterministic snapshots of the public directory. Published under the
+        <a href="https://opendatacommons.org/licenses/odbl/1-0/">Open Database License (ODbL) 1.0</a>
+        — please attribute “UK Jamaat Directory and contributors.”
+      </p>
+
+      <div id="snapshot">
+        <p class="status">Loading latest snapshot…</p>
+      </div>
+
+      <p class="note">
+        Prefer to sync incrementally? Use
+        <code>GET /v1/changes?since=&lt;event_id&gt;</code> and fall back to a full
+        snapshot for recovery. See the <a href="/docs/">API reference</a>.
+      </p>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap"><p>UK Jamaat Directory — a public data service.</p></div>
+    </footer>
+
+    <!-- External so the page works under a strict script-src 'self' CSP. -->
+    <script src="/assets/data.js"></script>
+  </body>
+</html>

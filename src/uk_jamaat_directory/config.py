@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     environment: Environment = Environment.DEVELOPMENT
     api_prefix: str = "/v1"
     public_base_url: str = "http://localhost:8000"
-    docs_enabled: bool = True
+    # Filtered public OpenAPI spec (admin routes excluded); served in all environments.
+    public_openapi_enabled: bool = True
+    # Full-spec Swagger UI at /internal/docs. None => active when env != production.
+    internal_docs_enabled: bool | None = None
     admin_api_key: str | None = None
 
     database_url: str = "postgresql+asyncpg://directory:directory@localhost:54324/directory"
@@ -45,9 +48,10 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["localhost", "127.0.0.1"]
     )
-    cors_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"]
-    )
+    # Public read API: any origin may call it. Safe only because credentials are
+    # never allowed (see create_app) and admin routes are gated by X-Admin-Key,
+    # not by CORS.
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
     # Documented operator intent; production VPS enforces proxy headers via
     # uvicorn --proxy-headers in docker-compose.production.yml, not app middleware.
     trust_proxy_headers: bool = False
@@ -60,6 +64,15 @@ class Settings(BaseSettings):
 
     community_submission_rate_limit: int = 10
     community_submission_rate_window_seconds: int = 60
+
+    # Global per-IP limit applied to all public API requests (health checks exempt).
+    # Set <= 0 to disable.
+    public_rate_limit: int = 120
+    public_rate_window_seconds: int = 60
+
+    # Error tracking. Sentry stays inert (no SDK import) when the DSN is unset.
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.0
 
     schedule_date_past_days: int = 7
     schedule_date_future_days: int = 400
@@ -134,22 +147,14 @@ class Settings(BaseSettings):
         return value
 
     @property
-    def openapi_url(self) -> str | None:
-        if self.docs_enabled and self.environment != Environment.PRODUCTION:
-            return f"{self.api_prefix}/openapi.json"
-        return None
+    def public_openapi_url(self) -> str:
+        return f"{self.api_prefix}/openapi.json"
 
     @property
-    def docs_url(self) -> str | None:
-        if self.docs_enabled and self.environment != Environment.PRODUCTION:
-            return "/docs"
-        return None
-
-    @property
-    def redoc_url(self) -> str | None:
-        if self.docs_enabled and self.environment != Environment.PRODUCTION:
-            return "/redoc"
-        return None
+    def internal_docs_active(self) -> bool:
+        if self.internal_docs_enabled is not None:
+            return self.internal_docs_enabled
+        return self.environment != Environment.PRODUCTION
 
 
 @lru_cache

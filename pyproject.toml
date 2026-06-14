@@ -22,6 +22,7 @@ dependencies = [
     "rapidfuzz>=3.10",
     "python-json-logger>=3.2",
     "redis>=5.2",
+    "sentry-sdk[fastapi,celery]>=2.0",
     "shapely>=2.0",
     "sqlalchemy[asyncio]>=2.0",
     "uvicorn[standard]>=0.32",

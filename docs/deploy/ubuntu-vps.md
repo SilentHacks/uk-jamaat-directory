@@ -101,13 +101,17 @@ Local development continues to use `docker-compose.yml` (reload, host port 8000,
 
 ## Routine deploys
 
-Use the deploy checklist script:
+Images are built and pushed to GHCR by CI on every merge to `master`. Deploys pull a
+chosen tag; the server never builds. Trigger the **Deploy** GitHub Actions workflow
+(`workflow_dispatch`, input `image_tag`), which SSHes in and runs the checklist script,
+or run it directly on the server:
 
 ```bash
-./scripts/deploy/deploy.sh
+IMAGE_TAG=latest ./scripts/deploy/deploy.sh
 ```
 
-This runs: pull (if git checkout), pre-deploy Postgres backup, image build, migrations, service restart, health wait, and public smoke tests.
+This runs: source pull (if git checkout), pre-deploy Postgres backup, image pull,
+migrations, service restart, health wait, and public smoke tests.
 
 Skip steps when needed:
 
@@ -117,7 +121,27 @@ SKIP_MIGRATE=1 ./scripts/deploy/deploy.sh     # schema unchanged
 SKIP_SMOKE=1 ./scripts/deploy/deploy.sh       # no external curl checks
 ```
 
+The deploy workflow needs these GitHub secrets: `DEPLOY_SSH_KEY` (a deploy user's
+private key), `DEPLOY_HOST`, `DEPLOY_USER`, and `DEPLOY_KNOWN_HOSTS`. **Rollback:**
+re-run the workflow with a previous `sha-<sha>` tag; if a migration was applied, restore
+the pre-deploy dump first ([restore.md](restore.md)).
+
 See [checklist.md](checklist.md) for the manual checklist.
+
+## Uptime and error monitoring
+
+Point an external monitor (UptimeRobot, healthchecks.io, BetterStack, …) at:
+
+```
+https://<PUBLIC_DOMAIN>/v1/health/ready
+```
+
+It returns `200` only when the database is reachable, and is exempt from the public rate
+limit, so a 1–5 minute interval is safe. Alert on any non-`200`.
+
+For error tracking, set `SENTRY_DSN` in `.env` (and optionally
+`SENTRY_TRACES_SAMPLE_RATE`). The API and Celery workers report automatically; leaving
+the DSN blank disables Sentry entirely.
 
 ## Backups
 

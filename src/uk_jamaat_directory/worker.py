@@ -4,8 +4,10 @@ from celery import Celery
 from celery.schedules import crontab
 
 from uk_jamaat_directory.config import get_settings
+from uk_jamaat_directory.observability import init_sentry
 
 settings = get_settings()
+init_sentry(settings)
 
 celery_app = Celery(
     "uk_jamaat_directory",

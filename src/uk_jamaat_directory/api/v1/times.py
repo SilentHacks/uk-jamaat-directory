@@ -5,11 +5,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from uk_jamaat_directory.api.cache import cache_control
 from uk_jamaat_directory.db.session import get_db_session
 from uk_jamaat_directory.schemas.public import NearbyTimesResponse
 from uk_jamaat_directory.services import public_reads
 
-router = APIRouter(prefix="/times", tags=["times"])
+router = APIRouter(
+    prefix="/times", tags=["times"], dependencies=[cache_control("public, max-age=60")]
+)
 
 
 @router.get("/nearby", response_model=NearbyTimesResponse)

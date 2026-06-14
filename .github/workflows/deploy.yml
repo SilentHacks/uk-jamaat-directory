@@ -1,0 +1,42 @@
+name: Deploy
+
+# Manual, operator-triggered deploy. Migrations run against the single production
+# database, so a human gate (not auto-on-master) is intentional. CI must have built
+# and pushed the chosen image tag to GHCR first.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag to deploy (e.g. latest or sha-<short-sha>)"
+        required: true
+        default: "latest"
+
+concurrency: production-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust deploy host
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd /opt/uk-jamaat-directory \
+             && git fetch --quiet origin master \
+             && git checkout master \
+             && git pull --ff-only \
+             && IMAGE_TAG='${IMAGE_TAG}' ./scripts/deploy/deploy.sh"
