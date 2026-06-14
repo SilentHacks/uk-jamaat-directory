@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     mylocalmasjid_publication_policy: str = "unknown"
     muslimsinbritain_enabled: bool = False
     muslimsinbritain_publication_policy: str = "public_redistribution_allowed"
+    # Policy stamped on auto-registered mosque_website crawl sources. Conservative
+    # by default; set MOSQUE_WEBSITE_PUBLICATION_POLICY=public_redistribution_allowed
+    # to publish prayer times scraped from mosques' own public websites.
+    mosque_website_publication_policy: str = "unknown"
     openai_api_key: str | None = None
 
     community_submission_rate_limit: int = 10

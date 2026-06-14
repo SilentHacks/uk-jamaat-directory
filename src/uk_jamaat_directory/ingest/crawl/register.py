@@ -11,7 +11,6 @@ from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.domain import (
     Confidence,
     MosqueStatus,
-    SourcePublicationPolicy,
     SourceType,
 )
 from uk_jamaat_directory.ingest.domain_policy import (
@@ -19,6 +18,7 @@ from uk_jamaat_directory.ingest.domain_policy import (
     is_umbrella_domain,
 )
 from uk_jamaat_directory.ingest.normalize import canonical_homepage, normalize_domain
+from uk_jamaat_directory.ingest.policy import parse_publication_policy
 from uk_jamaat_directory.models.core import Mosque, MosqueSource, SourceHealth
 
 _CRAWL_SOURCE_TYPES = (SourceType.MOSQUE_WEBSITE,)
@@ -86,6 +86,7 @@ async def ensure_crawl_sources(
 ) -> RegisterResult:
     cfg = settings or get_settings()
     result = RegisterResult()
+    website_policy = parse_publication_policy(cfg.mosque_website_publication_policy)
 
     stmt = (
         select(Mosque)
@@ -131,7 +132,7 @@ async def ensure_crawl_sources(
             source_type=SourceType.MOSQUE_WEBSITE,
             external_id=f"web-{mosque.id}",
             source_url=homepage,
-            publication_policy=SourcePublicationPolicy.UNKNOWN,
+            publication_policy=website_policy,
             confidence=Confidence.OFFICIAL_IMPORT,
             metadata_={
                 "crawl_enabled": True,
