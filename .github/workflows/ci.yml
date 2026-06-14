@@ -51,7 +51,7 @@ jobs:
 
       - name: API contracts are up to date
         run: |
-          make export-contracts
+          uk-jamaat-directory export-contracts
           git diff --exit-code docs/api/ \
             || { echo "docs/api is stale — run 'make export-contracts' and commit."; exit 1; }
 
