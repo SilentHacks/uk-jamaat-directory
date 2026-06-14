@@ -10,12 +10,11 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# shellcheck disable=SC1091
-set -a
-source .env
-set +a
+# Read only PUBLIC_BASE_URL from .env. Avoid `source .env`: values like
+# APP_NAME="UK Jamaat Directory" contain spaces/parens and break shell parsing.
+PUBLIC_BASE_URL="$(grep -E '^PUBLIC_BASE_URL=' .env | tail -n1 | cut -d= -f2- || true)"
 
-BASE_URL="${SMOKE_BASE_URL:-$PUBLIC_BASE_URL}"
+BASE_URL="${SMOKE_BASE_URL:-${PUBLIC_BASE_URL:-}}"
 
 if [[ -z "$BASE_URL" ]]; then
   echo "error: set PUBLIC_BASE_URL in .env or SMOKE_BASE_URL for smoke tests" >&2
