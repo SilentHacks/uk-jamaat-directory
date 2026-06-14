@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time, PLAUSIBLE_WINDOWS
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,

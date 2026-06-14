@@ -1,11 +1,11 @@
-from datetime import datetime, date
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import Table, extract_tables
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
-    ExtractorWarning,
     ExtractorRow,
     RefreshPolicy,
     RunFrequency,
@@ -16,7 +16,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     BaseMosqueWebsiteExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time, PLAUSIBLE_WINDOWS
 
 
 class Extractor(BaseMosqueWebsiteExtractor):

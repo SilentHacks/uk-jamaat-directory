@@ -1,5 +1,4 @@
 import json
-import re
 from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer

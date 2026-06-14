@@ -19,11 +19,11 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     """Extractor for Hamilton Islamic Centre prayer timetable.
-    
+
     The page is JavaScript-rendered (loads prayer times from CSV into HTML table).
     This extractor will work when proper JavaScript rendering is available.
     """
-    
+
     key = "islamic_centre_63d75651"
     version = "2026.06.13.2"
     source_match = SourceMatch(domains=("hamiltonislamiccentre.co.uk",))
@@ -49,45 +49,45 @@ class Extractor(BaseMosqueWebsiteExtractor):
         year = datetime.now().year
         extracted_rows = []
         warnings = []
-        
+
         # Parse table rows when JavaScript has rendered them
         # Table structure: Day, Month, FajrAdhan, FajrIqamah, Shouruq, DhuhrAdhan, DhuhrIqamah,
         #                 AsrAdhan, AsrIqamah, MaghribAdhan, MaghribIqamah, IshaAdhan, IshaIqamah
-        cell_pattern = r'<td[^>]*>([^<]*)</td>'
-        rows_pattern = r'<tr>((?:<td[^>]*>[^<]*</td>)+)</tr>'
-        
+        cell_pattern = r"<td[^>]*>([^<]*)</td>"
+        rows_pattern = r"<tr>((?:<td[^>]*>[^<]*</td>)+)</tr>"
+
         table_rows = re.findall(rows_pattern, html)
         if not table_rows:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="no table rows found",
             )
-        
+
         prayer_cols = {
-            Prayer.FAJR: 3,      # FajrIqamah (0-indexed)
-            Prayer.DHUHR: 6,     # DhuhrIqamah
-            Prayer.ASR: 8,       # AsrIqamah
+            Prayer.FAJR: 3,  # FajrIqamah (0-indexed)
+            Prayer.DHUHR: 6,  # DhuhrIqamah
+            Prayer.ASR: 8,  # AsrIqamah
             Prayer.MAGHRIB: 10,  # MaghribIqamah
-            Prayer.ISHA: 12,     # IshaIqamah
+            Prayer.ISHA: 12,  # IshaIqamah
         }
-        
+
         for row_html in table_rows[:365]:
             cells = re.findall(cell_pattern, row_html)
             if len(cells) < 13:
                 continue
-            
+
             try:
                 day = int(cells[0].strip())
                 month = int(cells[1].strip())
                 row_date = datetime(year, month, day).date()
             except (ValueError, TypeError):
                 continue
-            
+
             for prayer, col_idx in prayer_cols.items():
                 raw = cells[col_idx].strip()
                 if not raw:
                     continue
-                
+
                 try:
                     jamaat_time = coerce_time(raw, prayer=prayer.value)
                     if jamaat_time is None:
@@ -99,7 +99,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             )
                         )
                         continue
-                    
+
                     window = PLAUSIBLE_WINDOWS.get(prayer.value)
                     if window and not (window[0] <= jamaat_time <= window[1]):
                         warnings.append(
@@ -110,7 +110,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             )
                         )
                         continue
-                    
+
                     evidence = ctx.evidence(
                         target_label="timetable",
                         extractor_key=self.key,
@@ -134,13 +134,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             target_label="timetable",
                         )
                     )
-        
+
         if not extracted_rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no rows extracted (check if JavaScript rendered the table)",
             )
-        
-        return ExtractorResult(rows=extracted_rows, warnings=warnings)
 
+        return ExtractorResult(rows=extracted_rows, warnings=warnings)

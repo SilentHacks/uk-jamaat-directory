@@ -5,14 +5,14 @@ from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
+    ExtractContext,
+    ExtractorResult,
+    ExtractorRow,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractContext,
-    ExtractorResult,
-    ExtractorRow,
 )
 
 

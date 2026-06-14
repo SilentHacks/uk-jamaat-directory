@@ -2,21 +2,18 @@ from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
+from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
+    ExtractContext,
+    ExtractorResult,
+    ExtractorWarning,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractContext,
-    ExtractorResult,
-    BaseMosqueWebsiteExtractor,
-    ExtractorWarning,
 )
-from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
-    _TabularTimetableMixin,
-)
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -36,18 +33,22 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         table = html_helpers.find_table(artifact.text(), header_keywords=("fajr", "zuhr"))
         if not table:
             return ExtractorResult(
                 rows=[],
-                warnings=[ExtractorWarning(code="no_table", message="no prayer table found", target_label="timetable")],
+                warnings=[
+                    ExtractorWarning(
+                        code="no_table", message="no prayer table found", target_label="timetable"
+                    )
+                ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         # Dynamically find columns: find first row with "jama'at" or "iqama"
         header = [cell.lower().strip() for cell in table.header]
-        
+
         # Find prayer columns by looking for "jama'at" after prayer names
         prayer_cols = {}
         for idx, cell in enumerate(header):
@@ -62,7 +63,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     prayer_cols[Prayer.MAGHRIB] = idx
                 elif "isha" in " ".join(header[:idx]):
                     prayer_cols[Prayer.ISHA] = idx
-        
+
         # Fall back to indices if dynamic search didn't work
         if not prayer_cols:
             prayer_cols = {
@@ -72,7 +73,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 Prayer.MAGHRIB: 9,
                 Prayer.ISHA: 11,
             }
-        
+
         # Extract rows: date is column 0, prayers in dedicated columns
         rows = []
         seen_keys = set()
@@ -80,34 +81,38 @@ class Extractor(BaseMosqueWebsiteExtractor):
             cells = [cell.strip() for cell in row_data]
             if not cells or not cells[0].isdigit():
                 continue
-            
+
             day = int(cells[0])
             from datetime import datetime
+
             today = datetime.now()
             month = today.month
             year = today.year
-            
+
             try:
                 row_date = date(year, month, day)
             except ValueError:
                 continue
-            
+
             for prayer, col_idx in prayer_cols.items():
                 if col_idx >= len(cells):
                     continue
                 time_str = cells[col_idx].strip()
                 if not time_str:
                     continue
-                
+
                 # Skip duplicate entries (same date+prayer combo)
                 key = (row_date, prayer)
                 if key in seen_keys:
                     continue
                 seen_keys.add(key)
-                
+
                 jamaat = coerce_time(time_str, prayer=prayer.value)
                 if jamaat:
-                    from uk_jamaat_directory.ingest.extract.repo_extractors.contract import ExtractorRow
+                    from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+                        ExtractorRow,
+                    )
+
                     rows.append(
                         ExtractorRow(
                             date=row_date,
@@ -124,8 +129,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             ),
                         )
                     )
-        
+
         if not rows:
             return ExtractorResult(rows=[], no_schedule_reason="no extractable rows")
-        
+
         return ExtractorResult(rows=rows)

@@ -1,6 +1,6 @@
 """Extractor for Zakariyya Jaam'e Masjid (Bolton)."""
 
-from datetime import date, datetime
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
@@ -72,11 +72,11 @@ class Extractor(TableTimetableExtractor):
         today = datetime.now().date()
         body_with_date = [[str(today)] + row for row in table.body()]
         table_with_date = Table([["date"] + table.header] + body_with_date)
-        
+
         # Parse rows manually to match prayer names with times
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         prayer_map = {
             "fajr": Prayer.FAJR,
             "dhuhr": Prayer.DHUHR,
@@ -84,17 +84,17 @@ class Extractor(TableTimetableExtractor):
             "maghrib": Prayer.MAGHRIB,
             "isha": Prayer.ISHA,
         }
-        
+
         for row_num, row in enumerate(table_with_date.body(), start=1):
             prayer_name = row[1].lower() if len(row) > 1 else ""
             prayer = prayer_map.get(prayer_name)
             if not prayer:
                 continue
-            
+
             jamaat_raw = row[3] if len(row) > 3 else ""
             if not jamaat_raw:
                 continue
-            
+
             jamaat = coerce_time(jamaat_raw, prayer=prayer.value)
             if jamaat is None:
                 warnings.append(
@@ -105,10 +105,10 @@ class Extractor(TableTimetableExtractor):
                     )
                 )
                 continue
-            
+
             start_raw = row[2] if len(row) > 2 else ""
             start = coerce_time(start_raw, prayer=prayer.value) if start_raw else None
-            
+
             rows.append(
                 ExtractorRow(
                     date=today,
@@ -125,7 +125,7 @@ class Extractor(TableTimetableExtractor):
                     ),
                 )
             )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],

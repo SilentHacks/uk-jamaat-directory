@@ -2,7 +2,6 @@ import re
 from datetime import datetime, timedelta
 
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
@@ -143,7 +142,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if not extracted_rows:
             return ExtractorResult(
                 rows=[],
-                warnings=warnings or [
+                warnings=warnings
+                or [
                     ExtractorWarning(
                         code="no_rows",
                         message="no jamaat times could be extracted",

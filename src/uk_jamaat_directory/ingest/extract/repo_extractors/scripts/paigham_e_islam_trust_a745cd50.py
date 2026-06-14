@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import pdf as pdf_helpers
@@ -213,7 +213,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 if len(jumuah_raw_list) >= 2:
                     break
 
-        jumuah_entries: list[tuple[int, str, "time | None"]] = []
+        jumuah_entries: list[tuple[int, str, time | None]] = []
         for idx, rawj in enumerate(jumuah_raw_list[:2], 1):
             jt = coerce_time(rawj, prayer="jumuah")
             jumuah_entries.append((idx, rawj, jt))

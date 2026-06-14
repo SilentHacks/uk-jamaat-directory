@@ -3,6 +3,7 @@
 from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers.html import Table
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
@@ -17,7 +18,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers.html import Table
 
 
 class Extractor(TableTimetableExtractor):

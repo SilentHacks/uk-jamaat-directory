@@ -44,9 +44,9 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         tables = html_helpers.extract_tables(artifact.text())
-        
+
         # Find table with "Prayer" and "Begins" headers
         timetable = None
         for t in tables:
@@ -61,10 +61,10 @@ class Extractor(TableTimetableExtractor):
             if has_prayer and has_begins:
                 timetable = t
                 break
-        
+
         if timetable is None:
             return ExtractorResult(rows=[], no_schedule_reason="prayer times table not found")
-        
+
         # Find header row with "Prayer" and "Begins"
         header_idx = None
         prayer_col = begins_col = jamaat_col = None
@@ -77,20 +77,21 @@ class Extractor(TableTimetableExtractor):
                 # Jamaat is typically the next column after Begins
                 jamaat_col = begins_col + 1 if begins_col + 1 < len(row) else None
                 break
-        
+
         if header_idx is None or prayer_col is None or begins_col is None:
             return ExtractorResult(rows=[], no_schedule_reason="prayer times header not found")
-        
+
         # Extract date from first row (contains "June 13, 2026" or similar)
         row_date = datetime.now().date()
         if timetable.rows and len(timetable.rows) > 0:
             header_text = " ".join(timetable.rows[0])
             try:
                 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
+
                 row_date = parse_date_flexible(header_text, default_year=datetime.now().year)
             except:
                 pass
-        
+
         prayer_map = {
             "fajr": Prayer.FAJR,
             "zuhr": Prayer.DHUHR,
@@ -99,18 +100,18 @@ class Extractor(TableTimetableExtractor):
             "maghrib": Prayer.MAGHRIB,
             "isha": Prayer.ISHA,
         }
-        
+
         rows_out: list[ExtractorRow] = []
-        
+
         # Process prayer rows
-        for r in timetable.rows[header_idx + 1:]:
+        for r in timetable.rows[header_idx + 1 :]:
             if len(r) <= prayer_col:
                 continue
-                
+
             prayer_text = r[prayer_col].lower().strip()
             if not prayer_text or "sunrise" in prayer_text:
                 continue
-            
+
             # Map prayer name
             p = None
             for key, pr in prayer_map.items():
@@ -119,18 +120,18 @@ class Extractor(TableTimetableExtractor):
                     break
             if p is None:
                 continue
-            
+
             # Extract jamaat time (from jamaat column if available)
             jamaat_raw = ""
             if jamaat_col is not None and jamaat_col < len(r):
                 jamaat_raw = r[jamaat_col]
             elif begins_col + 1 < len(r):
                 jamaat_raw = r[begins_col + 1]
-            
+
             jamaat = coerce_time(jamaat_raw, prayer=p.value)
             if jamaat is None:
                 continue
-            
+
             rows_out.append(
                 ExtractorRow(
                     date=row_date,
@@ -147,8 +148,8 @@ class Extractor(TableTimetableExtractor):
                     ),
                 )
             )
-        
+
         if not rows_out:
             return ExtractorResult(rows=[], no_schedule_reason="no extractable rows")
-        
+
         return ExtractorResult(rows=rows_out, warnings=[])

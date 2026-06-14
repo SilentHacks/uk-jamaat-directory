@@ -15,8 +15,8 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetSpec,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
-    TableTimetableExtractor,
     PLAUSIBLE_WINDOWS,
+    TableTimetableExtractor,
 )
 
 
@@ -35,11 +35,11 @@ class Extractor(TableTimetableExtractor):
     table_keywords = ("date", "fajr")
     date_column = 1  # Index-based: "Date" is column 1
     prayer_columns = {
-        Prayer.FAJR: 4,      # Fajr adhan column
-        Prayer.DHUHR: 6,     # Dhuhr jamaat
-        Prayer.ASR: 7,       # Asr jamaat
-        Prayer.MAGHRIB: 9,   # Maghrib adhan column
-        Prayer.ISHA: 10,     # Isha jamaat
+        Prayer.FAJR: 4,  # Fajr adhan column
+        Prayer.DHUHR: 6,  # Dhuhr jamaat
+        Prayer.ASR: 7,  # Asr jamaat
+        Prayer.MAGHRIB: 9,  # Maghrib adhan column
+        Prayer.ISHA: 10,  # Isha jamaat
     }
 
     def clean_cell(self, value: str) -> str:
@@ -55,7 +55,7 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         table = find_table(artifact.text(), header_keywords=list(self.table_keywords))
         if table is None:
             return ExtractorResult(
@@ -69,10 +69,10 @@ class Extractor(TableTimetableExtractor):
                 ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         header = [self.clean_cell(cell) for cell in table.header]
         warnings: list[ExtractorWarning] = []
-        
+
         date_idx = self._column_index(header, self.date_column)
         if date_idx is None:
             return ExtractorResult(
@@ -86,7 +86,7 @@ class Extractor(TableTimetableExtractor):
                 ],
                 no_schedule_reason="date column not found",
             )
-        
+
         prayer_idx: dict[Prayer, int] = {}
         for prayer, spec in self.prayer_columns.items():
             idx = self._column_index(header, spec)
@@ -102,32 +102,32 @@ class Extractor(TableTimetableExtractor):
                 )
             else:
                 prayer_idx[prayer] = idx
-        
+
         if not prayer_idx:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no prayer columns found",
             )
-        
+
         body = [[self.clean_cell(cell) for cell in row] for row in table.body()]
-        
+
         year = self.current_year(ctx)
         month = self.current_month(ctx)
         rows: list[ExtractorRow] = []
-        
+
         for row_number, row in enumerate(body, start=1):
             if date_idx >= len(row):
                 continue
             row_date = self.parse_date_cell(row[date_idx], year=year, month=month)
             if row_date is None or not self.accept_row(row, row_date):
                 continue
-            
+
             for prayer, idx in prayer_idx.items():
                 raw = row[idx] if idx < len(row) else ""
                 if not raw:
                     continue
-                
+
                 # Parse the raw time first
                 adhan = times.coerce_time(raw, prayer=prayer.value)
                 if adhan is None:
@@ -139,7 +139,7 @@ class Extractor(TableTimetableExtractor):
                         )
                     )
                     continue
-                
+
                 # Apply prayer-specific transformations
                 if prayer == Prayer.FAJR:
                     # Fajr column contains adhan; jamaat = adhan + 15 min
@@ -154,23 +154,23 @@ class Extractor(TableTimetableExtractor):
                     warnings.append(
                         ExtractorWarning(
                             code="unparseable_time",
-                            message=f"{row_date} {prayer.value}: {jamaat_str!r}",
+                            message=f"{row_date} {prayer.value}: {raw!r}",
                             target_label=self.target_label,
                         )
                     )
                     continue
-                
+
                 window = PLAUSIBLE_WINDOWS.get(prayer.value)
                 if window and not (window[0] <= jamaat <= window[1]):
                     warnings.append(
                         ExtractorWarning(
                             code="implausible_time",
-                            message=f"{row_date} {prayer.value}: {jamaat_str!r} outside plausible window",
+                            message=f"{row_date} {prayer.value}: {raw!r} outside plausible window",
                             target_label=self.target_label,
                         )
                     )
                     continue
-                
+
                 rows.append(
                     ExtractorRow(
                         date=row_date,
@@ -187,5 +187,5 @@ class Extractor(TableTimetableExtractor):
                         ),
                     )
                 )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

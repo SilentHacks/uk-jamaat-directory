@@ -1,7 +1,8 @@
 from datetime import date
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time, PLAUSIBLE_WINDOWS
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractorResult,
@@ -35,10 +36,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
         html = artifact.text()
         tables = html_helpers.extract_tables(html)
-        
+
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         # Prayer name to Prayer enum mapping
         prayer_map = {
             "fajr": Prayer.FAJR,
@@ -47,7 +48,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             "maghrib": Prayer.MAGHRIB,
             "isha": Prayer.ISHA,
         }
-        
+
         for raw_table in tables:
             # Find header row (contains "Prayer" and "Iqamah")
             header_idx = None
@@ -60,10 +61,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     if i > 0 and len(raw_table.rows[i - 1]) == 1:
                         date_str = raw_table.rows[i - 1][0]
                     break
-            
+
             if header_idx is None or not date_str:
                 continue
-            
+
             # Parse date
             try:
                 row_date = date.fromisoformat(date_str[:10])
@@ -76,7 +77,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     )
                 )
                 continue
-            
+
             # Find column indices for Iqamah (jamaat time)
             header = [c.strip() for c in raw_table.rows[header_idx]]
             iqamah_idx = None
@@ -84,7 +85,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 if "iqamah" in cell.lower():
                     iqamah_idx = idx
                     break
-            
+
             if iqamah_idx is None:
                 warnings.append(
                     ExtractorWarning(
@@ -94,28 +95,28 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     )
                 )
                 continue
-            
+
             # Process body rows
             body_rows = raw_table.rows[header_idx + 1 :]
             for row_number, body_row in enumerate(body_rows, start=header_idx + 2):
                 if len(body_row) == 0:
                     continue
-                
+
                 # First cell should be prayer name
                 prayer_name = body_row[0].strip().lower()
                 if prayer_name not in prayer_map:
                     continue
-                
+
                 prayer = prayer_map[prayer_name]
-                
+
                 # Get Iqamah time from the appropriate column
                 if iqamah_idx >= len(body_row):
                     continue
-                
+
                 jamaat_raw = body_row[iqamah_idx].strip()
                 if not jamaat_raw:
                     continue
-                
+
                 # Parse time
                 jamaat_time = coerce_time(jamaat_raw, prayer=prayer.value)
                 if jamaat_time is None:
@@ -127,7 +128,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
                     )
                     continue
-                
+
                 # Check plausibility
                 window = PLAUSIBLE_WINDOWS.get(prayer.value)
                 if window and not (window[0] <= jamaat_time <= window[1]):
@@ -139,7 +140,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
                     )
                     continue
-                
+
                 # Extract successful
                 rows.append(
                     ExtractorRow(
@@ -157,12 +158,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         ),
                     )
                 )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no extractable rows",
             )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

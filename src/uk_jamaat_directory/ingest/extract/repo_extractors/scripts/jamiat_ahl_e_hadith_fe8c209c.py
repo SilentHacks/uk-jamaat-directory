@@ -45,29 +45,33 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="artifact was empty",
             )
-        
+
         html = artifact.text()
         extracted_rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         # Parse <ol class="p-prayer-table-row" prayer-date="DD-MM-YYYY"> rows
         # Each row has <li> elements with prayer-label attributes
         row_pattern = r'<ol\s+class="p-prayer-table-row"\s+prayer-date="(\d{2})-(\d{2})-(\d{4})"[^>]*>(.*?)</ol>'
-        
+
         for row_match in re.finditer(row_pattern, html, re.DOTALL):
-            day_str, month_str, year_str = row_match.group(1), row_match.group(2), row_match.group(3)
+            day_str, month_str, year_str = (
+                row_match.group(1),
+                row_match.group(2),
+                row_match.group(3),
+            )
             row_html = row_match.group(4)
-            
+
             try:
                 row_date = parse_date_flexible(
                     f"{day_str}/{month_str}/{year_str}",
-                    default_year=int(year_str) if year_str else datetime.now().year
+                    default_year=int(year_str) if year_str else datetime.now().year,
                 )
                 if row_date is None:
                     continue
             except Exception:
                 continue
-            
+
             # Extract prayer times from <li prayer-label="..."> elements
             prayers_map = {
                 "fajr-jamat": Prayer.FAJR,
@@ -76,18 +80,18 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 "maghrib": Prayer.MAGHRIB,
                 "isha-jamat": Prayer.ISHA,
             }
-            
+
             for label, prayer in prayers_map.items():
                 # Match <li prayer-label="...">time</li>
                 time_pattern = rf'<li\s+[^>]*prayer-label="{re.escape(label)}"[^>]*>([^<]+)</li>'
                 time_match = re.search(time_pattern, row_html)
-                
+
                 if not time_match:
                     continue
-                
+
                 time_text = time_match.group(1).strip()
                 jamaat_time = coerce_time(time_text, prayer=prayer.value)
-                
+
                 if jamaat_time is None:
                     warnings.append(
                         ExtractorWarning(
@@ -97,7 +101,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
                     )
                     continue
-                
+
                 evidence = ctx.evidence(
                     target_label="timetable",
                     extractor_key=self.key,
@@ -114,12 +118,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         evidence=evidence,
                     )
                 )
-        
+
         if not extracted_rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no extractable rows",
             )
-        
+
         return ExtractorResult(rows=extracted_rows, warnings=warnings)

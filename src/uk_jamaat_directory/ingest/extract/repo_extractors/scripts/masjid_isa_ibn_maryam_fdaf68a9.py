@@ -40,7 +40,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         html = artifact.text()
         tables = extract_tables(html)
-        
+
         rows = []
         today = date.today()
         prayer_map = {
@@ -61,14 +61,26 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 header_row = body_rows[0]
                 header_lower = [h.lower() for h in header_row]
 
-                has_prayer = any("fajr" in h or "zuhr" in h or "asr" in h or "maghrib" in h or "isha" in h for h in header_lower)
-                has_jamaat = any("jamaa" in h or "jamah" in h or "iqamah" in h for h in header_lower)
+                has_prayer = any(
+                    "fajr" in h or "zuhr" in h or "asr" in h or "maghrib" in h or "isha" in h
+                    for h in header_lower
+                )
+                has_jamaat = any(
+                    "jamaa" in h or "jamah" in h or "iqamah" in h for h in header_lower
+                )
 
                 if not (has_prayer and has_jamaat):
                     continue
 
                 # Find column indices for jamaat
-                jamaat_col = next((i for i, h in enumerate(header_lower) if "jamaa" in h or "jamah" in h or "iqamah" in h), None)
+                jamaat_col = next(
+                    (
+                        i
+                        for i, h in enumerate(header_lower)
+                        if "jamaa" in h or "jamah" in h or "iqamah" in h
+                    ),
+                    None,
+                )
                 if jamaat_col is None:
                     continue
 
@@ -125,7 +137,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 jamaat = coerce_time(raw_time, prayer=prayer_enum.value)
                 if jamaat is None:
                     continue
-                
+
                 rows.append(
                     ExtractorRow(
                         date=today,

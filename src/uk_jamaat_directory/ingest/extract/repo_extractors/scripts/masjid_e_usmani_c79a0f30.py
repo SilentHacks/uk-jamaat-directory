@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
     RunFrequency,

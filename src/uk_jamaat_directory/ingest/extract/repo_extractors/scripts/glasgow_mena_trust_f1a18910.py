@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
-from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
@@ -37,7 +36,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
         tables = extract_tables(html)
         if not tables:
@@ -52,30 +51,30 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         table = tables[0]
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         # Today's date for all entries
         today = date.today()
-        
+
         for row_index, row in enumerate(table.body(), start=1):
             if len(row) < 3:
                 continue
-            
+
             prayer_text = row[0].strip().lower()
             if prayer_text == "sunrise":
                 continue
-            
+
             prayer = parse_prayer_label(prayer_text)
             if prayer is None:
                 continue
-            
+
             jamaat_cell = row[2].strip() if len(row) > 2 else ""
             if not jamaat_cell:
                 continue
-            
+
             jamaat_time = parse_time_loose(jamaat_cell)
             if jamaat_time is None:
                 warnings.append(
@@ -86,7 +85,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     )
                 )
                 continue
-            
+
             # Handle multiple Jumuah sessions
             session_number = 1
             session_label: str | None = None
@@ -94,7 +93,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 sessions_today = [r for r in rows if r.date == today and r.prayer.value == "jumuah"]
                 session_number = len(sessions_today) + 1
                 session_label = f"session {session_number}"
-            
+
             evidence = ctx.evidence(
                 target_label="timetable",
                 extractor_key=self.key,
@@ -102,7 +101,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 raw_text=" | ".join(row),
                 selector=f"table tr:nth-child({row_index + 1})",
             )
-            
+
             rows.append(
                 ExtractorRow(
                     date=today,
@@ -114,7 +113,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     evidence=evidence,
                 )
             )
-        
+
         if not rows and not warnings:
             warnings.append(
                 ExtractorWarning(
@@ -123,5 +122,5 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     target_label="timetable",
                 )
             )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

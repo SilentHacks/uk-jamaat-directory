@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables, header_matches
+from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
@@ -12,7 +14,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetKind,
     TargetSpec,
 )
-from datetime import datetime, date
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -27,7 +28,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             kind=TargetKind.RENDERED_HTML,
         ),
     )
-    
+
     # Map common prayer name variants to Prayer enum
     PRAYER_NAMES = {
         "fajr": Prayer.FAJR,
@@ -45,7 +46,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         html_text = artifact.text()
         tables = extract_tables(html_text)
-        
+
         rows = []
         for table in tables:
             # Skip tables that don't have Prayer, Begins, Iqamah headers
@@ -58,14 +59,14 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ):
                     header_idx = i
                     break
-            
+
             if header_idx is None:
                 continue
-            
+
             # Extract rows after the header
             extracted_rows = self._extract_from_table(ctx, table, header_idx)
             rows.extend(extracted_rows)
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
@@ -76,30 +77,30 @@ class Extractor(BaseMosqueWebsiteExtractor):
     def _extract_from_table(self, ctx: ExtractContext, table, header_idx: int):
         rows = []
         today = datetime.now().date()
-        
+
         for row in table.rows[header_idx + 1 :]:
             if len(row) < 3:
                 continue
-            
+
             # Skip Sunrise rows
             prayer_name = row[0].strip().lower()
             if "sunrise" in prayer_name:
                 continue
-            
+
             # Match prayer name
             prayer = self.PRAYER_NAMES.get(prayer_name)
             if not prayer:
                 continue
-            
+
             # Get iqamah time (column 2)
             iqamah_str = row[2].strip() if len(row) > 2 else ""
             if not iqamah_str:
                 continue
-            
+
             jamaat = coerce_time(iqamah_str, prayer=prayer.value)
             if jamaat is None:
                 continue
-            
+
             rows.append(
                 ExtractorRow(
                     date=today,
@@ -116,5 +117,5 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     ),
                 )
             )
-        
+
         return rows

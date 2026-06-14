@@ -1,7 +1,7 @@
-from datetime import date
-
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables, Table
+from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
+from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
+from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -14,8 +14,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetKind,
     TargetSpec,
 )
-from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -36,7 +34,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
         tables = extract_tables(html)
         if not tables:
@@ -51,26 +49,26 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="no table found",
             )
-        
+
         table = tables[0]
         rows_list = list(table.body())
-        
+
         if len(rows_list) < 2:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="no data rows in table",
             )
-        
+
         # Skip the month/prayer header row, use the subheader (Date, Day, Begins, Jamaat, ...) as guide
         # Data starts from row 1 (index 1)
-        
+
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         for row_number, row in enumerate(rows_list[1:], start=2):
             if not row or not row[0].strip():
                 continue
-            
+
             # Column 0: Date (e.g., "1 June 2026")
             date_text = row[0].strip()
             parsed_date = parse_date_flexible(date_text, default_year=2026)
@@ -83,7 +81,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     )
                 )
                 continue
-            
+
             # Extract jamaat times from fixed columns
             # Col 3: Fajr jamaat, Col 6: Zuhr jamaat, Col 8: Asr jamaat, Col 10: Maghrib jamaat, Col 12: Isha jamaat
             prayer_cols = {
@@ -93,14 +91,14 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 Prayer.MAGHRIB: 10,
                 Prayer.ISHA: 12,
             }
-            
+
             for prayer, col_idx in prayer_cols.items():
                 if col_idx >= len(row):
                     continue
                 time_text = row[col_idx].strip()
                 if not time_text:
                     continue
-                
+
                 jamaat_time = coerce_time(time_text, prayer=prayer.value)
                 if not jamaat_time:
                     warnings.append(
@@ -111,7 +109,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
                     )
                     continue
-                
+
                 rows.append(
                     ExtractorRow(
                         date=parsed_date,
@@ -128,7 +126,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         ),
                     )
                 )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
@@ -136,4 +134,3 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 no_schedule_reason="no extractable rows",
             )
         return ExtractorResult(rows=rows, warnings=warnings)
-

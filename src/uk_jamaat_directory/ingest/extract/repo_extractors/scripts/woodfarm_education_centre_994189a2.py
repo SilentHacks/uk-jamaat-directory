@@ -76,7 +76,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
         jamaat_html = ""
         for r in rows_html:
             cells = re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.DOTALL | re.IGNORECASE)
-            texts = [re.sub(r"<[^>]+>", " ", c).strip() for c in cells if re.sub(r"<[^>]+>", " ", c).strip()]
+            texts = [
+                re.sub(r"<[^>]+>", " ", c).strip()
+                for c in cells
+                if re.sub(r"<[^>]+>", " ", c).strip()
+            ]
             if not texts:
                 continue
             first = texts[0].lower()

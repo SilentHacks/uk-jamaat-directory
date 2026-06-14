@@ -2,14 +2,14 @@ from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import find_table
 from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    ExtractorResult,
+    ExtractorRow,
+    ExtractorWarning,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractorResult,
-    ExtractorRow,
-    ExtractorWarning,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,

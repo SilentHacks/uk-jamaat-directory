@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 from datetime import date, datetime
 
 from uk_jamaat_directory.domain import Prayer

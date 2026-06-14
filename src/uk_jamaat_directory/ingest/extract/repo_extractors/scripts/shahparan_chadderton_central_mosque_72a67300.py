@@ -3,8 +3,8 @@ Shahparan Chadderton Central Mosque prayer timetable extractor.
 Source: https://chaddertonshahporan.co.uk/
 
 The mosque website is a JavaScript-rendered SPA with no server-side HTML tables.
-Prayer times are loaded dynamically by the Vue.js application and require 
-browser automation to access. This extractor is stubbed pending JavaScript 
+Prayer times are loaded dynamically by the Vue.js application and require
+browser automation to access. This extractor is stubbed pending JavaScript
 rendering infrastructure.
 """
 

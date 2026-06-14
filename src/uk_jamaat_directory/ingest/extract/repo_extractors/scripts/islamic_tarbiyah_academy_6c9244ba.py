@@ -5,6 +5,7 @@ from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
@@ -13,7 +14,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     SourceMatch,
     TargetKind,
     TargetSpec,
-    BaseMosqueWebsiteExtractor,
 )
 
 
@@ -36,7 +36,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         html = artifact.text()
 
         # Find the date in the page: looks for "June 13, 2026" etc.
-        date_match = re.search(r'(\w+)\s+(\d{1,2}),\s+(\d{4})', html)
+        date_match = re.search(r"(\w+)\s+(\d{1,2}),\s+(\d{4})", html)
         if not date_match:
             return ExtractorResult(
                 rows=[],
@@ -59,22 +59,22 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         rows = []
         prayer_map = {
-            'Fajr': Prayer.FAJR,
-            'Zuhr': Prayer.DHUHR,
-            'Asr': Prayer.ASR,
-            'Maghrib': Prayer.MAGHRIB,
-            'Isha': Prayer.ISHA,
+            "Fajr": Prayer.FAJR,
+            "Zuhr": Prayer.DHUHR,
+            "Asr": Prayer.ASR,
+            "Maghrib": Prayer.MAGHRIB,
+            "Isha": Prayer.ISHA,
         }
 
         # Find rows with prayer times
         for prayer_name, prayer_obj in prayer_map.items():
-            pattern = prayer_name + r'.*?</tr>'
+            pattern = prayer_name + r".*?</tr>"
             match = re.search(pattern, html, re.DOTALL)
             if not match:
                 continue
 
             row_html = match.group(0)
-            cells = re.findall(r'<td[^>]*>([^<]*)</td>', row_html)
+            cells = re.findall(r"<td[^>]*>([^<]*)</td>", row_html)
 
             if len(cells) < 2:
                 continue

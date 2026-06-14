@@ -1,8 +1,8 @@
 from datetime import date
 
-from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time, PLAUSIBLE_WINDOWS
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -15,7 +15,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetKind,
     TargetSpec,
 )
-from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -142,7 +141,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
             session_number = 1
             session_label: str | None = None
             if prayer.value == "jumuah":
-                sessions = [r for r in extracted_rows if r.date == today and r.prayer.value == "jumuah"]
+                sessions = [
+                    r for r in extracted_rows if r.date == today and r.prayer.value == "jumuah"
+                ]
                 session_number = len(sessions) + 1
                 session_label = f"session {session_number}"
 

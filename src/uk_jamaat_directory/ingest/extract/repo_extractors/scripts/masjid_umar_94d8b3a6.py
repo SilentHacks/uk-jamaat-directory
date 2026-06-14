@@ -1,5 +1,5 @@
-from datetime import date, datetime
 import re
+from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time

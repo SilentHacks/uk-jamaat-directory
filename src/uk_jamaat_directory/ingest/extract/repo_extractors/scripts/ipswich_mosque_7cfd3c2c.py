@@ -1,4 +1,5 @@
 from datetime import date, datetime
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time

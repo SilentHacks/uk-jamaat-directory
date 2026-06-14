@@ -1,11 +1,11 @@
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
-from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
@@ -15,9 +15,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     SourceMatch,
     TargetKind,
     TargetSpec,
-)
-from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
-    BaseMosqueWebsiteExtractor,
 )
 
 
@@ -47,7 +44,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Extract table rows using regex (HTML is malformed)
         row_pattern = r"<tr[^>]*>(.*?)</tr>"
         rows_html = re.findall(row_pattern, html, re.DOTALL)
-        
+
         if not rows_html:
             return ExtractorResult(
                 rows=[],
@@ -67,13 +64,13 @@ class Extractor(BaseMosqueWebsiteExtractor):
         for row_index, row_html in enumerate(rows_html, start=1):
             cells_pattern = r"<td[^>]*>(.*?)</td>"
             cells = re.findall(cells_pattern, row_html, re.DOTALL)
-            
+
             if len(cells) < 4:
                 continue
-            
+
             # Clean cell text
             cell_text = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-            
+
             # Parse date from first cell
             parsed_date = parse_date_flexible(cell_text[0], default_year=datetime.now().year)
             if parsed_date is None:
@@ -90,7 +87,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             # Column layout: Date(0), Day(1), Fajr-Begins(2), Fajr-Iqamah(3), Sunrise(4),
             # Zuhr-Begins(5), Zuhr-Iqamah(6), Asr-Begins(7), Asr-Iqamah(8),
             # Maghrib-Begins(9), Maghrib-Iqamah(10), Isha-Begins(11), Isha-Iqamah(12)
-            
+
             prayer_jamaat_cols = {
                 Prayer.FAJR: 3,
                 Prayer.DHUHR: 6,
@@ -98,21 +95,21 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 Prayer.MAGHRIB: 10,
                 Prayer.ISHA: 12,
             }
-            
+
             for prayer, col_idx in prayer_jamaat_cols.items():
                 if col_idx >= len(cell_text):
                     continue
-                    
+
                 jamaat_text = cell_text[col_idx].strip()
-                
+
                 # Skip placeholder times (12:00 am usually indicates no real data)
                 if "12:00 am" in jamaat_text or not jamaat_text:
                     continue
-                
+
                 jamaat_time = parse_time_loose(jamaat_text)
                 if jamaat_time is None:
                     continue
-                
+
                 # For Jumuah, track session numbers
                 session_number = 1
                 session_label: str | None = None
@@ -124,7 +121,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     ]
                     session_number = len(sessions_today) + 1
                     session_label = f"session {session_number}"
-                
+
                 evidence = ctx.evidence(
                     target_label="timetable",
                     extractor_key=self.key,
@@ -132,7 +129,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     raw_text=jamaat_text,
                     selector=f"tr:nth-child({row_index}) td:nth-child({col_idx + 1})",
                 )
-                
+
                 extracted_rows.append(
                     ExtractorRow(
                         date=parsed_date,

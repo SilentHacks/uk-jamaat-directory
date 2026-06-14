@@ -23,8 +23,18 @@ class Extractor(StubbedPdfExtractor):
         month = datetime.now().month
         year = datetime.now().year
         month_names = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
         ]
         month_name = month_names[month - 1]
         return (

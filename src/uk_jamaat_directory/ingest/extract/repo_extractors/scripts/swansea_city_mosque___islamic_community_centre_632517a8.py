@@ -1,5 +1,5 @@
-from datetime import date
 import re
+from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import (

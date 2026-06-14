@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
     RunFrequency,
@@ -20,7 +18,7 @@ class Extractor(StubbedOcrExtractor):
     targets = (
         TargetSpec(
             label="monthly_timetable",
-            url=f"https://islamicacademy.co.uk/june-2026-prayer-timetable/",
+            url="https://islamicacademy.co.uk/june-2026-prayer-timetable/",
             kind=TargetKind.IMAGE,
         ),
     )

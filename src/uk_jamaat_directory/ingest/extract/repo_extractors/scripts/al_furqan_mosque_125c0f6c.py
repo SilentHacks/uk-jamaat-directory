@@ -107,9 +107,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 session_label = None
                 if prayer == Prayer.JUMUAH:
                     existing = [
-                        r
-                        for r in rows_out
-                        if r.date == parsed_date and r.prayer == Prayer.JUMUAH
+                        r for r in rows_out if r.date == parsed_date and r.prayer == Prayer.JUMUAH
                     ]
                     session_number = len(existing) + 1
                     session_label = f"session {session_number}"

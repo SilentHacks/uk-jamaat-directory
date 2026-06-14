@@ -1,5 +1,5 @@
-from datetime import datetime, time as time_type
-import re
+from datetime import datetime
+from datetime import time as time_type
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
@@ -19,7 +19,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     """Extract Bearsden Muslim Association prayer times from homepage.
-    
+
     The homepage renders a daily timetable via JavaScript+Aladhan API with
     both adhan (Begins) and jamaat (congregation) rows in an HTML table.
     Note: Isha jamaat times may cross midnight; such entries are skipped
@@ -65,7 +65,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows_out = []
         warnings = []
         today = datetime.now().date()
-        
+
         # Column indices for prayers in the jamaat row
         prayer_columns = {
             Prayer.FAJR: 1,
@@ -105,6 +105,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
                 try:
                     from uk_jamaat_directory.ingest.extract.helpers import times as time_helpers
+
                     jamaat_time = time_helpers.coerce_time(cell_value)
                     if jamaat_time is None:
                         warnings.append(

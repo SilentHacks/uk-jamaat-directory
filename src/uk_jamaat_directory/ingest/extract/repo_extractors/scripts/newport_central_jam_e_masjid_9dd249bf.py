@@ -56,8 +56,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         for table_html in tables:
             # Extract header row
-            header_cells = re.findall(r"<th[^>]*>([^<]+)</th>|<td[^>]*>([^<]+)</td>", 
-                                     table_html[:1000], re.IGNORECASE)
+            header_cells = re.findall(
+                r"<th[^>]*>([^<]+)</th>|<td[^>]*>([^<]+)</td>", table_html[:1000], re.IGNORECASE
+            )
             if not header_cells:
                 continue
 
@@ -117,7 +118,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 for prayer, idx in prayer_indices.items():
                     if idx >= len(cells):
                         continue
-                    
+
                     time_str = cells[idx].strip()
                     if not time_str:
                         continue

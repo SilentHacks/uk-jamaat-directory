@@ -21,21 +21,21 @@ def _url_decode(encoded: str) -> str:
     result = []
     i = 0
     while i < len(encoded):
-        if encoded[i] == '%' and i + 2 < len(encoded):
-            hex_str = encoded[i+1:i+3]
+        if encoded[i] == "%" and i + 2 < len(encoded):
+            hex_str = encoded[i + 1 : i + 3]
             try:
                 result.append(chr(int(hex_str, 16)))
                 i += 3
             except ValueError:
                 result.append(encoded[i])
                 i += 1
-        elif encoded[i] == '+':
-            result.append(' ')
+        elif encoded[i] == "+":
+            result.append(" ")
             i += 1
         else:
             result.append(encoded[i])
             i += 1
-    return ''.join(result)
+    return "".join(result)
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -108,7 +108,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
 
         except (json.JSONDecodeError, KeyError, ValueError, AttributeError) as e:
-            return ExtractorResult(no_schedule_reason=f"Failed to parse timetable: {type(e).__name__}")
+            return ExtractorResult(
+                no_schedule_reason=f"Failed to parse timetable: {type(e).__name__}"
+            )
 
         if not rows:
             return ExtractorResult(no_schedule_reason="No jamaat times found in timetable")

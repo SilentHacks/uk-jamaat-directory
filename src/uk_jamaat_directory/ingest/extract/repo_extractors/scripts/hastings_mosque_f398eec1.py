@@ -1,4 +1,5 @@
 """Hastings Mosque timetable extractor."""
+
 import json
 import re
 from datetime import datetime
@@ -24,9 +25,9 @@ def _url_unquote(text: str) -> str:
     result = []
     i = 0
     while i < len(text):
-        if text[i] == '%' and i + 2 < len(text):
+        if text[i] == "%" and i + 2 < len(text):
             try:
-                char_code = int(text[i+1:i+3], 16)
+                char_code = int(text[i + 1 : i + 3], 16)
                 result.append(chr(char_code))
                 i += 3
                 continue
@@ -34,7 +35,7 @@ def _url_unquote(text: str) -> str:
                 pass
         result.append(text[i])
         i += 1
-    return ''.join(result)
+    return "".join(result)
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -69,7 +70,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Extract JSON data from the embedded script
         # The timetable is embedded in URL-encoded format: %22="  %3A=: %5B=[  %5D=]
         # Search for "timetable":[{...}]
-        match = re.search(r'%22timetable%22%3A(%5B.*?%5D)(?=%2C%22)', artifact_text, re.DOTALL)
+        match = re.search(r"%22timetable%22%3A(%5B.*?%5D)(?=%2C%22)", artifact_text, re.DOTALL)
         if not match:
             return ExtractorResult(
                 rows=[],
@@ -115,7 +116,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 continue
 
             # Check if Jumuah is present (Friday)
-            has_jumuah = bool(iqamah.get("jumuah") and isinstance(iqamah.get("jumuah"), list) and len(iqamah.get("jumuah")) > 0)
+            has_jumuah = bool(
+                iqamah.get("jumuah")
+                and isinstance(iqamah.get("jumuah"), list)
+                and len(iqamah.get("jumuah")) > 0
+            )
 
             # Parse jamaat times for each prayer
             for prayer, time_key in [
@@ -137,7 +142,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     # The jamaat_str is an ISO datetime like "2026-06-13T03:30:00+01:00"
                     # Extract just the time portion
                     dt = datetime.fromisoformat(jamaat_str)
-                    jamaat_time = dt.strftime('%H:%M')
+                    jamaat_time = dt.strftime("%H:%M")
                     evidence = ctx.evidence(
                         target_label="timetable",
                         extractor_key=self.key,
@@ -163,7 +168,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 try:
                     # Extract time from ISO datetime
                     dt = datetime.fromisoformat(jumuah_str)
-                    jumuah_time = dt.strftime('%H:%M')
+                    jumuah_time = dt.strftime("%H:%M")
                     evidence = ctx.evidence(
                         target_label="timetable",
                         extractor_key=self.key,

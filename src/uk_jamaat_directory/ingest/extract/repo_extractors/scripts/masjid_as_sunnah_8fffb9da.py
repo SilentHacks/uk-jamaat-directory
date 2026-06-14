@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, date
+from datetime import date, datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import times as time_helpers
@@ -37,13 +37,13 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
-        
+
         # Parse CSS Grid layout with grid-* classes
         rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         # Extract grid items: each row has grid-date, grid-day, grid-fajr, etc.
         grid_dates = re.findall(r'<div[^>]*class="grid-date"[^>]*>([^<]+)<', html)
         grid_fajrs = re.findall(r'<div[^>]*class="grid-fajr"[^>]*>([^<]+)<', html)
@@ -52,40 +52,49 @@ class Extractor(BaseMosqueWebsiteExtractor):
         grid_maghribs = re.findall(r'<div[^>]*class="grid-maghrib"[^>]*>([^<]+)<', html)
         grid_ishaas = re.findall(r'<div[^>]*class="grid-ishaa"[^>]*>([^<]+)<', html)
         grid_jumaahs = re.findall(r'<div[^>]*class="grid-jummah"[^>]*>([^<]+)<', html)
-        
+
         if not grid_dates:
             return ExtractorResult(rows=[], no_schedule_reason="no date grid items found")
-        
+
         # Extract month/year from header
         month_match = re.search(r'<div[^>]*id="grid-month"[^>]*>([^<]+)<', html)
         month_str = month_match.group(1).strip() if month_match else ""
-        
+
         year = datetime.now().year
         month = datetime.now().month
-        
+
         # Map month names
         month_names = {
-            'january': 1, 'february': 2, 'march': 3, 'april': 4,
-            'may': 5, 'june': 6, 'july': 7, 'august': 8,
-            'september': 9, 'october': 10, 'november': 11, 'december': 12,
+            "january": 1,
+            "february": 2,
+            "march": 3,
+            "april": 4,
+            "may": 5,
+            "june": 6,
+            "july": 7,
+            "august": 8,
+            "september": 9,
+            "october": 10,
+            "november": 11,
+            "december": 12,
         }
         for name, num in month_names.items():
             if name in month_str.lower():
                 month = num
                 break
-        
+
         # Process each date row
         for i, date_str in enumerate(grid_dates):
             date_str = date_str.strip()
             if not date_str or date_str == "Date":
                 continue
-            
+
             # Parse date
             try:
                 parsed = parse_date_flexible(date_str, default_year=year)
                 if parsed is None:
                     # Try day-only format
-                    day_match = re.match(r'^(\d+)', date_str)
+                    day_match = re.match(r"^(\d+)", date_str)
                     if day_match:
                         day = int(day_match.group(1))
                         parsed = date(year, month, day)
@@ -93,9 +102,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         continue
             except:
                 continue
-            
+
             row_date = parsed
-            
+
             # Extract jamaat times for this row
             prayer_times = {
                 Prayer.FAJR: grid_fajrs[i].strip() if i < len(grid_fajrs) else "",
@@ -105,11 +114,18 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 Prayer.ISHA: grid_ishaas[i].strip() if i < len(grid_ishaas) else "",
                 Prayer.JUMUAH: grid_jumaahs[i].strip() if i < len(grid_jumaahs) else "",
             }
-            
+
             for prayer, raw_time in prayer_times.items():
-                if not raw_time or raw_time.lower() in ("fajr", "dhuhr", "asr", "maghrib", "isha", "jumuah"):
+                if not raw_time or raw_time.lower() in (
+                    "fajr",
+                    "dhuhr",
+                    "asr",
+                    "maghrib",
+                    "isha",
+                    "jumuah",
+                ):
                     continue
-                
+
                 # Parse time
                 jamaat = time_helpers.coerce_time(raw_time, prayer=prayer.value)
                 if jamaat is None:
@@ -121,7 +137,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         )
                     )
                     continue
-                
+
                 rows.append(
                     ExtractorRow(
                         date=row_date,
@@ -138,12 +154,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         ),
                     )
                 )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no extractable rows",
             )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import find_table
@@ -37,7 +37,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
 
         html = artifact.text()
-        
+
         # Try to find the proper timetable (Prayer | Begins | Jamaat)
         table = find_table(html, header_keywords=("prayer", "begins", "jamaat"))
         if not table:
@@ -45,7 +45,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if not table:
             # Try the simpler "Namaz" table
             table = find_table(html, header_keywords=("namaz",))
-        
+
         if not table:
             return ExtractorResult(
                 rows=[],
@@ -58,7 +58,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Find column indices
         header = [cell.lower().strip() for cell in table.header]
-        
+
         # Find jamaat column (could be "jamaat", "jamah", or last column)
         jamaat_col = None
         for i, h in enumerate(header):
@@ -85,7 +85,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 continue
 
             prayer_name = row_cells[0].strip().lower()
-            
+
             # Skip non-prayer rows
             if not prayer_name or prayer_name in ("prayer", "namaz", "sunrise"):
                 continue
@@ -97,7 +97,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             # Extract jamaat time
             if jamaat_col is None or jamaat_col >= len(row_cells):
                 continue
-            
+
             raw_time = row_cells[jamaat_col].strip()
             if not raw_time or raw_time.lower() in ("jamaat", "jamah", "time", "begins"):
                 continue

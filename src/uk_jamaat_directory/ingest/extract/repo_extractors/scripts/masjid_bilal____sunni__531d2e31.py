@@ -50,9 +50,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
             # Try to find date in header or first row
             row_date: date | None = None
             header_text = " ".join(table.header)
-            
+
             # Look for date pattern in header
-            date_match = re.search(r'([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})', header_text)
+            date_match = re.search(r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})", header_text)
             if date_match:
                 date_str = f"{date_match.group(1)} {date_match.group(2)} {date_match.group(3)}"
                 row_date = parse_date_flexible(date_str, default_year=2026)
@@ -82,7 +82,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
                 # Handle Jumuah with multiple sessions
                 if prayer.value == "jumuah":
-                    times = re.findall(r'(\d{1,2}:\d{2})', iqamah_text)
+                    times = re.findall(r"(\d{1,2}:\d{2})", iqamah_text)
                     for sidx, t in enumerate(times, 1):
                         jt = coerce_time(t, prayer="jumuah")
                         if jt is None:

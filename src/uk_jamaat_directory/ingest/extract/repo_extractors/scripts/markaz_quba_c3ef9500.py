@@ -27,7 +27,7 @@ class Extractor(StubbedOcrExtractor):
         return (
             TargetSpec(
                 label=f"monthly_timetable_{month_name}_{year}",
-                url=f"http://markazquba.org.uk/salat-time-table/",
+                url="http://markazquba.org.uk/salat-time-table/",
                 kind=TargetKind.IMAGE,
             ),
         )

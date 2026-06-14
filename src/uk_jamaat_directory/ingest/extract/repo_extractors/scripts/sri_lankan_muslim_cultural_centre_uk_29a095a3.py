@@ -36,11 +36,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         html = artifact.text()
         tables = extract_tables(html)
-        
+
         if not tables:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="no tables found"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="no tables found")
 
         # Find the table with Prayer/Begins/Iqamah structure
         matching_table = None
@@ -57,15 +55,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     break
 
         if matching_table is None:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="prayer table not found"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="prayer table not found")
 
         body_rows = list(matching_table.body())
         if not body_rows:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="table has no rows"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="table has no rows")
 
         # Skip first row (it's the header), use rest as data
         data_rows = body_rows[1:]
@@ -120,8 +114,6 @@ class Extractor(BaseMosqueWebsiteExtractor):
             )
 
         if not rows:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="no extractable rows"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="no extractable rows")
 
         return ExtractorResult(rows=rows)

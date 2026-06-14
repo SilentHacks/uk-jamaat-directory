@@ -1,4 +1,5 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
@@ -71,7 +72,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         extracted_rows: list[ExtractorRow] = []
         warnings: list[ExtractorWarning] = []
-        
+
         # Ramadan 2026: approximately mid-May to mid-June
         # (The site publishes Ramadan 2025 data; we apply it to Ramadan 2026)
         ramadan_start = date(2026, 5, 23)

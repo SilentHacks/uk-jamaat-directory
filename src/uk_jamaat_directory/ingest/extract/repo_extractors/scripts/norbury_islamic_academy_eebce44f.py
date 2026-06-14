@@ -43,9 +43,7 @@ class Extractor(_TabularTimetableMixin, BaseMosqueWebsiteExtractor):
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
         tables = extract_tables(artifact.text())
         if not tables:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="timetable table not found"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="timetable table not found")
         table = tables[0]
         # Skip prayer header row and use column header row
         rows_to_process = table.rows[1:] if len(table.rows) > 1 else table.rows

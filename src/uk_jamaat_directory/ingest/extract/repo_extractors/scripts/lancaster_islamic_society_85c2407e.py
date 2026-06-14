@@ -27,7 +27,7 @@ def _parse_csv_line(line: str) -> list[str]:
         ch = line[i]
         if ch == '"':
             in_quotes = not in_quotes
-        elif ch == ',' and not in_quotes:
+        elif ch == "," and not in_quotes:
             fields.append("".join(current))
             current = []
         else:
@@ -76,7 +76,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Parse header
         header = [h.strip().strip('"') for h in _parse_csv_line(lines[0])]
-        
+
         # Find column indices
         col_map = {h: i for i, h in enumerate(header)}
         date_idx = col_map.get("date")
@@ -103,7 +103,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 continue
 
             fields = [f.strip().strip('"') for f in _parse_csv_line(line)]
-            
+
             if date_idx >= len(fields):
                 continue
 
@@ -123,21 +123,21 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 time_str = fields[col_idx].strip()
                 if not time_str:
                     continue
-                
+
                 # Remove seconds if present (HH:MM:SS -> HH:MM)
-                if len(time_str) > 5 and time_str[5] == ':':
+                if len(time_str) > 5 and time_str[5] == ":":
                     time_str = time_str[:5]
-                
+
                 try:
                     jamaat_time = coerce_time(time_str, prayer=prayer.value)
                     if not jamaat_time:
                         continue
-                    
+
                     # Check plausible window
                     window = PLAUSIBLE_WINDOWS.get(prayer.value)
                     if window and not (window[0] <= jamaat_time <= window[1]):
                         continue
-                    
+
                     rows.append(
                         ExtractorRow(
                             date=parsed_date,

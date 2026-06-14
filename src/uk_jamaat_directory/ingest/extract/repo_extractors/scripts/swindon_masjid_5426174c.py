@@ -1,7 +1,6 @@
 import re
 from datetime import date as date_type
 
-from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
@@ -139,7 +138,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 normalized = "zuhr"
             elif normalized == "magrib":
                 normalized = "maghrib"
-            
+
             prayer = parse_prayer_label(normalized)
             if prayer is None:
                 warnings.append(
@@ -165,9 +164,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             session_number = 1
             session_label = None
             if prayer.value == "jumuah":
-                jumuah_count = len(
-                    [r for r in extracted_rows if r.prayer.value == "jumuah"]
-                )
+                jumuah_count = len([r for r in extracted_rows if r.prayer.value == "jumuah"])
                 session_number = jumuah_count + 1
                 session_label = f"session {session_number}"
 

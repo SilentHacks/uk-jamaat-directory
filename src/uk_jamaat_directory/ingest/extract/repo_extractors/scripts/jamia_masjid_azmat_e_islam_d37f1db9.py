@@ -27,9 +27,7 @@ class Extractor(StubbedPdfExtractor):
         # Declare as PDF target (stubbed; parser implementation pending).
         now = datetime.now()
         month_name = now.strftime("%B")
-        url = (
-            f"http://ukimoldham.org.uk/wp-content/uploads/2014/09/{month_name}.pdf"
-        )
+        url = f"http://ukimoldham.org.uk/wp-content/uploads/2014/09/{month_name}.pdf"
         self.targets = (
             TargetSpec(
                 label="timetable",

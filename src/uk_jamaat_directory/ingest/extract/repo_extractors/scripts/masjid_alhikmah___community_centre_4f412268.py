@@ -1,23 +1,22 @@
 import re
 from datetime import date
+
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
+from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
 from uk_jamaat_directory.ingest.extract.helpers.relative import jamaat_after_start
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    ExtractContext,
+    ExtractorResult,
+    ExtractorWarning,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractContext,
-    ExtractorResult,
-    ExtractorRow,
-    ExtractorWarning,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
 
 
 class Extractor(TableTimetableExtractor):
@@ -61,7 +60,7 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         table = html_helpers.find_table(artifact.text(), header_keywords=list(self.table_keywords))
         if table is None:
             return ExtractorResult(
@@ -75,14 +74,18 @@ class Extractor(TableTimetableExtractor):
                 ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         # Call parent's extraction but intercept rows to handle Maghrib "+5 mins"
         base_result = self._extract_from_table(ctx, table)
-        
+
         # Post-process to handle "+5 mins" for Maghrib jamaat
         processed_rows = []
         for row in base_result.rows:
-            if row.prayer == Prayer.MAGHRIB and row.jamaat_time is None and row.start_time is not None:
+            if (
+                row.prayer == Prayer.MAGHRIB
+                and row.jamaat_time is None
+                and row.start_time is not None
+            ):
                 # Re-check the raw text for "+5 mins"
                 raw_text = row.evidence.raw_text if row.evidence else ""
                 cells = raw_text.split(" | ")
@@ -96,5 +99,5 @@ class Extractor(TableTimetableExtractor):
                             processed_rows.append(row)
                             continue
             processed_rows.append(row)
-        
+
         return ExtractorResult(rows=processed_rows, warnings=base_result.warnings)

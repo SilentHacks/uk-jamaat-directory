@@ -1,6 +1,6 @@
-from datetime import date as date_type, datetime
-import re
 import json
+import re
+from datetime import datetime
 
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
@@ -53,7 +53,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Extract JSON-LD prayer event data from the page
         json_ld_pattern = r'<script type="application/ld\+json">\[(.*?)\]</script>'
         match = re.search(json_ld_pattern, html, re.DOTALL)
-        
+
         if not match:
             return ExtractorResult(
                 rows=[],
@@ -104,7 +104,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
             # Extract prayer type from event name (e.g., "🕌 Fajr Prayer → 2:57 AM")
             name = event.get("name", "")
-            prayer_match = re.search(r'(fajr|sunrise|dhuhr|asr|maghrib|isha|jumuah)', name.lower())
+            prayer_match = re.search(r"(fajr|sunrise|dhuhr|asr|maghrib|isha|jumuah)", name.lower())
             if not prayer_match:
                 continue
 
@@ -168,7 +168,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 extractor_key=self.key,
                 extractor_version=self.version,
                 raw_text=f"{prayer_name}: {time_str}",
-                selector=f"script[type='application/ld+json']",
+                selector="script[type='application/ld+json']",
             )
 
             extracted_rows.append(

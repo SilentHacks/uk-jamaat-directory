@@ -119,5 +119,6 @@ class Extractor(TableTimetableExtractor):
         value = value.strip()
         # Remove HTML tags (e.g., <i class="fa fa-sun-o">)
         import re
+
         value = re.sub(r"<[^>]+>", "", value).strip()
         return value

@@ -1,4 +1,5 @@
 """Deterministic extractor for Shah Jalal Mosque Southampton prayer times."""
+
 import json
 from datetime import datetime
 
@@ -190,9 +191,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         jumah_timings = model.get("jumahSalahIqamahTimings", [])
         if isinstance(jumah_timings, list) and jumah_timings:
             # Use only the primary jumu'ah time
-            primary_jumah = next(
-                (j for j in jumah_timings if j.get("isPrimary")), jumah_timings[0]
-            )
+            primary_jumah = next((j for j in jumah_timings if j.get("isPrimary")), jumah_timings[0])
             jamaat_time_str = primary_jumah.get("iqamahTime")
             if jamaat_time_str:
                 jamaat_time = coerce_time(jamaat_time_str)
@@ -219,7 +218,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     warnings.append(
                         ExtractorWarning(
                             code="invalid_jumah_time",
-                            message=f"Could not parse primary jumu'ah jamaat time",
+                            message="Could not parse primary jumu'ah jamaat time",
                             target_label="prayer_times_api",
                         )
                     )

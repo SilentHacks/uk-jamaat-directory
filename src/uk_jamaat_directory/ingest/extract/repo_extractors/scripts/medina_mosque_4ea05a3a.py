@@ -63,16 +63,18 @@ class Extractor(BaseMosqueWebsiteExtractor):
             # DPT plugin: first body row is actual header (not table.header)
             header_row = body_rows[0]
             header_lower = [h.lower() for h in header_row]
-            
+
             has_prayer = any("prayer" in h for h in header_lower)
             has_iqamah = any("iqamah" in h or "jamah" in h for h in header_lower)
-            
+
             if not (has_prayer and has_iqamah):
                 continue
 
             # Find column indices
             prayer_col = next((i for i, h in enumerate(header_lower) if "prayer" in h), 0)
-            iqamah_col = next((i for i, h in enumerate(header_lower) if "iqamah" in h or "jamah" in h), 2)
+            iqamah_col = next(
+                (i for i, h in enumerate(header_lower) if "iqamah" in h or "jamah" in h), 2
+            )
 
             row_number = 0
             for row_cells in body_rows[1:]:
@@ -81,7 +83,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     continue
 
                 prayer_name = (row_cells[prayer_col] or "").strip().lower()
-                
+
                 if not prayer_name or prayer_name in ("prayer", "sunrise"):
                     continue
 
@@ -91,7 +93,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
                 if iqamah_col >= len(row_cells):
                     continue
-                    
+
                 raw_jamaat = (row_cells[iqamah_col] or "").strip()
                 if not raw_jamaat or raw_jamaat.lower() in ("iqamah", "jamah", "time"):
                     continue

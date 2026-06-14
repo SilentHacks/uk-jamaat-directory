@@ -83,9 +83,8 @@ class Extractor(TableTimetableExtractor):
 
         # Use rows from header_row_index onward
         from uk_jamaat_directory.ingest.extract.helpers.html import Table
+
         data_rows = first_table.rows[header_row_index:]
         working_table = Table(data_rows)
 
         return self._extract_from_table(ctx, working_table)
-
-

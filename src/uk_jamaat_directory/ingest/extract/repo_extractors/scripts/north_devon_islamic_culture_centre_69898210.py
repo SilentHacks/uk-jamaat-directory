@@ -42,23 +42,15 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # The timetable data is not available as static HTML without JS rendering
         # The external app (vercel.app) is not an approved target domain
         if "north-devon-ic.vercel.app" in html:
-            return ExtractorResult(
-                rows=[],
-                no_schedule_reason="awaiting OCR"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="awaiting OCR")
 
         rows = []
 
         try:
             # Try to extract JSON data if it's embedded in the page
-            json_match = re.search(
-                r'"today":(\{[^}]*?"fajr".*?"isha"[^}]*\})', html, re.DOTALL
-            )
+            json_match = re.search(r'"today":(\{[^}]*?"fajr".*?"isha"[^}]*\})', html, re.DOTALL)
             if not json_match:
-                return ExtractorResult(
-                    rows=[],
-                    no_schedule_reason="awaiting OCR"
-                )
+                return ExtractorResult(rows=[], no_schedule_reason="awaiting OCR")
 
             json_str = json_match.group(1)
             today_data = json.loads(json_str)

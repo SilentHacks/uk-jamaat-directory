@@ -1,7 +1,10 @@
 from datetime import datetime
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
+from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
     ExtractContext,
     ExtractorEvidence,
     ExtractorResult,
@@ -11,9 +14,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     SourceMatch,
     TargetKind,
     TargetSpec,
-    BaseMosqueWebsiteExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -33,25 +34,25 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         table = html_helpers.find_table(artifact.text(), header_keywords=("prayer", "jama"))
         if table is None:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         rows = []
         today = datetime.now().date()
-        
+
         for row in table.rows:
             if len(row) < 3:
                 continue
-            
+
             prayer_name = row[0].strip().lower()
             prayer = None
             prayer_key = None
-            
+
             if "fajr" in prayer_name:
                 prayer = Prayer.FAJR
                 prayer_key = "fajr"
@@ -67,13 +68,13 @@ class Extractor(BaseMosqueWebsiteExtractor):
             elif "isha" in prayer_name:
                 prayer = Prayer.ISHA
                 prayer_key = "isha"
-            
+
             if prayer is None:
                 continue
-            
+
             jamaat_str = row[2].strip()
             jamaat_time = coerce_time(jamaat_str, prayer=prayer_key)
-            
+
             if jamaat_time:
                 rows.append(
                     ExtractorRow(
@@ -89,6 +90,5 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         ),
                     )
                 )
-        
-        return ExtractorResult(rows=rows)
 
+        return ExtractorResult(rows=rows)

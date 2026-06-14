@@ -1,4 +1,5 @@
 from datetime import date
+
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
@@ -32,16 +33,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
         artifact = ctx.artifact("timetable")
         if not artifact or not artifact.body:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="artifact was empty"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
 
         html = artifact.text()
         tables = extract_tables(html)
         if not tables:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="image target — awaiting OCR"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="image target — awaiting OCR")
 
         extracted_rows: list[ExtractorRow] = []
         for table in tables:

@@ -1,9 +1,9 @@
 import json
 import re
-from datetime import datetime, time as datetime_time
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS, coerce_time
+from uk_jamaat_directory.ingest.extract.helpers.times import PLAUSIBLE_WINDOWS
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -41,31 +41,21 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Extract JSON from window.REDUX_STATE embedded in the HTML
         m = re.search(r"window\.REDUX_STATE\s*=\s*['\"](.+?)['\"];", html)
         if not m:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="redux state not found in HTML"
-            )
-        
+            return ExtractorResult(rows=[], no_schedule_reason="redux state not found in HTML")
+
         try:
             encoded_str = m.group(1)
             # Manual percent-decode: replace %XX with corresponding character
-            json_str = re.sub(
-                r'%([0-9A-Fa-f]{2})',
-                lambda m: chr(int(m.group(1), 16)),
-                encoded_str
-            )
+            json_str = re.sub(r"%([0-9A-Fa-f]{2})", lambda m: chr(int(m.group(1), 16)), encoded_str)
             state_dict = json.loads(json_str)
         except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError):
-            return ExtractorResult(
-                rows=[], no_schedule_reason="failed to parse embedded JSON"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="failed to parse embedded JSON")
 
         # Navigate to timetable in the state
         try:
             timetable = state_dict["masjidbox"]["masjidboxAthany"]["timetable"]
         except KeyError:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="timetable not found in state"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="timetable not found in state")
 
         warnings: list[ExtractorWarning] = []
         rows: list[ExtractorRow] = []

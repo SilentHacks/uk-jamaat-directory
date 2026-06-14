@@ -1,10 +1,10 @@
 import re
-from datetime import datetime, date
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    BaseMosqueWebsiteExtractor,
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
@@ -13,7 +13,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     SourceMatch,
     TargetKind,
     TargetSpec,
-    BaseMosqueWebsiteExtractor,
 )
 
 
@@ -111,25 +110,25 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Extract times from Jama'ah row
         jamaat_cells_raw = re.findall(r"<td[^>]*>([^<]+)</td>", jamaat_row_html)
-        
+
         # Skip first cell (label), get times starting from index 1
         if len(jamaat_cells_raw) < 2:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="insufficient cells in jamaat row",
             )
-        
+
         jamaat_cells = jamaat_cells_raw[1:]  # Skip the label
-        
+
         # The Sunrise column is missing from Jama'ah row due to rowspan in Begins row
         # Insert empty string at position 1 (between Fajr and Zuhr) to align columns
         jamaat_cells_aligned = [
             jamaat_cells[0],  # Fajr
-            "",                # Sunrise (missing, but reserve position)
-            jamaat_cells[1],   # Zuhr (now at index 2 after insert)
-            jamaat_cells[2],   # Asr
-            jamaat_cells[3],   # Magrib
-            jamaat_cells[4],   # Isha
+            "",  # Sunrise (missing, but reserve position)
+            jamaat_cells[1],  # Zuhr (now at index 2 after insert)
+            jamaat_cells[2],  # Asr
+            jamaat_cells[3],  # Magrib
+            jamaat_cells[4],  # Isha
         ]
 
         # Map prayer names to header keywords and extract times

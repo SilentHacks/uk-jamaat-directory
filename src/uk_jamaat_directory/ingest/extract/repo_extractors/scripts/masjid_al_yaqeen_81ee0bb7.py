@@ -1,6 +1,3 @@
-from datetime import datetime
-import re
-
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,

@@ -31,7 +31,7 @@ class Extractor(TableTimetableExtractor):
     # Row 2: Entry | Jamaà | Entry | Jamaà | Entry | Jamaà | Entry | Jamaà
     # Data rows: date | entry(fajr) | jamaà(fajr) | sunrise | entry(zuhr) | jamaà(zuhr) | entry(asr) | jamaà(asr) | entry(magrib) | jamaà(magrib) | entry(isha) | jamaà(isha)
     # So jamaat columns are: 2 (fajr), 5 (zuhr), 7 (asr), 9 (magrib), 11 (isha)
-    
+
     prayer_columns = {
         Prayer.FAJR: 2,
         Prayer.DHUHR: 5,

@@ -1,6 +1,6 @@
-import re
 import json
-from datetime import datetime, date
+import re
+from datetime import date, datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
@@ -54,7 +54,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         try:
             encoded = redux_match.group(1)
             # Simple URL decode: replace %XX with corresponding chars
-            decoded = re.sub(r'%([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), encoded)
+            decoded = re.sub(r"%([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), encoded)
             data = json.loads(decoded)
         except Exception:
             return ExtractorResult(
@@ -63,7 +63,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             )
 
         # Navigate to timetable
-        timetable = data.get('masjidbox', {}).get('masjidboxAthany', {}).get('timetable', [])
+        timetable = data.get("masjidbox", {}).get("masjidboxAthany", {}).get("timetable", [])
         if not timetable:
             return ExtractorResult(
                 rows=[],
@@ -73,10 +73,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Find today's entry
         today_entry = None
         for day in timetable:
-            day_date_str = day.get('date', '')
+            day_date_str = day.get("date", "")
             try:
                 if day_date_str:
-                    day_date = datetime.fromisoformat(day_date_str.replace('Z', '+00:00')).date()
+                    day_date = datetime.fromisoformat(day_date_str.replace("Z", "+00:00")).date()
                     if day_date == today:
                         today_entry = day
                         break
@@ -90,13 +90,13 @@ class Extractor(BaseMosqueWebsiteExtractor):
             )
 
         # Extract iqamah times
-        iqamah = today_entry.get('iqamah', {})
+        iqamah = today_entry.get("iqamah", {})
         prayer_mapping = {
-            Prayer.FAJR: 'fajr',
-            Prayer.DHUHR: 'dhuhr',
-            Prayer.ASR: 'asr',
-            Prayer.MAGHRIB: 'maghrib',
-            Prayer.ISHA: 'isha',
+            Prayer.FAJR: "fajr",
+            Prayer.DHUHR: "dhuhr",
+            Prayer.ASR: "asr",
+            Prayer.MAGHRIB: "maghrib",
+            Prayer.ISHA: "isha",
         }
 
         for prayer, key in prayer_mapping.items():
@@ -113,7 +113,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
             # Parse ISO 8601 datetime
             try:
-                dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
                 jamaat_time = dt.time()
             except Exception:
                 warnings.append(

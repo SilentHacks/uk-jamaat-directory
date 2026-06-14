@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
@@ -10,7 +9,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers.html import find_table
 
 
 class Extractor(TableTimetableExtractor):
@@ -26,7 +24,7 @@ class Extractor(TableTimetableExtractor):
             requires_javascript=True,
         ),
     )
-    
+
     table_keywords = ("date", "fajr", "dhuhr")
     date_column = "date"
     target_label = "timetable"

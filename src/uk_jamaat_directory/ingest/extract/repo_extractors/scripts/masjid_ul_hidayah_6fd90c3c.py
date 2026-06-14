@@ -1,4 +1,5 @@
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
@@ -11,7 +12,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
 
 
 class Extractor(TableTimetableExtractor):
@@ -40,21 +40,21 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
         tables = html_helpers.extract_tables(html)
-        
+
         if not tables:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="no table found on page",
             )
-        
+
         for table in tables:
             result = self._extract_from_table(ctx, table)
             if result.rows:
                 return result
-        
+
         return ExtractorResult(
             rows=[],
             no_schedule_reason="no extractable rows from any table",

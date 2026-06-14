@@ -2,7 +2,6 @@ from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
-from uk_jamaat_directory.ingest.extract.helpers.html import find_table
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
@@ -70,8 +69,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
             )
 
         # Search for dates AFTER Namaz Timings (to avoid old Ramadan cache)
-        search_window = html[namaz_idx :]
-        date_matches = list(re.finditer(r"(\w+),\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\w+),\s+(\d{4})", search_window))
+        search_window = html[namaz_idx:]
+        date_matches = list(
+            re.finditer(r"(\w+),\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\w+),\s+(\d{4})", search_window)
+        )
 
         if not date_matches:
             return ExtractorResult(
@@ -113,7 +114,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         namaz_end = html.find("Copyright", namaz_idx)
         if namaz_end == -1:
             namaz_end = len(html)
-        namaz_section = html[namaz_idx : namaz_end]
+        namaz_section = html[namaz_idx:namaz_end]
         prayer_pattern = r"(\w+)\s+Salat:([^\s]+\s+[AP]M)\s+Time:([^\s]+\s+[AP]M)"
         prayer_matches = re.findall(prayer_pattern, namaz_section, re.IGNORECASE)
 

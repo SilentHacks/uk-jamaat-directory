@@ -1,5 +1,6 @@
 import re
-from datetime import datetime, timedelta, date
+from datetime import date, timedelta
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
@@ -38,9 +39,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
         warnings = []
         rows = []
 
-        jumu_pattern = r"(?:Juma|Jamat)\s+(?:\d+(?:st|nd|rd|th))?\s*(?:Jamat)?\s*([0-9]{1,2}[:.][0-9]{2})"
+        jumu_pattern = (
+            r"(?:Juma|Jamat)\s+(?:\d+(?:st|nd|rd|th))?\s*(?:Jamat)?\s*([0-9]{1,2}[:.][0-9]{2})"
+        )
         matches = list(re.finditer(jumu_pattern, text, re.IGNORECASE))
-        
+
         if not matches:
             return ExtractorResult(rows=[], no_schedule_reason="no Jumu'ah times found")
 
@@ -54,7 +57,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         for session_num, match in enumerate(matches[:2], 1):
             time_str = match.group(1)
             jamaat_time = coerce_time(time_str, prayer="jumuah")
-            
+
             if jamaat_time is None:
                 warnings.append(
                     ExtractorWarning(

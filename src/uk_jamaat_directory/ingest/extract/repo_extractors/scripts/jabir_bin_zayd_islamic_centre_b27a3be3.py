@@ -41,7 +41,7 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         # The page has a title row with colspan, so we need to find the actual header
         tables = list(html_helpers.extract_tables(artifact.text()))
         if not tables:
@@ -56,7 +56,7 @@ class Extractor(TableTimetableExtractor):
                 ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         table_rows = tables[0].rows
         # Find the actual header (skip title rows with single cell)
         header_row_idx = None
@@ -64,7 +64,7 @@ class Extractor(TableTimetableExtractor):
             if html_helpers.header_matches(row, list(self.table_keywords)):
                 header_row_idx = i
                 break
-        
+
         if header_row_idx is None:
             return ExtractorResult(
                 rows=[],
@@ -77,10 +77,10 @@ class Extractor(TableTimetableExtractor):
                 ],
                 no_schedule_reason="timetable table not found",
             )
-        
+
         # Rebuild table with correct header
         from uk_jamaat_directory.ingest.extract.helpers.html import Table
-        
+
         table_data = table_rows[header_row_idx:]
         table = Table(table_data)
         return self._extract_from_table(ctx, table)

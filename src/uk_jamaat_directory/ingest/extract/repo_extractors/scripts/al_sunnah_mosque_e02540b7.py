@@ -1,12 +1,16 @@
 import re
 
-from datetime import date, datetime
-
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
-    ExtractorResult, ExtractorRow, ExtractorWarning,
-    RefreshPolicy, RunFrequency, SourceMatch, TargetKind, TargetSpec,
+    ExtractorResult,
+    ExtractorRow,
+    ExtractorWarning,
+    RefreshPolicy,
+    RunFrequency,
+    SourceMatch,
+    TargetKind,
+    TargetSpec,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
@@ -37,7 +41,7 @@ class Extractor(TableTimetableExtractor):
 
     def _extract_iqamah(self, cell: str) -> str:
         """Extract iqamah time from 'HH:MM AMIqm HH:MM AM' format."""
-        match = re.search(r'Iqm\s+(\d{1,2}:\d{2}\s+(?:AM|PM))', cell)
+        match = re.search(r"Iqm\s+(\d{1,2}:\d{2}\s+(?:AM|PM))", cell)
         if match:
             return match.group(1)
         return ""

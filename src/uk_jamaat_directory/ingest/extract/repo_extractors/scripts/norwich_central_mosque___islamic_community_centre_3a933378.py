@@ -1,5 +1,9 @@
 from datetime import datetime
+
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
+from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
+from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -11,9 +15,6 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     TargetKind,
     TargetSpec,
 )
-from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
-from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
 
 
 class Extractor(BaseMosqueWebsiteExtractor):
@@ -63,7 +64,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # 0: Date, 1: Day, 2: Fajr Begins, 3: Fajr Iqamah, 4: Sunrise,
         # 5: Zuhr Begins, 6: Zuhr Iqamah, 7: Asr Standard, 8: Asr Hanafi, 9: Asr Iqamah,
         # 10: Maghrib Begins, 11: Maghrib Iqamah, 12: Isha Begins, 13: Isha Iqamah
-        
+
         prayer_cols = {
             Prayer.FAJR: 3,
             Prayer.DHUHR: 6,

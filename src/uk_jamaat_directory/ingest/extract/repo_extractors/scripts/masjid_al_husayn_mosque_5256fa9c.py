@@ -3,7 +3,6 @@ Masjid Al-Husayn Mosque timetable extractor.
 Extracts prayer times from monthly PDF timetables.
 """
 
-from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
     RunFrequency,

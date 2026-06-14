@@ -1,5 +1,5 @@
-from datetime import date
 import re
+from datetime import date
 
 from uk_jamaat_directory.ingest.extract.helpers.html import extract_tables
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
@@ -52,7 +52,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 rows=[],
                 no_schedule_reason="no date found",
             )
-        
+
         for table in tables:
             rows = list(table.body())
             if len(rows) < 2:
@@ -98,9 +98,18 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if match:
             day_str, month_str, year_str = match.groups()
             months = {
-                "january": 1, "february": 2, "march": 3, "april": 4,
-                "may": 5, "june": 6, "july": 7, "august": 8,
-                "september": 9, "october": 10, "november": 11, "december": 12,
+                "january": 1,
+                "february": 2,
+                "march": 3,
+                "april": 4,
+                "may": 5,
+                "june": 6,
+                "july": 7,
+                "august": 8,
+                "september": 9,
+                "october": 10,
+                "november": 11,
+                "december": 12,
             }
             month = months.get(month_str.lower())
             if month:

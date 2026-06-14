@@ -1,7 +1,8 @@
 """Glasgow Central Mosque prayer times extractor."""
 
 import json
-from datetime import datetime, date as date_type
+from datetime import date as date_type
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
@@ -154,7 +155,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
         if not extracted_rows:
             return ExtractorResult(
                 rows=[],
-                warnings=warnings or [
+                warnings=warnings
+                or [
                     ExtractorWarning(
                         code="no_extractable_rows",
                         message="no jamaat times found in API response",

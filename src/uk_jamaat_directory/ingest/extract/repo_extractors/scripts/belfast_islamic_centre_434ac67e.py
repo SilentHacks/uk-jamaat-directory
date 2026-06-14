@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.dates import parse_date_flexible
 from uk_jamaat_directory.ingest.extract.helpers.html import (
     Table,
@@ -108,9 +107,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             session_label = None
             if prayer.value == "jumuah":
                 sessions_today = [
-                    r
-                    for r in rows
-                    if r.date == row_date and r.prayer.value == "jumuah"
+                    r for r in rows if r.date == row_date and r.prayer.value == "jumuah"
                 ]
                 session_number = len(sessions_today) + 1
                 session_label = f"session {session_number}"

@@ -1,5 +1,5 @@
-from datetime import datetime
 import re
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
@@ -55,11 +55,20 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Pattern: "Fajr 1:53 AM ... Iqamah 4:00 AM"
         prayer_patterns = [
             (Prayer.FAJR, r"Fajr\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
-            (Prayer.DHUHR, r"Dhuhr\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
+            (
+                Prayer.DHUHR,
+                r"Dhuhr\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)",
+            ),
             (Prayer.ASR, r"Asr\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
-            (Prayer.MAGHRIB, r"Maghrib\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
+            (
+                Prayer.MAGHRIB,
+                r"Maghrib\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)",
+            ),
             (Prayer.ISHA, r"Isha\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
-            (Prayer.JUMUAH, r"Jumuah\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)"),
+            (
+                Prayer.JUMUAH,
+                r"Jumuah\s+(\d{1,2}:\d{2}\s*[AP]M).*?[Ii]qamah\s+(\d{1,2}:\d{2}\s*[AP]M)",
+            ),
         ]
 
         today = datetime.now().date()
@@ -84,7 +93,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 session_number = 1
                 session_label = None
                 if prayer == Prayer.JUMUAH:
-                    sessions_today = [r for r in extracted_rows if r.date == today and r.prayer == Prayer.JUMUAH]
+                    sessions_today = [
+                        r for r in extracted_rows if r.date == today and r.prayer == Prayer.JUMUAH
+                    ]
                     session_number = len(sessions_today) + 1
                     session_label = f"session {session_number}"
 

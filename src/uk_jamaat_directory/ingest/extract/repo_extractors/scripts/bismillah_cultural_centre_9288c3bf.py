@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers

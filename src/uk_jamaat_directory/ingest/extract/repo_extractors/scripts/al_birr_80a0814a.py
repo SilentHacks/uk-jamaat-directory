@@ -35,7 +35,7 @@ class Extractor(TableTimetableExtractor):
         self.targets = (
             TargetSpec(
                 label="timetable",
-                url=f"http://albirr.com/Home/PrayerTime",
+                url="http://albirr.com/Home/PrayerTime",
                 kind=TargetKind.RENDERED_HTML,
                 requires_javascript=True,
             ),

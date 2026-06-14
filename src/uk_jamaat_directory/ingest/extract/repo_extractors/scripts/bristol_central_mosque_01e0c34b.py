@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import date, datetime, time
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
@@ -33,48 +33,43 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
         rows = []
-        
+
         # Get the artifact (artifacts is a dict)
         if not ctx.artifacts:
-            return ExtractorResult(
-                rows=[],
-                no_schedule_reason="No artifacts provided"
-            )
-        
+            return ExtractorResult(rows=[], no_schedule_reason="No artifacts provided")
+
         artifact = next(iter(ctx.artifacts.values()))
         html = artifact.text() if callable(artifact.text) else artifact.text
-        
+
         # Extract prayerTimesData JavaScript object from the page
-        match = re.search(r'const\s+prayerTimesData\s*=\s*(\{.*?\});', html, re.DOTALL)
+        match = re.search(r"const\s+prayerTimesData\s*=\s*(\{.*?\});", html, re.DOTALL)
         if not match:
             return ExtractorResult(
-                rows=[],
-                no_schedule_reason="Prayer times data not found in page"
+                rows=[], no_schedule_reason="Prayer times data not found in page"
             )
-        
+
         js_obj = match.group(1)
-        
+
         # Remove comments
-        js_obj = re.sub(r'//.*?$', '', js_obj, flags=re.MULTILINE)
-        
+        js_obj = re.sub(r"//.*?$", "", js_obj, flags=re.MULTILINE)
+
         # Convert JavaScript object to valid JSON by adding quotes around keys
         # Replace unquoted keys with quoted keys: match { or , followed by word:
-        json_str = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', js_obj)
-        
+        json_str = re.sub(r"([{,]\s*)(\w+):", r'\1"\2":', js_obj)
+
         try:
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
             return ExtractorResult(
-                rows=[],
-                no_schedule_reason=f"Failed to parse prayer times data: {str(e)[:50]}"
+                rows=[], no_schedule_reason=f"Failed to parse prayer times data: {str(e)[:50]}"
             )
-        
+
         for date_str, prayer_data in data.items():
             try:
                 row_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 continue
-            
+
             # Map jamaat times, with prayer name for am/pm inference
             time_mappings = {
                 Prayer.FAJR: ("fajarJamaat", "fajr"),
@@ -83,7 +78,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 Prayer.MAGHRIB: ("maghrib", "maghrib"),
                 Prayer.ISHA: ("ishaJamaat", "isha"),
             }
-            
+
             for prayer, (field_name, prayer_name) in time_mappings.items():
                 if field_name in prayer_data:
                     time_str = prayer_data[field_name]
@@ -97,23 +92,22 @@ class Extractor(BaseMosqueWebsiteExtractor):
                                 extractor_version=self.version,
                                 derivation={
                                     "field": field_name,
-                                    "source": "embedded_javascript_data"
-                                }
+                                    "source": "embedded_javascript_data",
+                                },
                             )
                             row = ExtractorRow(
                                 date=row_date,
                                 prayer=prayer,
                                 jamaat_time=prayer_time,
-                                evidence=evidence
+                                evidence=evidence,
                             )
                             rows.append(row)
                     except Exception:
                         pass
-        
+
         if not rows:
             return ExtractorResult(
-                rows=[],
-                no_schedule_reason="No prayer times extracted from data"
+                rows=[], no_schedule_reason="No prayer times extracted from data"
             )
-        
+
         return ExtractorResult(rows=rows, warnings=[])

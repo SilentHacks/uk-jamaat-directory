@@ -42,7 +42,4 @@ class Extractor(TableTimetableExtractor):
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
         # JS-rendered content can't be processed in static sandbox
-        return ExtractorResult(
-            rows=[],
-            no_schedule_reason="pdf target — awaiting parser"
-        )
+        return ExtractorResult(rows=[], no_schedule_reason="pdf target — awaiting parser")

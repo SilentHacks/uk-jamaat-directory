@@ -7,7 +7,11 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
     ExtractorRow,
-    RefreshPolicy, RunFrequency, SourceMatch, TargetKind, TargetSpec,
+    RefreshPolicy,
+    RunFrequency,
+    SourceMatch,
+    TargetKind,
+    TargetSpec,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     BaseMosqueWebsiteExtractor,
@@ -38,16 +42,14 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Find all day-date entries
         day_matches = list(re.finditer(r'day-date">([^<]+?)<', html))
-        
+
         for day_match in day_matches:
             date_str = day_match.group(1).strip()
             if not date_str or date_str.lower() == "date":
                 continue
 
             try:
-                parsed_date = dates.parse_date_flexible(
-                    date_str, default_year=datetime.now().year
-                )
+                parsed_date = dates.parse_date_flexible(date_str, default_year=datetime.now().year)
                 if not parsed_date:
                     continue
             except Exception:
@@ -58,12 +60,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
             # Find the next day-date or end of string
             next_day_match = re.search(r'day-date">', html[start_pos:])
             end_pos = start_pos + next_day_match.start() if next_day_match else len(html)
-            
+
             day_section = html[start_pos:end_pos]
 
             # Extract each prayer and its jamaat time
             prayer_pattern = re.compile(r'prayer-title">([^<]+?)<.*?jam">([^<]+?)<', re.DOTALL)
-            
+
             for pmatch in prayer_pattern.finditer(day_section):
                 prayer_name = pmatch.group(1).strip().replace("'", "").replace("&rsquo;", "")
                 jamaat_str = pmatch.group(2).strip()

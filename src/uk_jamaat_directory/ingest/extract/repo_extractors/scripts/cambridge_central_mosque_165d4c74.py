@@ -51,17 +51,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
         # Find all border:0 tables containing prayer times
         tables = re.findall(
-            r"<table[^>]*style=['\"]border:0['\"][^>]*>(.*?)</table>", 
-            html, 
-            re.DOTALL
+            r"<table[^>]*style=['\"]border:0['\"][^>]*>(.*?)</table>", html, re.DOTALL
         )
 
         for table_html in tables:
             # Extract date from colspan='7' cell
-            date_match = re.search(
-                r"<td[^>]*>([A-Za-z]+day,\s*\d+-\d+-\d+)", 
-                table_html
-            )
+            date_match = re.search(r"<td[^>]*>([A-Za-z]+day,\s*\d+-\d+-\d+)", table_html)
             if not date_match:
                 continue
 
@@ -73,8 +68,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
             # Find the BEGINS/JAMA'AT row (using . to match quote character variants)
             times_match = re.search(
-                r"<td[^>]*>BEGINS<br>JAMA.AT</td>((?:<td[^>]*>.*?</td>){6})", 
-                table_html
+                r"<td[^>]*>BEGINS<br>JAMA.AT</td>((?:<td[^>]*>.*?</td>){6})", table_html
             )
             if not times_match:
                 continue

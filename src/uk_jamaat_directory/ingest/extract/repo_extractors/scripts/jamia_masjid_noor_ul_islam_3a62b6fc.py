@@ -65,14 +65,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 )
                 redux_obj = json.loads(decoded_state)
                 timetable_data = (
-                    redux_obj.get("masjidbox", {})
-                    .get("masjidboxAthany", {})
-                    .get("timetable", [])
+                    redux_obj.get("masjidbox", {}).get("masjidboxAthany", {}).get("timetable", [])
                 )
                 for entry in timetable_data:
-                    entry_date = date.fromisoformat(
-                        entry.get("date", "").split("T")[0]
-                    )
+                    entry_date = date.fromisoformat(entry.get("date", "").split("T")[0])
                     iqamah = entry.get("iqamah", {})
 
                     # Map iqamah times by prayer
@@ -97,9 +93,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         if isinstance(jumuah_times_raw, list):
                             for jt in jumuah_times_raw:
                                 try:
-                                    jt_dt = datetime.fromisoformat(
-                                        jt.replace("Z", "+00:00")
-                                    )
+                                    jt_dt = datetime.fromisoformat(jt.replace("Z", "+00:00"))
                                     jumuah_iqamah_times.append(jt_dt.time())
                                 except ValueError:
                                     pass

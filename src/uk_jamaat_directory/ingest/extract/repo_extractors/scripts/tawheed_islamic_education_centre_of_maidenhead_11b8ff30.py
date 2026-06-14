@@ -1,6 +1,6 @@
 import re
+
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
     RunFrequency,
@@ -38,12 +38,12 @@ class Extractor(TableTimetableExtractor):
     def clean_cell(self, value: str, prayer: str | None = None) -> str:
         """Split concatenated adhan+iqamah times; extract iqamah (jamaat) time."""
         # Format: "3:03 AMIqm 3:45 AM" → "3:45 AM"
-        match = re.search(r'Iqm\s+(\d{1,2}:\d{2}\s*(?:AM|PM))', value, re.IGNORECASE)
+        match = re.search(r"Iqm\s+(\d{1,2}:\d{2}\s*(?:AM|PM))", value, re.IGNORECASE)
         if match:
             return match.group(1).strip()
         # Fallback: try to extract any time after "Iqm"
         if "iqm" in value.lower():
-            parts = re.split(r'iqm\s*', value, flags=re.IGNORECASE)
+            parts = re.split(r"iqm\s*", value, flags=re.IGNORECASE)
             if len(parts) > 1:
                 return parts[1].strip()
         return value

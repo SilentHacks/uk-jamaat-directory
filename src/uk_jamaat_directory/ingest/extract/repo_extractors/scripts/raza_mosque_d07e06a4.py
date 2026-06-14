@@ -5,7 +5,11 @@ Target: MasjidBox embedded widget (JS-rendered).
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
-    RefreshPolicy, RunFrequency, SourceMatch, TargetKind, TargetSpec,
+    RefreshPolicy,
+    RunFrequency,
+    SourceMatch,
+    TargetKind,
+    TargetSpec,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, time
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
@@ -49,7 +49,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
             Prayer.FAJR: (r"<h3>\s*FAJR\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>", True),
             Prayer.DHUHR: (r"<h3>\s*ZUHR\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>", True),
             Prayer.ASR: (r"<h3>\s*ASAR\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>", True),
-            Prayer.MAGHRIB: (r"<h3>\s*MAGHRIB\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>", True),
+            Prayer.MAGHRIB: (
+                r"<h3>\s*MAGHRIB\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>",
+                True,
+            ),
             Prayer.ISHA: (r"<h3>\s*ISHA\s*</h3>.*?<p>(\d{1,2}):(\d{2})\s+(AM|am|PM|pm)</p>", True),
         }
 

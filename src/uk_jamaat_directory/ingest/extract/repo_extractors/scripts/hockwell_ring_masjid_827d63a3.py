@@ -1,18 +1,19 @@
 import re
 from datetime import datetime
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.html import find_table
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    ExtractContext,
+    ExtractorEvidence,
+    ExtractorResult,
+    ExtractorRow,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractContext,
-    ExtractorResult,
-    ExtractorRow,
-    ExtractorEvidence,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     BaseMosqueWebsiteExtractor,
@@ -39,11 +40,15 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows = []
 
         # Extract date from the page (format: 13/06/2026)
-        date_match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', html)
+        date_match = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", html)
         if not date_match:
             return ExtractorResult(rows=rows, no_schedule_reason="date not found")
 
-        day, month, year = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
+        day, month, year = (
+            int(date_match.group(1)),
+            int(date_match.group(2)),
+            int(date_match.group(3)),
+        )
         try:
             row_date = datetime(year, month, day).date()
         except ValueError:
@@ -76,7 +81,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
 
             # Handle Jumuah (special: has two times separated by |)
             if prayer_name == "Jumuah":
-                jumuah_times = re.findall(r'(\d{1,2}):(\d{2})', iqamah_text)
+                jumuah_times = re.findall(r"(\d{1,2}):(\d{2})", iqamah_text)
                 for h, m in jumuah_times:
                     jamaat_time = coerce_time(f"{h}:{m}", prayer=Prayer.JUMUAH.value)
                     if jamaat_time:
@@ -104,7 +109,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             prayer = prayer_map[prayer_name]
 
             # Extract iqamah time
-            time_match = re.search(r'(\d{1,2}):(\d{2})', iqamah_text)
+            time_match = re.search(r"(\d{1,2}):(\d{2})", iqamah_text)
             if time_match:
                 h, m = time_match.group(1), time_match.group(2)
                 jamaat_time = coerce_time(f"{h}:{m}", prayer=prayer.value)

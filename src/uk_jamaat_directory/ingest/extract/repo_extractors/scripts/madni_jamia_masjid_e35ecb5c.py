@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
@@ -38,7 +38,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows = []
 
         # Extract date
-        date_pattern = r'(\w+\s+\d{1,2},\s+\d{4})'
+        date_pattern = r"(\w+\s+\d{1,2},\s+\d{4})"
         date_match = re.search(date_pattern, html)
         if not date_match:
             return ExtractorResult(rows=[], no_schedule_reason="date not found")
@@ -50,7 +50,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             return ExtractorResult(rows=[], no_schedule_reason="date parsing failed")
 
         # Extract table rows from HTML
-        row_pattern = r'<tr[^>]*>.*?</tr>'
+        row_pattern = r"<tr[^>]*>.*?</tr>"
         table_rows = re.findall(row_pattern, html, re.DOTALL)
 
         if not table_rows:
@@ -59,8 +59,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
         # Find the Jamat row (typically row 4 in the timetable)
         jamat_cells = None
         for row_html in table_rows:
-            cells = re.findall(r'<t[dh][^>]*>([^<]*)</t[dh]>', row_html)
-            if cells and len(cells) > 0 and cells[0].strip().lower() == 'jamat':
+            cells = re.findall(r"<t[dh][^>]*>([^<]*)</t[dh]>", row_html)
+            if cells and len(cells) > 0 and cells[0].strip().lower() == "jamat":
                 jamat_cells = [c.strip() for c in cells[1:]]
                 break
 
@@ -81,7 +81,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         for prayer, col_idx in prayer_col_map:
             if col_idx < len(jamat_cells):
                 time_str = jamat_cells[col_idx].strip()
-                if time_str and time_str.lower() not in ('', '—', '-'):
+                if time_str and time_str.lower() not in ("", "—", "-"):
                     try:
                         jamaat_time = coerce_time(time_str, prayer=prayer.value.lower())
                         if jamaat_time:

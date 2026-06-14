@@ -33,26 +33,26 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("timetable")
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
         rows = []
         warnings = []
         today = datetime.now().date()
-        
+
         # Parse daily prayer times from the HTML
         # Expected format (from web inspection):
         # PRAYER | FAJR | SUNRISE | ZUHR | ASR | MAGHRIB | ISHA
         # BEGINS | time | time | time | time | time | time
         # JAMAT  | time | (skip) | time | time | time | time
-        
+
         # Split HTML into lines and look for the JAMAT line
         import re
-        
+
         # Pattern: JAMAT followed by exactly 5 times (HH:MM format) in sequence
         # Allow flexibility in whitespace between times
         jamat_pattern = r"JAMAT\s+(\d{1,2}:\d{2})[\s\-\n]+(\d{1,2}:\d{2})[\s\-\n]+(\d{1,2}:\d{2})[\s\-\n]+(\d{1,2}:\d{2})[\s\-\n]+(\d{1,2}:\d{2})"
         match = re.search(jamat_pattern, html, re.IGNORECASE)
-        
+
         if not match:
             return ExtractorResult(
                 rows=[],
@@ -65,7 +65,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="no jamaat times found",
             )
-        
+
         # Extract times from the match groups
         # Group order: fajr, zuhr, asr, maghrib, isha
         times_str = match.groups()
@@ -76,7 +76,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             (Prayer.MAGHRIB, times_str[3]),
             (Prayer.ISHA, times_str[4]),
         ]
-        
+
         for prayer, time_str in prayers:
             time_str = time_str.strip()
             if time_str and time_str != "-":
@@ -105,11 +105,13 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             target_label="timetable",
                         )
                     )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
-                warnings=warnings if warnings else [
+                warnings=warnings
+                if warnings
+                else [
                     ExtractorWarning(
                         code="no_extractable_times",
                         message="No extractable prayer times found",
@@ -118,5 +120,5 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="no extractable times",
             )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

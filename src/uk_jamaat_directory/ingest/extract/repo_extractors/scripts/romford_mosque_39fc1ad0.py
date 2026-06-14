@@ -31,6 +31,7 @@ _DATE_LINE_RE = re.compile(
     re.IGNORECASE,
 )
 
+
 def _find_date_header(text: str):
     m = _DATE_LINE_RE.search(text)
     if m:
@@ -46,12 +47,15 @@ def _find_date_header(text: str):
         class _Fake:
             def __init__(self, val: str):
                 self._val = val
+
             def group(self, key):
                 if key in (0, 1, "date"):
                     return self._val
                 return None
+
         return _Fake(m.group(1))
     return None
+
 
 # Map labels we see in the rendered text to (Prayer, optional jumuah session number).
 # Only JAMAAT (second time value) is used. We ignore Shuruq and Athan columns.
@@ -145,7 +149,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
             t1 = None
             if i + 1 < n:
                 cand = tokens[i + 1].strip().rstrip(":").lower()
-                if cand and not re.match(r"^\d{1,2}[:.]?\d{0,2}$", cand) and cand not in {"athan", "iqamah", "am", "pm"}:
+                if (
+                    cand
+                    and not re.match(r"^\d{1,2}[:.]?\d{0,2}$", cand)
+                    and cand not in {"athan", "iqamah", "am", "pm"}
+                ):
                     t1 = cand
             label = f"{t0} {t1}".strip() if t1 else t0
             mapped = _LABEL_MAP.get(label) or _LABEL_MAP.get(t0)
@@ -163,7 +171,11 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 if not tk or tk in {"athan", "iqamah", "am", "pm", "•"}:
                     j += 1
                     continue
-                if tk in {"--", "-"} or re.match(r"^\d{1,2}[:.]?\d{2}$", tk) or re.match(r"^\d{1,2}[:.]?\d{2}(?:am|pm)$", tk, re.I):
+                if (
+                    tk in {"--", "-"}
+                    or re.match(r"^\d{1,2}[:.]?\d{2}$", tk)
+                    or re.match(r"^\d{1,2}[:.]?\d{2}(?:am|pm)$", tk, re.I)
+                ):
                     times.append(tk)
                     j += 1
                     continue

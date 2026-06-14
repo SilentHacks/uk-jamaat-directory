@@ -1,18 +1,18 @@
 from uk_jamaat_directory.domain import Prayer
+from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
+from uk_jamaat_directory.ingest.extract.helpers.html import Table
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
+    ExtractContext,
+    ExtractorResult,
     RefreshPolicy,
     RunFrequency,
     SourceMatch,
     TargetKind,
     TargetSpec,
-    ExtractContext,
-    ExtractorResult,
 )
 from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
     TableTimetableExtractor,
 )
-from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
-from uk_jamaat_directory.ingest.extract.helpers.html import Table
 
 
 class Extractor(TableTimetableExtractor):
@@ -43,7 +43,7 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         # Find table and merge first two rows as header
         tables = html_helpers.extract_tables(artifact.text())
         table = None
@@ -58,13 +58,13 @@ class Extractor(TableTimetableExtractor):
                     h1 = header_1[i].lower() if i < len(header_1) else ""
                     merged = f"{h0} {h1}".strip()
                     merged_header.append(merged)
-                
+
                 # Check if keywords match
                 if all(kw.lower() in " ".join(merged_header) for kw in self.table_keywords):
                     # Create new table with merged header and original body (skip first 2 rows)
                     table = Table([merged_header] + t.rows[2:])
                     break
-        
+
         if table is None:
             return ExtractorResult(
                 rows=[],

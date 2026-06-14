@@ -2,12 +2,11 @@
 Extractor for Muslim Youth Foundation (MYF) jamaat times.
 Parses fixed jamaat times and relative offsets from the homepage.
 """
+
 import re
 from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
-from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
-from uk_jamaat_directory.ingest.extract.helpers.times import parse_time_loose
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     BaseMosqueWebsiteExtractor,
     ExtractContext,
@@ -24,7 +23,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 class Extractor(BaseMosqueWebsiteExtractor):
     """
     Extract jamaat times from MYF homepage.
-    
+
     MYF publishes:
     - Fixed jamaat times: Fajr 03:30am, Dhuhr 1:30pm
     - Relative times: Asr & Maghrib 7 mins after adhan
@@ -124,8 +123,6 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 )
 
         if not rows:
-            return ExtractorResult(
-                rows=[], no_schedule_reason="no jamaat times found"
-            )
+            return ExtractorResult(rows=[], no_schedule_reason="no jamaat times found")
 
         return ExtractorResult(rows=rows)

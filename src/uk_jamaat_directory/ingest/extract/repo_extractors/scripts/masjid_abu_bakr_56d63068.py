@@ -1,7 +1,6 @@
 import re
 from datetime import datetime
 
-from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers.prayers import parse_prayer_label
 from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
@@ -35,14 +34,14 @@ class Extractor(BaseMosqueWebsiteExtractor):
         artifact = ctx.artifact("homepage prayer times")
         if not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
-        
+
         # Extract prayer rows from the table using regex
         # Pattern: <th>Prayer Name</th><td>Time</td><td>Time</td>
-        pattern = r'<th[^>]*>(\w+)</th>\s*<td[^>]*>([^<]+)</td>\s*<td[^>]*>([^<]+)</td>'
+        pattern = r"<th[^>]*>(\w+)</th>\s*<td[^>]*>([^<]+)</td>\s*<td[^>]*>([^<]+)</td>"
         matches = re.findall(pattern, html)
-        
+
         if not matches:
             return ExtractorResult(
                 rows=[],
@@ -55,23 +54,23 @@ class Extractor(BaseMosqueWebsiteExtractor):
                 ],
                 no_schedule_reason="timetable rows not found",
             )
-        
+
         today = datetime.now().date()
         rows = []
         warnings = []
-        
+
         for row_num, (prayer_text, begins_text, iqamah_text) in enumerate(matches, start=1):
             prayer_text = prayer_text.strip()
             iqamah_text = iqamah_text.strip()
-            
+
             # Skip Sunrise
             if prayer_text.lower() == "sunrise" or not iqamah_text:
                 continue
-            
+
             prayer = parse_prayer_label(prayer_text)
             if prayer is None:
                 continue
-            
+
             jamaat = coerce_time(iqamah_text, prayer=prayer.value)
             if jamaat is None:
                 warnings.append(
@@ -82,7 +81,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     )
                 )
                 continue
-            
+
             rows.append(
                 ExtractorRow(
                     date=today,
@@ -98,12 +97,12 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     ),
                 )
             )
-        
+
         if not rows:
             return ExtractorResult(
                 rows=[],
                 warnings=warnings,
                 no_schedule_reason="no extractable rows",
             )
-        
+
         return ExtractorResult(rows=rows, warnings=warnings)

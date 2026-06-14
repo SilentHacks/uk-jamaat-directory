@@ -69,9 +69,9 @@ class Extractor(BaseMosqueWebsiteExtractor):
             decoded = ""
             i = 0
             while i < len(encoded):
-                if encoded[i] == '%' and i + 2 < len(encoded):
+                if encoded[i] == "%" and i + 2 < len(encoded):
                     try:
-                        hex_str = encoded[i+1:i+3]
+                        hex_str = encoded[i + 1 : i + 3]
                         decoded += chr(int(hex_str, 16))
                         i += 3
                     except (ValueError, OverflowError):
@@ -81,13 +81,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     decoded += encoded[i]
                     i += 1
 
-
             data = json.loads(decoded)
-            timetable = (
-                data.get("masjidbox", {})
-                .get("masjidboxAthany", {})
-                .get("timetable", [])
-            )
+            timetable = data.get("masjidbox", {}).get("masjidboxAthany", {}).get("timetable", [])
 
             if not timetable:
                 return ExtractorResult(
@@ -128,9 +123,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     if iqamah_time:
                         try:
                             # Extract time portion (HH:MM) from ISO format
-                            time_str = iqamah_time.split("T")[1].split("+")[0][
-                                :5
-                            ]  # HH:MM
+                            time_str = iqamah_time.split("T")[1].split("+")[0][:5]  # HH:MM
                             t = time.fromisoformat(time_str)
                             evidence = ctx.evidence(
                                 target_label="masjidbox prayer times",
@@ -156,9 +149,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     jumuah_times = iqamah.get("jumuah", [])
                     for jumuah_time in jumuah_times:
                         try:
-                            time_str = jumuah_time.split("T")[1].split("+")[0][
-                                :5
-                            ]  # HH:MM
+                            time_str = jumuah_time.split("T")[1].split("+")[0][:5]  # HH:MM
                             t = time.fromisoformat(time_str)
                             evidence = ctx.evidence(
                                 target_label="masjidbox prayer times",

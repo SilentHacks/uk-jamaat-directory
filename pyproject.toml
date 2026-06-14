@@ -57,3 +57,16 @@ select = ["E", "F", "I", "UP", "B"]
 "src/uk_jamaat_directory/api/**" = ["B008"]
 # Prompt templates contain one-line commands the agent must copy verbatim.
 "src/uk_jamaat_directory/ingest/authoring/authoring_prompt.py" = ["E501"]
+# Machine-authored extractor scripts: validated by the repo-extractor gates
+# (static/capability/contract/output), not by hand-written-code style rules.
+# Real-bug pyflakes rules (F821 etc.) stay active; cosmetic/loop-idiom noise is ignored.
+"src/uk_jamaat_directory/ingest/extract/repo_extractors/scripts/**" = [
+    "E501",
+    "F841",
+    "B007",
+    "B023",
+    "B905",
+    "B020",
+    "E722",
+    "E741",
+]

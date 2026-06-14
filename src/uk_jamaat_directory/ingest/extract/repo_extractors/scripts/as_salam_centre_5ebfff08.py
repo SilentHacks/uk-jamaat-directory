@@ -42,7 +42,7 @@ class Extractor(TableTimetableExtractor):
             return ""
         val = value.strip()
         # Try to extract time from format like "4:10 AMBegins 2:35 AM"
-        m = re.search(r'(\d{1,2}:\d{2}\s*(?:am|pm)?)', val, re.IGNORECASE)
+        m = re.search(r"(\d{1,2}:\d{2}\s*(?:am|pm)?)", val, re.IGNORECASE)
         if m:
             return m.group(1)
         # Not a time cell, return as-is

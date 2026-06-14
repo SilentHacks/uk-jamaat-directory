@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     RefreshPolicy,
@@ -47,4 +48,3 @@ class Extractor(TableTimetableExtractor):
         # Include only the five daily prayers
         allowed = {"fajr", "dhuhr", "asr", "maghrib", "isha"}
         return prayer_name in allowed
-

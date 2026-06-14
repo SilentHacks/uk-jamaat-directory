@@ -1,8 +1,5 @@
-from datetime import datetime
-
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
-from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
 from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
     ExtractContext,
     ExtractorResult,
@@ -45,27 +42,31 @@ class Extractor(TableTimetableExtractor):
         artifact = ctx.artifact(self.target_label)
         if not artifact or not artifact.body:
             return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
-        
+
         html = artifact.text()
-        
+
         # Mapcarta is primarily an OSM-derived aggregator listing many places of worship.
         # It does not provide mosque-specific jamaat times.
         lowered = html.lower()
-        if ("openstreetmap" in lowered or "osm" in lowered) and "jamaat" not in lowered and "iqamah" not in lowered:
+        if (
+            ("openstreetmap" in lowered or "osm" in lowered)
+            and "jamaat" not in lowered
+            and "iqamah" not in lowered
+        ):
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="aggregator listing",
             )
-        
+
         # Search for any table with prayer times
         tables = html_helpers.extract_tables(html)
-        
+
         if not tables:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="no timetable table found",
             )
-        
+
         # Look for a table with both prayer names and jamaat times
         timetable = None
         for t in tables:
@@ -76,23 +77,23 @@ class Extractor(TableTimetableExtractor):
             if has_prayers and has_jamaat:
                 timetable = t
                 break
-        
+
         if timetable is None:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason="no jamaat times found",
             )
-        
+
         rows_out: list[ExtractorRow] = []
-        
+
         # Use the parent class's extraction logic on the found table
         # For now, if we got here we have a timetable; delegate to parent
         result = self._extract_from_table(ctx, timetable)
-        
+
         if not result.rows:
             return ExtractorResult(
                 rows=[],
                 no_schedule_reason=result.no_schedule_reason or "no extractable rows",
             )
-        
+
         return result
