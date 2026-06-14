@@ -20,6 +20,8 @@ COPY alembic ./alembic
 RUN python -m pip install -U pip \
     && python -m pip install .
 
+RUN python -m playwright install chromium --with-deps
+
 # Celery beat persists its schedule under /data (named volume in production).
 # Create it owned by appuser so the volume initialises writable for the non-root user.
 RUN mkdir -p /data && chown appuser:appuser /data
