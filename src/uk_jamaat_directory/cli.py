@@ -473,6 +473,25 @@ def _add_crawl_parsers(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Skip the execution smoke test before deploying (debugging only)",
     )
+    orchestrate.add_argument(
+        "--preflight",
+        action="store_true",
+        help=(
+            "Run the batch pre-flight first: filter out sources with a "
+            "deterministic verdict (aggregator/umbrella domain, dead DNS, "
+            "robots, 4xx) before any agent is spawned. Only needs to run once "
+            "for a corpus"
+        ),
+    )
+    orchestrate.add_argument(
+        "--preflight-concurrency",
+        type=int,
+        default=None,
+        help=(
+            "Parallelism for the batch pre-flight "
+            "(default: settings.authoring_preflight_concurrency)"
+        ),
+    )
 
 
 def _add_export_parsers(subparsers: argparse._SubParsersAction) -> None:
@@ -1698,6 +1717,24 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
     async def _on_progress(summary) -> None:
         nonlocal progress_line
         elapsed = time.monotonic() - summary.start_time
+        if summary.phase == "preflight":
+            done = summary.preflight_done
+            total = summary.preflight_total
+            pct = (done / total * 100) if total else 0
+            line = (
+                f"[preflight {done}/{total}] {pct:.1f}% "
+                f"elapsed={elapsed:.0f}s "
+                f"filtered={summary.preflight_filtered}"
+            )
+            if summary.failure_categories:
+                cats = ",".join(f"{k}={v}" for k, v in sorted(summary.failure_categories.items()))
+                line += f" [{cats}]"
+            progress_line = line
+            if isatty:
+                print(f"\r{line:<120}", end="", flush=True)
+            else:
+                print(line, flush=True)
+            return
         processed = summary.processed
         total = summary.candidates
         pct = (processed / total * 100) if total else 0
@@ -1736,6 +1773,8 @@ async def _run_orchestrate_authoring(args: argparse.Namespace, settings: Setting
             retry_failed=args.retry_failed,
             retry_categories=set(args.retry_category) if args.retry_category else None,
             max_attempts=args.max_attempts,
+            run_preflight=args.preflight,
+            preflight_concurrency=args.preflight_concurrency,
             on_progress=_on_progress,
         )
         await session.commit()

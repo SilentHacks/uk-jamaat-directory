@@ -57,6 +57,7 @@ TRUSTED_WIDGET_HOSTS: frozenset[str] = frozenset(
         "mawaqit.net",
         "masjidbox.com",
         "masjidal.com",
+        "athanplus.com",
     }
 )
 
@@ -70,9 +71,7 @@ def _matches(host_or_domain: str, domains: frozenset[str], extra: list[str] | No
     if not candidate:
         return False
     all_domains = domains if not extra else domains | {d.lower() for d in extra}
-    return any(
-        candidate == domain or candidate.endswith(f".{domain}") for domain in all_domains
-    )
+    return any(candidate == domain or candidate.endswith(f".{domain}") for domain in all_domains)
 
 
 def is_aggregator_domain(domain: str | None, *, settings: Settings | None = None) -> bool:

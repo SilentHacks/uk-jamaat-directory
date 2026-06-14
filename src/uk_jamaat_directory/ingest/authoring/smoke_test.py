@@ -61,9 +61,7 @@ async def smoke_test_extractor(
     settings: Settings | None = None,
 ) -> SmokeReport:
     cfg = settings or get_settings()
-    entries = [
-        e for e in load_all_extractors(reload=True) if e.extractor.key == extractor_key
-    ]
+    entries = [e for e in load_all_extractors(reload=True) if e.extractor.key == extractor_key]
     if not entries:
         return SmokeReport(ok=False, issues=[f"extractor not found: {extractor_key}"])
     extractor = entries[0].extractor
@@ -75,7 +73,15 @@ async def smoke_test_extractor(
 
     artifacts: dict[str, ExtractorArtifact] = {}
     for target in extractor.targets:
-        if target.requires_javascript:
+        if target.requires_pdf or target.requires_ocr:
+            artifacts[target.label] = ExtractorArtifact(
+                target_label=target.label,
+                target_url=target.url,
+                content_type=None,
+                body=b"",
+                content_hash=None,
+            )
+        elif target.requires_javascript:
             from uk_jamaat_directory.ingest.fetch.playwright import fetch_rendered_html
 
             fetch = await fetch_rendered_html(
@@ -83,21 +89,22 @@ async def smoke_test_extractor(
             )
         else:
             fetch = await fetch_url(target.url, settings=cfg)
-        if fetch.error or not fetch.ok:
-            return SmokeReport(
-                ok=False,
-                issues=[
-                    f"target {target.label} fetch failed: "
-                    f"{fetch.error or f'http {fetch.status_code}'}"
-                ],
+        if not target.requires_pdf and not target.requires_ocr:
+            if fetch.error or not fetch.ok:
+                return SmokeReport(
+                    ok=False,
+                    issues=[
+                        f"target {target.label} fetch failed: "
+                        f"{fetch.error or f'http {fetch.status_code}'}"
+                    ],
+                )
+            artifacts[target.label] = ExtractorArtifact(
+                target_label=target.label,
+                target_url=target.url,
+                content_type=fetch.content_type,
+                body=fetch.body or b"",
+                content_hash=None,
             )
-        artifacts[target.label] = ExtractorArtifact(
-            target_label=target.label,
-            target_url=target.url,
-            content_type=fetch.content_type,
-            body=fetch.body or b"",
-            content_hash=None,
-        )
 
     payload = build_sandbox_payload(
         extractor_key=extractor.key,

@@ -16,7 +16,9 @@ mechanics:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+import signal
 import time
 from pathlib import Path
 
@@ -27,6 +29,27 @@ from uk_jamaat_directory.ingest.authoring.authoring_result import (
     read_authoring_result,
 )
 from uk_jamaat_directory.ingest.authoring.backends import AgentBackend, get_agent_backend
+
+
+async def _terminate_process_tree(process: asyncio.subprocess.Process) -> None:
+    """Forcefully stop the agent and any children it spawned.
+
+    The agent is launched in its own session (``start_new_session=True``), so
+    killing the whole process group reaps subprocesses the CLI started (model
+    runners, smoke-test invocations) instead of orphaning them on timeout or
+    Ctrl+C.
+    """
+
+    if process.returncode is not None:
+        return
+    try:
+        pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(pgid, signal.SIGKILL)
+    with contextlib.suppress(ProcessLookupError):
+        await process.wait()
 
 
 async def run_authoring_agent(
@@ -55,6 +78,7 @@ async def run_authoring_agent(
     backend = backend or get_agent_backend(settings)
     bin_path = backend.resolve_binary()
     model = backend.resolve_model(settings)
+    agent_name = backend.resolve_agent_name(settings)
     timeout = timeout_seconds or settings.authoring_per_source_timeout_seconds
     workdir = cwd or os.getcwd()
 
@@ -63,23 +87,34 @@ async def run_authoring_agent(
         env.update(extra_env)
     backend.apply_env(env, settings)
 
-    command_repr = backend.describe(model=model, prompt=prompt)
+    command_repr = backend.describe(model=model, prompt=prompt, agent_name=agent_name)
+
+    stdin_payload = prompt.encode("utf-8") if backend.prompt_via_stdin else None
 
     start = time.monotonic()
     process = await asyncio.create_subprocess_exec(
-        *backend.build_argv(bin_path=bin_path, model=model, prompt=prompt),
+        *backend.build_argv(bin_path=bin_path, model=model, prompt=prompt, agent_name=agent_name),
+        stdin=asyncio.subprocess.PIPE if stdin_payload is not None else None,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=workdir,
         env=env,
+        # Own session/process group so a timeout or Ctrl+C can kill the whole
+        # tree, not just the direct child.
+        start_new_session=True,
     )
     try:
-        stdout_b, stderr_b = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        stdout_b, stderr_b = await asyncio.wait_for(
+            process.communicate(input=stdin_payload), timeout=timeout
+        )
     except TimeoutError as exc:
-        process.kill()
-        await process.wait()
+        await _terminate_process_tree(process)
         msg = f"{backend.name} agent timed out after {timeout:.0f}s"
         raise TimeoutError(msg) from exc
+    except asyncio.CancelledError:
+        # Ctrl+C / orchestrator shutdown: kill the spawned tree before unwinding.
+        await _terminate_process_tree(process)
+        raise
 
     duration_ms = int((time.monotonic() - start) * 1000)
     stdout = stdout_b.decode("utf-8", errors="replace")

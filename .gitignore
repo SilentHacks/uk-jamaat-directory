@@ -28,6 +28,9 @@ docker-compose.local.yml
 # Operator notes and host-only deploy fragments
 .local/
 
+# Kiro agent working directory
+.kiro/
+
 # Local runtime data
 data/artifacts/
 data/cache/

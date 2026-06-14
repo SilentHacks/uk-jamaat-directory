@@ -38,6 +38,9 @@ class AgentBackend(ABC):
     binary: ClassVar[str]
     #: model used when ``ai_agent_model`` is unset
     default_model: ClassVar[str]
+    #: when True, the prompt is delivered on the subprocess's stdin instead of
+    #: as an argv element, so nothing quotes or escapes the prompt body
+    prompt_via_stdin: ClassVar[bool] = False
 
     def is_available(self) -> bool:
         return shutil.which(self.binary) is not None
@@ -55,8 +58,18 @@ class AgentBackend(ABC):
     def resolve_model(self, settings: Settings) -> str:
         return settings.ai_agent_model or self.default_model
 
+    def resolve_agent_name(self, settings: Settings) -> str | None:
+        return settings.ai_agent_name
+
     @abstractmethod
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
+    def build_argv(
+        self,
+        *,
+        bin_path: str,
+        model: str,
+        prompt: str,
+        agent_name: str | None = None,
+    ) -> list[str]:
         """Return the full subprocess argv for one non-interactive run."""
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
@@ -67,22 +80,34 @@ class AgentBackend(ABC):
         """
         return None
 
-    def describe(self, *, model: str, prompt: str) -> str:
+    def describe(self, *, model: str, prompt: str, agent_name: str | None = None) -> str:
         """Loggable command summary that never includes the prompt body."""
-        argv = self.build_argv(bin_path=self.binary, model=model, prompt="")
+        argv = self.build_argv(bin_path=self.binary, model=model, prompt="", agent_name=agent_name)
         rendered = " ".join(part for part in argv if part)
         return f"{rendered} <prompt:{len(prompt)} chars>"
 
 
 class OpenCodeBackend(AgentBackend):
-    """OpenCode CLI: ``opencode -m <model> run --format json <prompt>``."""
+    """OpenCode CLI: ``opencode -m <model> run --format json`` with the prompt
+    piped on stdin.
+
+    OpenCode's ``run`` reads the message from stdin when no positional
+    ``message`` is given, so the prompt is passed verbatim — no argv quoting
+    or backslash-escaping of nested quotes touches the prompt body.
+    """
 
     name = "opencode"
     binary = "opencode"
     default_model = "opencode-go/deepseek-v4-flash"
+    prompt_via_stdin = True
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
-        return [bin_path, "-m", model, "run", "--format", "json", prompt]
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
+        argv = [bin_path, "-m", model, "run", "--format", "json"]
+        if agent_name:
+            argv.extend(["--agent", agent_name])
+        return argv
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         # OpenCode routes through OpenAI-compatible provider variables.
@@ -106,7 +131,9 @@ class ClaudeCodeBackend(AgentBackend):
     binary = "claude"
     default_model = "claude-haiku-4-5-20251001"
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
         return [
             bin_path,
             "-p",
@@ -143,8 +170,22 @@ class PiBackend(AgentBackend):
     binary = "pi"
     default_model = "anthropic/claude-haiku-4-5-20251001"
 
-    def build_argv(self, *, bin_path: str, model: str, prompt: str) -> list[str]:
-        return [bin_path, "--model", model, "-p", prompt, "--mode", "json"]
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
+        # ``--no-skills``/``--no-context-files`` keep the run focused on the
+        # authoring prompt: no ambient AGENTS.md/CLAUDE.md or skill discovery.
+        return [
+            bin_path,
+            "--model",
+            model,
+            "-p",
+            prompt,
+            "--mode",
+            "json",
+            "--no-skills",
+            "--no-context-files",
+        ]
 
     def apply_env(self, env: dict[str, str], settings: Settings) -> None:
         if settings.ai_agent_api_key:
@@ -154,10 +195,40 @@ class PiBackend(AgentBackend):
             env.setdefault("OPENAI_BASE_URL", settings.ai_agent_base_url)
 
 
+class KiroCliBackend(AgentBackend):
+    """Kiro CLI headless mode (https://kiro.dev/docs/cli/reference/cli-commands/).
+
+    ``kiro-cli chat --no-interactive --trust-all-tools <prompt>`` runs one
+    non-interactive session, printing the first response to STDOUT.
+    ``--trust-all-tools`` bypasses all tool-permission prompts, which the
+    orchestrator requires (no human attached to approve tool use; authored
+    scripts are gated afterwards by the static validator, smoke test, and
+    semantic checks). ``--agent`` selects a custom agent configuration.
+
+    Kiro CLI does not expose a ``--model`` flag on the ``chat`` command;
+    model selection is done via ``kiro-cli settings chat.defaultModel``
+    beforehand. The ``default_model`` attribute is informational only.
+    """
+
+    name = "kiro-cli"
+    binary = "kiro-cli"
+    default_model = "claude-sonnet-4-20250514"
+
+    def build_argv(
+        self, *, bin_path: str, model: str, prompt: str, agent_name: str | None = None
+    ) -> list[str]:
+        argv = [bin_path, "chat", "--no-interactive", "--trust-all-tools"]
+        if agent_name:
+            argv.extend(["--agent", agent_name])
+        argv.append(prompt)
+        return argv
+
+
 AGENT_BACKENDS: dict[str, type[AgentBackend]] = {
     OpenCodeBackend.name: OpenCodeBackend,
     ClaudeCodeBackend.name: ClaudeCodeBackend,
     PiBackend.name: PiBackend,
+    KiroCliBackend.name: KiroCliBackend,
 }
 
 
@@ -166,9 +237,6 @@ def get_agent_backend(settings: Settings) -> AgentBackend:
     name = settings.ai_agent_backend
     backend_cls = AGENT_BACKENDS.get(name)
     if backend_cls is None:
-        msg = (
-            f"unknown agent backend {name!r}; "
-            f"available: {', '.join(sorted(AGENT_BACKENDS))}"
-        )
+        msg = f"unknown agent backend {name!r}; available: {', '.join(sorted(AGENT_BACKENDS))}"
         raise UnknownAgentBackendError(msg)
     return backend_cls()

@@ -13,7 +13,7 @@ _PATTERN = re.compile(
 PLAUSIBLE_WINDOWS: dict[str, tuple[time, time]] = {
     "fajr": (time(2, 0), time(7, 30)),
     "dhuhr": (time(11, 30), time(16, 0)),
-    "asr": (time(13, 30), time(19, 30)),
+    "asr": (time(13, 30), time(20, 0)),
     "maghrib": (time(15, 30), time(22, 30)),
     "isha": (time(17, 0), time(23, 59)),
     "jumuah": (time(11, 30), time(15, 30)),

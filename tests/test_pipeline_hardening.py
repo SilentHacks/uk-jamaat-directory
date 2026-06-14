@@ -175,9 +175,7 @@ class _DemoExtractor(TableTimetableExtractor):
     version = "2026.06.10.1"
     source_match = SourceMatch(domains=("demo.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
-    targets = (
-        TargetSpec(label="timetable", url="https://demo.org/times", kind=TargetKind.HTML),
-    )
+    targets = (TargetSpec(label="timetable", url="https://demo.org/times", kind=TargetKind.HTML),)
     table_keywords = ("date", "fajr")
     date_column = "date"
     prayer_columns = {
@@ -334,16 +332,14 @@ def test_classify_failure() -> None:
     )
     assert classify_failure(preflight_error="http 404") == AuthoringFailureCategory.DEAD_SITE
     assert (
-        classify_failure(preflight_error="http 503")
-        == AuthoringFailureCategory.TRANSIENT_NETWORK
+        classify_failure(preflight_error="http 503") == AuthoringFailureCategory.TRANSIENT_NETWORK
     )
     assert (
         classify_failure(agent_reason="no jamaat times found")
         == AuthoringFailureCategory.PERMANENT_NO_JAMAAT
     )
     assert (
-        classify_failure(agent_reason="aggregator listing")
-        == AuthoringFailureCategory.AGGREGATOR
+        classify_failure(agent_reason="aggregator listing") == AuthoringFailureCategory.AGGREGATOR
     )
     assert classify_failure(agent_timed_out=True) == AuthoringFailureCategory.TIMEOUT
     assert (

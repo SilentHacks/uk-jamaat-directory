@@ -107,11 +107,17 @@ class OrchestrationSummary:
     start_time: float = field(default_factory=time.monotonic)
     processed: int = 0
     in_flight: int = 0
+    # Batch pre-flight phase: deterministic reachability filter before agents.
+    phase: str = "authoring"
+    preflight_total: int = 0
+    preflight_done: int = 0
+    preflight_filtered: int = 0
 
     def as_dict(self) -> dict[str, object]:
         elapsed = time.monotonic() - self.start_time
         return {
             "candidates": self.candidates,
+            "preflight_filtered": self.preflight_filtered,
             "preflight_ok": self.preflight_ok,
             "authored": self.authored,
             "deployed": self.deployed,
@@ -454,9 +460,7 @@ async def _process_one(
                         else:
                             task.status = AuthoringTaskStatus.FAILED.value
                             task.error = "; ".join(issues) or "no assignment created"
-                            task.failure_category = (
-                                AuthoringFailureCategory.VALIDATION_FAILED.value
-                            )
+                            task.failure_category = AuthoringFailureCategory.VALIDATION_FAILED.value
                     except Exception as post_exc:
                         logger.exception("deploy failed for source %s", source.id)
                         task.status = AuthoringTaskStatus.FAILED.value
@@ -486,9 +490,7 @@ async def _process_one(
                     task.metadata_ = {"source_url": source.source_url}
                     await session.commit()
             except Exception:
-                logger.exception(
-                    "failed to persist failure task for source %s", source.id
-                )
+                logger.exception("failed to persist failure task for source %s", source.id)
 
         # The per-source result JSON is fully captured on the task row; drop
         # the file so data/authoring_results does not accumulate stale state.
@@ -517,6 +519,43 @@ async def _process_one(
                 summary.errors_total += 1
             if on_progress is not None:
                 await on_progress(summary)
+
+
+def _domain_policy_outcome(
+    *,
+    source: MosqueSource,
+    extractor_key: str,
+    extractor_version: str,
+    settings: Settings,
+) -> _SourceProcessResult | None:
+    """Deterministic domain-policy verdict for a source, or ``None`` to proceed.
+
+    Aggregator/directory domains can never yield a single-mosque extractor;
+    umbrella (multi-mosque) domains need manual review. Both are decided purely
+    from the registrable domain — no fetch, no agent — so the batch pre-flight
+    and the per-source path share this gate.
+    """
+
+    domain = normalize_domain(source.source_url)
+    if is_aggregator_domain(domain, settings=settings):
+        return _SourceProcessResult(
+            status=AuthoringTaskStatus.FAILED.value,
+            error=f"source domain {domain} is a directory/aggregator site",
+            failure_category=AuthoringFailureCategory.AGGREGATOR.value,
+            discovered_url=source.source_url,
+            extractor_key=extractor_key,
+            extractor_version=extractor_version,
+        )
+    if is_umbrella_domain(domain, settings=settings):
+        return _SourceProcessResult(
+            status=AuthoringTaskStatus.SKIPPED_REVIEW.value,
+            error=(f"source domain {domain} is a multi-mosque umbrella site — needs manual review"),
+            failure_category=AuthoringFailureCategory.UMBRELLA_REVIEW.value,
+            discovered_url=source.source_url,
+            extractor_key=extractor_key,
+            extractor_version=extractor_version,
+        )
+    return None
 
 
 def _registry_entry_for_module(module_short: str):
@@ -550,27 +589,16 @@ async def _process_source(
     domain = normalize_domain(source.source_url)
 
     # Domain policy gates: no agent call for aggregator/umbrella sources.
-    if is_aggregator_domain(domain, settings=settings):
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.FAILED.value,
-            error=f"source domain {domain} is a directory/aggregator site",
-            failure_category=AuthoringFailureCategory.AGGREGATOR.value,
-            discovered_url=source.source_url,
-            extractor_key=extractor_key,
-            extractor_version=extractor_version,
-        )
-    if is_umbrella_domain(domain, settings=settings):
-        return _SourceProcessResult(
-            status=AuthoringTaskStatus.SKIPPED_REVIEW.value,
-            error=(
-                f"source domain {domain} is a multi-mosque umbrella site — "
-                "needs manual review"
-            ),
-            failure_category=AuthoringFailureCategory.UMBRELLA_REVIEW.value,
-            discovered_url=source.source_url,
-            extractor_key=extractor_key,
-            extractor_version=extractor_version,
-        )
+    # (Already applied in batch pre-flight when enabled; repeated here so the
+    # per-source path stands alone when pre-flight is skipped.)
+    policy = _domain_policy_outcome(
+        source=source,
+        extractor_key=extractor_key,
+        extractor_version=extractor_version,
+        settings=settings,
+    )
+    if policy is not None:
+        return policy
 
     preflight = await preflight_source(source_url=source.source_url or "", settings=settings)
     if not preflight.reachable:
@@ -696,6 +724,158 @@ async def _process_source(
         )
 
 
+async def _persist_preflight_outcome(
+    *,
+    session_factory: async_sessionmaker,
+    source: MosqueSource,
+    status: str,
+    error: str,
+    failure_category: str,
+    predicted_kind: str,
+) -> None:
+    """Record a deterministic pre-flight verdict as a terminal authoring task.
+
+    Writing the task here both removes the source from this run's agent queue
+    and — because the category is permanent — keeps it out of future runs'
+    candidate lists (see :func:`_task_eligible_for_retry`). Aggregator/dead/
+    robots verdicts are FAILED; umbrella verdicts are SKIPPED_REVIEW.
+    """
+
+    async with session_factory() as session:
+        task = await _existing_task(session, source.id)
+        if task is None:
+            task = ExtractorAuthoringTask(id=uuid.uuid4(), source_id=source.id)
+            session.add(task)
+        task.status = status
+        task.discovered_url = source.source_url
+        task.target_kind = predicted_kind
+        task.error = error
+        task.failure_category = failure_category
+        task.attempts = (task.attempts or 0) + 1
+        task.last_attempt_at = datetime.now(UTC)
+        task.started_at = datetime.now(UTC)
+        task.finished_at = datetime.now(UTC)
+        task.metadata_ = {"source_url": source.source_url, "phase": "preflight"}
+        await session.commit()
+
+
+async def _batch_preflight(
+    *,
+    session_factory: async_sessionmaker,
+    sources: list[MosqueSource],
+    settings: Settings,
+    summary: OrchestrationSummary,
+    progress_lock: asyncio.Lock,
+    on_progress: Callable[[OrchestrationSummary], Awaitable[None]] | None,
+    concurrency: int,
+) -> list[MosqueSource]:
+    """Filter out sources with deterministic verdicts before agents run.
+
+    This is where *every* programmatically decidable fail-fast lives, so the
+    agent only ever sees sources that genuinely need navigating:
+
+    * Domain policy — aggregator/directory domains (recorded FAILED) and
+      multi-mosque umbrella domains (recorded SKIPPED_REVIEW), decided from the
+      registrable domain with no fetch.
+    * Reachability — one polite fetch per source, concurrently (network-bound,
+      so far wider than the agent concurrency). Permanent failures (dead DNS /
+      SSL / 4xx, robots-disallowed) are recorded FAILED and dropped.
+
+    Everything reachable — or only transiently broken — is returned for the
+    agent phase.
+    """
+
+    summary.phase = "preflight"
+    summary.preflight_total = len(sources)
+    if on_progress is not None:
+        async with progress_lock:
+            await on_progress(summary)
+
+    semaphore = asyncio.Semaphore(max(1, concurrency))
+    survivors: list[MosqueSource] = []
+    survivors_lock = asyncio.Lock()
+
+    async def _check(source: MosqueSource) -> None:
+        async with semaphore:
+            keep = True
+            status: str | None = None
+            error: str | None = None
+            category: str | None = None
+            predicted_kind = AuthoringTargetKind.UNKNOWN.value
+            try:
+                # Domain policy first — it needs no network round-trip.
+                policy = _domain_policy_outcome(
+                    source=source,
+                    extractor_key="",
+                    extractor_version="",
+                    settings=settings,
+                )
+                if policy is not None:
+                    keep = False
+                    status = policy.status
+                    error = policy.error
+                    category = policy.failure_category
+                else:
+                    preflight = await preflight_source(
+                        source_url=source.source_url or "", settings=settings
+                    )
+                    predicted_kind = preflight.predicted_kind.value
+                    if not preflight.reachable:
+                        error = preflight.error or "preflight: source unreachable"
+                        category = classify_failure(preflight_error=error).value
+                        if category in PERMANENT_FAILURE_CATEGORIES:
+                            keep = False
+                            status = AuthoringTaskStatus.FAILED.value
+            except Exception as exc:
+                # A crash in pre-flight must never drop a source — let the
+                # agent phase make the call.
+                logger.exception("pre-flight crashed for source %s", source.id)
+                keep = True
+                summary_err = f"preflight crashed: {exc}"
+                async with progress_lock:
+                    summary.errors.append(f"{source.id}: {summary_err[:200]}")
+                    summary.errors_total += 1
+
+            if keep:
+                async with survivors_lock:
+                    survivors.append(source)
+            else:
+                assert status is not None and error is not None and category is not None
+                await _persist_preflight_outcome(
+                    session_factory=session_factory,
+                    source=source,
+                    status=status,
+                    error=error,
+                    failure_category=category,
+                    predicted_kind=predicted_kind,
+                )
+
+            async with progress_lock:
+                summary.preflight_done += 1
+                if not keep and category is not None:
+                    summary.preflight_filtered += 1
+                    summary.processed += 1
+                    if status == AuthoringTaskStatus.SKIPPED_REVIEW.value:
+                        summary.skipped_review += 1
+                    else:
+                        summary.failed += 1
+                    summary.failure_categories[category] = (
+                        summary.failure_categories.get(category, 0) + 1
+                    )
+                    if error:
+                        summary.errors.append(f"{source.id}: {error[:200]}")
+                        summary.errors_total += 1
+                if on_progress is not None:
+                    await on_progress(summary)
+
+    await asyncio.gather(*(_check(source) for source in sources))
+    summary.phase = "authoring"
+    if on_progress is not None:
+        async with progress_lock:
+            await on_progress(summary)
+    return survivors
+
+
 async def run_overnight_orchestrator(
     *,
     session: AsyncSession,
@@ -707,6 +887,8 @@ async def run_overnight_orchestrator(
     retry_failed: bool = False,
     retry_categories: set[str] | None = None,
     max_attempts: int | None = None,
+    run_preflight: bool = False,
+    preflight_concurrency: int | None = None,
     on_progress: Callable[[OrchestrationSummary], Awaitable[None]] | None = None,
 ) -> OrchestrationSummary:
     cfg = settings or get_settings()
@@ -732,6 +914,25 @@ async def run_overnight_orchestrator(
     engine = session.bind
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     progress_lock = asyncio.Lock()
+
+    # Deterministic filter (opt-in): drop sources with a programmatic verdict
+    # (aggregator/umbrella domain, dead DNS, robots-disallowed, 4xx) before
+    # spending an agent run on them. It only needs to run once for a corpus,
+    # so it is off unless explicitly requested.
+    if run_preflight or cfg.authoring_preflight_enabled:
+        sources = await _batch_preflight(
+            session_factory=session_factory,
+            sources=sources,
+            settings=cfg,
+            summary=summary,
+            progress_lock=progress_lock,
+            on_progress=on_progress,
+            concurrency=preflight_concurrency or cfg.authoring_preflight_concurrency,
+        )
+        if not sources:
+            if on_progress is not None:
+                await on_progress(summary)
+            return summary
 
     tasks = [
         asyncio.create_task(
@@ -761,9 +962,21 @@ async def run_overnight_orchestrator(
 
         heartbeat = asyncio.create_task(_heartbeat())
 
-    done, pending = await asyncio.wait(
-        tasks, timeout=cfg.authoring_global_timeout_seconds or None
-    )
+    try:
+        done, pending = await asyncio.wait(
+            tasks, timeout=cfg.authoring_global_timeout_seconds or None
+        )
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        # Ctrl+C / shutdown: cancel every in-flight source so the agent
+        # subprocess trees are killed (see run_authoring_agent) rather than
+        # left running, then propagate the interrupt.
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        if heartbeat is not None:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
+        raise
     if heartbeat is not None:
         heartbeat.cancel()
         await asyncio.gather(heartbeat, return_exceptions=True)

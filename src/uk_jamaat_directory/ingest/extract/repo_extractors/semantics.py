@@ -20,6 +20,8 @@ ALLOWED_EMPTY_REASONS: tuple[str, ...] = (
     "jumuah_only",
     "awaiting ocr",
     "awaiting OCR",
+    "image target — awaiting OCR",
+    "pdf target — awaiting parser",
 )
 
 _DAILY_ORDER = (Prayer.FAJR, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
@@ -86,8 +88,7 @@ def check_result_semantics(result: ExtractorResult, *, today: date | None = None
     distinct_dates = len(dates)
     if distinct_dates >= 7:
         starts_equal = all(
-            row.start_time is not None and row.start_time == row.jamaat_time
-            for row in result.rows
+            row.start_time is not None and row.start_time == row.jamaat_time for row in result.rows
         )
         if starts_equal:
             pair_counts = Counter((row.prayer.value, row.jamaat_time) for row in result.rows)

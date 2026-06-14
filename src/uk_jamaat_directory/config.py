@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     crawl_user_agent: str = (
         "UKJamaatDirectoryBot/0.1 (+https://github.com/SilentHacks/uk-jamaat-directory)"
     )
-    crawl_timeout_seconds: float = 20.0
+    crawl_timeout_seconds: float = 120.0
     crawl_max_bytes: int = 5_000_000
     crawl_per_domain_delay_seconds: float = 2.0
     crawl_interval_hours: int = 24
@@ -100,9 +100,17 @@ class Settings(BaseSettings):
     ai_agent_backend: str = "opencode"
     # None = use the selected backend's default model.
     ai_agent_model: str | None = None
+    # None = use the backend's default primary agent (e.g. opencode "build").
+    ai_agent_name: str | None = None
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
     authoring_concurrency: int = 8
+    # Batch pre-flight (deterministic verdict filter) runs before any agent is
+    # spawned; it is network-bound and safe to run far wider than the agent
+    # concurrency. Opt-in (CLI --preflight) — it only needs to run once for a
+    # corpus to drop the permanently-unworkable sources.
+    authoring_preflight_concurrency: int = 16
+    authoring_preflight_enabled: bool = False
     authoring_per_source_timeout_seconds: float = 600.0
     authoring_global_timeout_seconds: float = 4 * 60 * 60.0
     authoring_drafts_dir: str = "data/authoring/drafts"

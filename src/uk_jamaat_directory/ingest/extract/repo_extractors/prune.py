@@ -65,9 +65,7 @@ class PruneReport:
             "deleted_aggregator": sorted(self.deleted_aggregator),
             "deleted_umbrella": sorted(self.deleted_umbrella),
             "deleted_orphan": sorted(self.deleted_orphan),
-            "deleted_smoke_failed": {
-                k: v for k, v in sorted(self.deleted_smoke_failed.items())
-            },
+            "deleted_smoke_failed": {k: v for k, v in sorted(self.deleted_smoke_failed.items())},
             "deleted_broken": sorted(self.deleted_broken),
             "counts": {
                 "kept": len(self.kept),
@@ -102,9 +100,7 @@ def _broken_module_names(loaded: list[RegisteredExtractor]) -> list[str]:
     return broken
 
 
-async def _task_for_key(
-    session: AsyncSession, extractor_key: str
-) -> ExtractorAuthoringTask | None:
+async def _task_for_key(session: AsyncSession, extractor_key: str) -> ExtractorAuthoringTask | None:
     return (
         (
             await session.execute(
@@ -151,12 +147,16 @@ async def _delete_script(
     if path and os.path.isfile(path):
         os.unlink(path)
     assignment = (
-        await session.execute(
-            select(SourceExtractorAssignment).where(
-                SourceExtractorAssignment.extractor_key == entry_key
+        (
+            await session.execute(
+                select(SourceExtractorAssignment).where(
+                    SourceExtractorAssignment.extractor_key == entry_key
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if assignment is not None:
         assignment.status = "retired"
     _reset_task(
