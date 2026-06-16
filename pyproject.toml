@@ -17,8 +17,11 @@ dependencies = [
     "fastapi>=0.115",
     "geoalchemy2>=0.15",
     "httpx>=0.28",
+    "itsdangerous>=2.2",
+    "jinja2>=3.1",
     "pydantic>=2.10",
     "pydantic-settings>=2.6",
+    "python-multipart>=0.0.18",
     "rapidfuzz>=3.10",
     "python-json-logger>=3.2",
     "redis>=5.2",
@@ -56,6 +59,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]
 "src/uk_jamaat_directory/api/**" = ["B008"]
+"src/uk_jamaat_directory/ui/**" = ["B008"]
 # Prompt templates contain one-line commands the agent must copy verbatim.
 "src/uk_jamaat_directory/ingest/authoring/authoring_prompt.py" = ["E501"]
 # Machine-authored extractor scripts: validated by the repo-extractor gates

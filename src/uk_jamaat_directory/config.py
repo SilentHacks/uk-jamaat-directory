@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     internal_docs_enabled: bool | None = None
     admin_api_key: str | None = None
 
+    # Server-rendered dashboard + admin UI (SSR Jinja2 + HTMX).
+    # Session cookie signing key for the admin login session. MUST be set to a
+    # long random secret in production; a blank value disables the admin UI login.
+    session_secret_key: str | None = None
+    # Cookie name + lifetime for the admin session.
+    session_cookie_name: str = "ujd_session"
+    session_max_age_seconds: int = 60 * 60 * 8
+    # Per-IP limit on admin login attempts (brute-force guard).
+    admin_login_rate_limit: int = 10
+    admin_login_rate_window_seconds: int = 300
+
     database_url: str = "postgresql+asyncpg://directory:directory@localhost:54324/directory"
     test_database_url: str | None = None
 
@@ -167,6 +178,15 @@ class Settings(BaseSettings):
         if self.internal_docs_enabled is not None:
             return self.internal_docs_enabled
         return self.environment != Environment.PRODUCTION
+
+    @property
+    def session_https_only(self) -> bool:
+        return self.environment == Environment.PRODUCTION
+
+    @property
+    def admin_ui_enabled(self) -> bool:
+        """Admin UI login requires both a session signing key and an admin key."""
+        return bool(self.session_secret_key) and bool(self.admin_api_key)
 
 
 @lru_cache

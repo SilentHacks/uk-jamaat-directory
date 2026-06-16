@@ -1,0 +1,67 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Pipeline — Admin{% endblock %}
+
+{% block admin %}
+<h1>Pipeline</h1>
+
+<div class="panel">
+  <h2>Authoring queue</h2>
+  <ul class="kv">
+    {% for status, count in authoring_counts.items() %}
+    <li><span>{{ status | replace('_', ' ') }}</span><strong>{{ count }}</strong></li>
+    {% else %}
+    <li class="muted">No authoring tasks recorded.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>Source health <span class="muted">({{ health_total }})</span></h2>
+  <table class="data">
+    <thead><tr><th>Source</th><th>Status</th><th>7-day</th><th>Fails</th><th>Last success</th><th></th></tr></thead>
+    <tbody>
+      {% for health, source in health_rows %}
+      <tr>
+        <td>{{ source.display_name or source.external_id }} <small class="muted">{{ source.source_type.value }}</small></td>
+        <td><span class="badge fresh-{{ health.freshness_status.value }}">{{ health.freshness_status.value | replace('_', ' ') }}</span></td>
+        <td>{{ health.next_7_days_coverage }}</td>
+        <td>{{ health.consecutive_failures }}</td>
+        <td>{{ health.last_success_at.strftime('%Y-%m-%d') if health.last_success_at else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/sources/{{ source.id }}/crawl" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <input type="hidden" name="redirect_to" value="/admin/pipeline?offset={{ offset }}" />
+            <button type="submit" class="btn small">Crawl now</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No source health recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="pager">
+    {% if prev_offset is not none %}<a class="btn" href="/admin/pipeline?offset={{ prev_offset }}">← Prev</a>{% endif %}
+    {% if next_offset is not none %}<a class="btn" href="/admin/pipeline?offset={{ next_offset }}">Next →</a>{% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Recent authoring tasks</h2>
+  <table class="data">
+    <thead><tr><th>Status</th><th>Target</th><th>Extractor</th><th>Updated</th></tr></thead>
+    <tbody>
+      {% for t in authoring_rows %}
+      <tr>
+        <td><span class="badge">{{ t.status }}</span></td>
+        <td>{{ t.target_kind }}{% if t.discovered_url %}<br><a href="{{ t.discovered_url }}" target="_blank" class="muted">{{ t.discovered_url | truncate(48) }}</a>{% endif %}</td>
+        <td>{{ t.extractor_key or '—' }}</td>
+        <td>{{ t.updated_at.strftime('%Y-%m-%d %H:%M') if t.updated_at else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No authoring tasks.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

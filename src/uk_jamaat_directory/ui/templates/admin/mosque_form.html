@@ -1,0 +1,34 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}New mosque — Admin{% endblock %}
+
+{% block admin %}
+<p class="back"><a href="/admin/mosques">← Mosques</a></p>
+<h1>New mosque</h1>
+
+<form method="post" action="/admin/mosques" class="stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+  <label>Name <input type="text" name="name" required /></label>
+  <div class="row">
+    <label>Address line 1 <input type="text" name="address_line1" /></label>
+    <label>Address line 2 <input type="text" name="address_line2" /></label>
+  </div>
+  <div class="row">
+    <label>City <input type="text" name="city" /></label>
+    <label>County <input type="text" name="county" /></label>
+    <label>Postcode <input type="text" name="postcode" /></label>
+    <label>Country <input type="text" name="country" value="GB" maxlength="2" /></label>
+  </div>
+  <label>Website URL <input type="url" name="website_url" /></label>
+  <div class="row">
+    <label>Latitude <input type="text" name="latitude" inputmode="decimal" /></label>
+    <label>Longitude <input type="text" name="longitude" inputmode="decimal" /></label>
+    <label>Status
+      <select name="status">
+        {% for s in statuses %}<option value="{{ s }}" {% if s == 'active' %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <label>Public notes <textarea name="public_notes" rows="2"></textarea></label>
+  <button type="submit" class="btn primary">Create mosque</button>
+</form>
+{% endblock %}

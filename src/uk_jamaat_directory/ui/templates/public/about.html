@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}API &amp; bulk data — UK Jamaat Directory{% endblock %}
+
+{% block main %}
+<section class="wrap hero">
+  <h1>Open UK mosque &amp; jamaat timetable data</h1>
+  <p class="lede">
+    A public data utility containing UK mosque identities, source provenance,
+    jamaat (congregational prayer) timetables, and freshness status — usable by
+    any Muslim app, community tool, or researcher.
+  </p>
+  <div class="cta-row">
+    <a class="btn primary" href="/docs/">Explore the API</a>
+    <a class="btn" href="/data/">Download bulk data</a>
+  </div>
+</section>
+
+<section class="wrap grid">
+  <article class="card">
+    <h2>Public read API</h2>
+    <p>
+      Search mosques, fetch published jamaat times by date, find times nearby,
+      and follow an incremental change feed. Every published row carries its
+      source, confidence, and freshness.
+    </p>
+    <p><a href="/docs/">Read the API reference →</a></p>
+  </article>
+  <article class="card">
+    <h2>Bulk exports</h2>
+    <p>
+      Versioned, deterministic snapshots in NDJSON and CSV, plus a change log and
+      attribution manifest. Sync from snapshots instead of calling the API on your
+      request path.
+    </p>
+    <p><a href="/data/">Browse the latest snapshot →</a></p>
+  </article>
+  <article class="card">
+    <h2>Provenance first</h2>
+    <p>
+      Calculated times are never labelled as jamaat. Restricted partner data never
+      enters public exports. What you see is what a mosque or a trusted source
+      actually published.
+    </p>
+  </article>
+</section>
+
+<section class="wrap licensing">
+  <h2>Licensing</h2>
+  <ul>
+    <li><strong>Code</strong> — AGPL-3.0-or-later
+      (<a href="https://github.com/SilentHacks/uk-jamaat-directory/blob/master/LICENSE.md">LICENSE</a>).</li>
+    <li><strong>Public normalized data</strong> — Open Database License (ODbL) 1.0.
+      Attribution required; share-alike for derived databases.</li>
+    <li><strong>API docs &amp; schemas</strong> — CC BY 4.0.</li>
+  </ul>
+  <p class="note">
+    Please attribute "UK Jamaat Directory and contributors." See the
+    <a href="https://github.com/SilentHacks/uk-jamaat-directory/blob/master/ATTRIBUTION.md">attribution</a>
+    and <a href="https://github.com/SilentHacks/uk-jamaat-directory/blob/master/SECURITY.md">security</a>
+    policies for details.
+  </p>
+</section>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}{{ mosque.name }} — Admin{% endblock %}
+
+{% block admin %}
+<p class="back"><a href="/admin/mosques">← Mosques</a> · <a href="/mosques/{{ mosque.id }}" target="_blank">View public page ↗</a></p>
+<h1>{{ mosque.name }}</h1>
+<p class="muted">ID: <code>{{ mosque.id }}</code></p>
+
+<div class="panel">
+  <h2>Edit details</h2>
+  <form method="post" action="/admin/mosques/{{ mosque.id }}" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label>Name <input type="text" name="name" value="{{ mosque.name }}" /></label>
+    <div class="row">
+      <label>Address line 1 <input type="text" name="address_line1" value="{{ mosque.address_line1 or '' }}" /></label>
+      <label>Address line 2 <input type="text" name="address_line2" value="{{ mosque.address_line2 or '' }}" /></label>
+    </div>
+    <div class="row">
+      <label>City <input type="text" name="city" value="{{ mosque.city or '' }}" /></label>
+      <label>County <input type="text" name="county" value="{{ mosque.county or '' }}" /></label>
+      <label>Postcode <input type="text" name="postcode" value="{{ mosque.postcode or '' }}" /></label>
+      <label>Country <input type="text" name="country" value="{{ mosque.country }}" maxlength="2" /></label>
+    </div>
+    <label>Website URL <input type="url" name="website_url" value="{{ mosque.website_url or '' }}" /></label>
+    <div class="row">
+      <label>Latitude <input type="text" name="latitude" value="{{ latitude if latitude is not none else '' }}" /></label>
+      <label>Longitude <input type="text" name="longitude" value="{{ longitude if longitude is not none else '' }}" /></label>
+      <label>Status
+        <select name="status">
+          {% for s in statuses %}<option value="{{ s }}" {% if s == mosque.status.value %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Public notes <textarea name="public_notes" rows="2">{{ mosque.public_notes or '' }}</textarea></label>
+    <button type="submit" class="btn primary">Save</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h2>Sources</h2>
+  <table class="data">
+    <thead><tr><th>Type</th><th>Display / external id</th><th>Policy</th><th>Confidence</th><th></th></tr></thead>
+    <tbody>
+      {% for s in sources %}
+      <tr>
+        <td>{{ s.source_type.value }}</td>
+        <td>{{ s.display_name or s.external_id }}{% if s.source_url %}<br><a href="{{ s.source_url }}" target="_blank" class="muted">{{ s.source_url }}</a>{% endif %}</td>
+        <td colspan="2">
+          <form method="post" action="/admin/sources/{{ s.id }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <input type="hidden" name="redirect_to" value="/admin/mosques/{{ mosque.id }}" />
+            <select name="publication_policy">
+              {% for p in policies %}<option value="{{ p }}" {% if p == s.publication_policy.value %}selected{% endif %}>{{ p | replace('_', ' ') }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn small">Update policy</button>
+          </form>
+        </td>
+        <td>{{ s.confidence.value }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No sources attached.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Attach source</h3>
+  <form method="post" action="/admin/mosques/{{ mosque.id }}/sources" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <div class="row">
+      <label>Type <input type="text" name="source_type" placeholder="manual" required /></label>
+      <label>External id <input type="text" name="external_id" required /></label>
+    </div>
+    <label>Source URL <input type="url" name="source_url" /></label>
+    <label>Display name <input type="text" name="display_name" /></label>
+    <div class="row">
+      <label>Publication policy
+        <select name="publication_policy">{% for p in policies %}<option value="{{ p }}">{{ p | replace('_', ' ') }}</option>{% endfor %}</select>
+      </label>
+      <label>Confidence <input type="text" name="confidence" value="community" /></label>
+    </div>
+    <label>Attribution <input type="text" name="attribution" /></label>
+    <button type="submit" class="btn">Attach source</button>
+  </form>
+</div>
+
+<div class="panel danger">
+  <h2>Merge duplicate into this mosque</h2>
+  <p class="muted">The duplicate is marked <code>duplicate</code> and its sources, aliases, candidates, and occurrences are reassigned here.</p>
+  <form method="post" action="/admin/mosques/{{ mosque.id }}/merge" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label>Duplicate mosque ID <input type="text" name="duplicate_mosque_id" required /></label>
+    <label>Reason <input type="text" name="reason" /></label>
+    <button type="submit" class="btn">Merge</button>
+  </form>
+</div>
+{% endblock %}

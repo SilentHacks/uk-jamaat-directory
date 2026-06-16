@@ -1,0 +1,56 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Admin dashboard — UK Jamaat Directory{% endblock %}
+
+{% block admin %}
+<h1>Dashboard</h1>
+
+<div class="stat-grid">
+  <div class="stat"><span class="num">{{ coverage.mosque_count }}</span><span class="lbl">Mosques</span></div>
+  <div class="stat"><span class="num">{{ coverage.active_mosque_count }}</span><span class="lbl">Active</span></div>
+  <div class="stat"><span class="num">{{ published_mosques }}</span><span class="lbl">With published times</span></div>
+  <div class="stat"><span class="num">{{ pct_published }}%</span><span class="lbl">Coverage of active</span></div>
+  <div class="stat"><span class="num">{{ coverage.pending_candidates }}</span><span class="lbl">Pending candidates</span></div>
+  <div class="stat"><span class="num">{{ coverage.stale_source_count }}</span><span class="lbl">Stale sources</span></div>
+  <div class="stat"><span class="num">{{ coverage.pending_identity_reviews }}</span><span class="lbl">Identity reviews</span></div>
+  <div class="stat"><span class="num">{{ coverage.open_corrections }}</span><span class="lbl">Open corrections</span></div>
+</div>
+
+<div class="panel">
+  <h2>Sources by publication policy</h2>
+  <ul class="kv">
+    {% for policy, count in coverage.policy_counts.items() %}
+    <li><span>{{ policy | replace('_', ' ') }}</span><strong>{{ count }}</strong></li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>Data quality</h2>
+  <ul class="kv">
+    <li><span>Missing postcode</span><strong>{{ coverage.missing_postcode_count }}</strong></li>
+    <li><span>Missing coordinates</span><strong>{{ coverage.missing_coordinates_count }}</strong></li>
+    <li><span>Missing website</span><strong>{{ coverage.missing_website_count }}</strong></li>
+    <li><span>Duplicate candidates</span><strong>{{ coverage.duplicate_candidate_count }}</strong></li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>Recent source health</h2>
+  <table class="data">
+    <thead><tr><th>Source</th><th>Status</th><th>7-day coverage</th><th>Fails</th></tr></thead>
+    <tbody>
+      {% for health, source in health_rows %}
+      <tr>
+        <td>{{ source.display_name or source.external_id }} <small class="muted">{{ source.source_type.value }}</small></td>
+        <td><span class="badge fresh-{{ health.freshness_status.value }}">{{ health.freshness_status.value | replace('_', ' ') }}</span></td>
+        <td>{{ health.next_7_days_coverage }}</td>
+        <td>{{ health.consecutive_failures }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No source health recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="/admin/pipeline">View full pipeline →</a></p>
+</div>
+{% endblock %}
