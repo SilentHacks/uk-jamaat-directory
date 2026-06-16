@@ -57,11 +57,22 @@
 		file_server
 	}
 
-	# Everything else: the static site (pages we fully control → strict CSP).
-	handle {
+	# First-party static assets and the bulk-data listing (pages/files we control).
+	@static path /assets/* /favicon.svg /robots.txt /sitemap.xml /404.html /data /data/*
+	handle @static {
 		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		root * /srv/www
 		file_server
+	}
+
+	# Everything else: the server-rendered dashboard + admin UI (Jinja2 + HTMX).
+	# Same strict first-party CSP; htmx is self-hosted under /assets.
+	handle {
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+		reverse_proxy api:8000 {
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+		}
 	}
 
 	handle_errors {

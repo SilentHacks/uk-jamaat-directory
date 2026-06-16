@@ -66,4 +66,10 @@ echo "$headers" | grep -qi 'x-content-type-options' || {
   exit 1
 }
 
+echo "Smoke test: GET $BASE_URL/admin/login (admin UI surface)"
+curl -fsS "$BASE_URL/admin/login" | grep -qi '<html' || {
+  echo "error: admin login page did not return HTML" >&2
+  exit 1
+}
+
 echo "All smoke checks passed."

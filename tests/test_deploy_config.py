@@ -64,6 +64,24 @@ def test_caddyfile_does_not_expose_internal_docs_publicly() -> None:
     assert "/internal/*" not in text
 
 
+def test_caddyfile_proxies_app_routes_and_serves_static_assets() -> None:
+    text = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
+    # SSR dashboard/admin pages are proxied to the API…
+    assert "reverse_proxy api:8000" in text
+    # …while first-party static assets keep being served by Caddy.
+    assert "/assets/*" in text
+
+
+def test_smoke_test_checks_admin_login_surface() -> None:
+    text = (ROOT / "scripts" / "deploy" / "smoke-test.sh").read_text()
+    assert "/admin/login" in text
+
+
+def test_env_example_documents_session_secret_key() -> None:
+    text = (ROOT / ".env.example").read_text()
+    assert "SESSION_SECRET_KEY" in text
+
+
 def test_production_compose_mounts_static_site() -> None:
     text = (ROOT / "docker-compose.production.yml").read_text()
     assert "./web/public:/srv/www:ro" in text
