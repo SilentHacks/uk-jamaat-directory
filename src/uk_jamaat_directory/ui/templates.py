@@ -9,6 +9,8 @@ from typing import Any
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from uk_jamaat_directory.ui import auth
+
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 #: Prayer display order used by the public timetable grid.
@@ -61,10 +63,9 @@ def render(
     """Render a template with the shared request context."""
     ctx: dict[str, Any] = {"request": request}
     # Expose auth state to the shared layout (nav shows the Admin link when set).
-    try:
-        ctx["admin_authenticated"] = bool(request.session.get("admin_authenticated"))
-    except (AssertionError, KeyError):
-        ctx["admin_authenticated"] = False
+    # SessionMiddleware is always installed by create_app, so request.session is
+    # guaranteed present here.
+    ctx["admin_authenticated"] = auth.is_authenticated(request)
     if context:
         ctx.update(context)
     return templates.TemplateResponse(request, template_name, ctx, status_code=status_code)

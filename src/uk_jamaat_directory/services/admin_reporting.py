@@ -21,6 +21,7 @@ from uk_jamaat_directory.models.core import (
     MosqueClaim,
     MosqueSource,
     ScheduleCandidate,
+    ScheduleOccurrence,
     SourceHealth,
 )
 
@@ -31,6 +32,8 @@ class AdminCoverageReport:
     mosque_count: int
     active_mosque_count: int
     source_count: int
+    published_mosque_count: int
+    published_active_pct: float
     pending_candidates: int
     approved_candidates: int
     rejected_candidates: int
@@ -98,6 +101,19 @@ async def build_admin_coverage(session: AsyncSession) -> AdminCoverageReport:
     )
     source_count = int(
         (await session.execute(select(func.count()).select_from(MosqueSource))).scalar_one()
+    )
+
+    published_mosque_count = int(
+        (
+            await session.execute(
+                select(func.count(func.distinct(ScheduleOccurrence.mosque_id)))
+            )
+        ).scalar_one()
+    )
+    published_active_pct = (
+        round(100 * published_mosque_count / active_mosque_count, 1)
+        if active_mosque_count
+        else 0.0
     )
 
     policy_counts: dict[str, int] = {}
@@ -204,6 +220,8 @@ async def build_admin_coverage(session: AsyncSession) -> AdminCoverageReport:
         mosque_count=mosque_count,
         active_mosque_count=active_mosque_count,
         source_count=source_count,
+        published_mosque_count=published_mosque_count,
+        published_active_pct=published_active_pct,
         pending_candidates=pending_candidates,
         approved_candidates=approved_candidates,
         rejected_candidates=rejected_candidates,
