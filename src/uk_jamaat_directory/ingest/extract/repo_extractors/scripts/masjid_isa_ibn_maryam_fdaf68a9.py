@@ -21,7 +21,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "masjid_isa_ibn_maryam_fdaf68a9"
-    version = "2026.06.13.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("isaibnmaryam.co.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -124,42 +124,10 @@ class Extractor(BaseMosqueWebsiteExtractor):
                     # Found data, return immediately
                     return ExtractorResult(rows=rows)
 
-        # Fallback: try text-based extraction for plugin-rendered data
-        # Look for patterns like "Fajr ... 4:00" (Jamā'ah time)
-        extracted_prayers = set()
-        for prayer_name, prayer_enum in prayer_map.items():
-            if prayer_enum in extracted_prayers:
-                continue
-            pattern = rf"{prayer_name}\s*.*?(\d{{1,2}}:\d{{2}})"
-            matches = re.finditer(pattern, html, re.IGNORECASE)
-            for match in matches:
-                raw_time = match.group(1)
-                jamaat = coerce_time(raw_time, prayer=prayer_enum.value)
-                if jamaat is None:
-                    continue
-
-                rows.append(
-                    ExtractorRow(
-                        date=today,
-                        prayer=prayer_enum,
-                        jamaat_time=jamaat,
-                        timezone=ctx.timezone,
-                        evidence=ctx.evidence(
-                            target_label="timetable",
-                            extractor_key=self.key,
-                            extractor_version=self.version,
-                            raw_text=raw_time,
-                            selector=f"text pattern for {prayer_name}",
-                        ),
-                    )
-                )
-                extracted_prayers.add(prayer_enum)
-                break
-
         if not rows:
             return ExtractorResult(
                 rows=[],
-                no_schedule_reason="no prayer times found in tables or text",
+                no_schedule_reason="no prayer times found in tables",
             )
 
         return ExtractorResult(rows=rows)

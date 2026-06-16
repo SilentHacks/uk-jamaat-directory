@@ -18,7 +18,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "thornton_heath_islamic_centre_d557d412"
-    version = "2026.06.13.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("thislamiccentre.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -60,7 +60,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
                         continue
 
                     day = int(date_str.split()[0])
-                    date_obj = datetime(datetime.now().year, 6, day).date()
+                    now = datetime.now()
+                    date_obj = datetime(now.year, now.month, day).date()
 
                     # Skip if Dhuhr Jamat is "*"
                     if row[7].strip() == "*":

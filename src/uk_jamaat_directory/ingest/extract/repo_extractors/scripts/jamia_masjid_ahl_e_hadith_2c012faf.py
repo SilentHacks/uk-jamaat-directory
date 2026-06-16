@@ -19,8 +19,8 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "jamia_masjid_ahl_e_hadith_2c012faf"
-    version = "2026.06.13.1"
-    source_match = SourceMatch(domains=("web.archive.org",))
+    version = "2026.06.16.1"
+    source_match = SourceMatch(domains=("greenlanemasjid.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
         TargetSpec(

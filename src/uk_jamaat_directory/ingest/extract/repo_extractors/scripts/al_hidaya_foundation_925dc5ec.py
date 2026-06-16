@@ -18,7 +18,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "al_hidaya_foundation_925dc5ec"
-    version = "2026.06.13.3"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("alhidayahfoundation.co.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -48,6 +48,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
         today = datetime.now().date()
 
         prayer_map = {
+            "fajr": Prayer.FAJR,
             "dhuhr": Prayer.DHUHR,
             "zuhr": Prayer.DHUHR,
             "asr": Prayer.ASR,
@@ -65,8 +66,8 @@ class Extractor(BaseMosqueWebsiteExtractor):
             jamaat_time_str = match.group(2).strip()
             prayer_name_lower = prayer_name.lower()
 
-            # Skip sunrise and fajr
-            if prayer_name_lower in ("sunrise", "fajr"):
+            # Skip sunrise only
+            if prayer_name_lower == "sunrise":
                 continue
 
             prayer = prayer_map.get(prayer_name_lower)

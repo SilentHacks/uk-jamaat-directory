@@ -13,7 +13,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "masjid_al_birr_8f1db745"
-    version = "2026.06.12.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("albirr.com",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -30,6 +30,6 @@ class Extractor(TableTimetableExtractor):
         Prayer.FAJR: "fajr jamat",
         Prayer.DHUHR: "dhur jamat",
         Prayer.ASR: "asr jamat",
-        Prayer.MAGHRIB: "maghrib",
+        Prayer.MAGHRIB: "maghrib jamat",
         Prayer.ISHA: "isha jamat",
     }

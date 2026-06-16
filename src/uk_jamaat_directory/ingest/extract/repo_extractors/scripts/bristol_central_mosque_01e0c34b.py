@@ -20,7 +20,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "bristol_central_mosque_01e0c34b"
-    version = "2026.06.13.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("bristolcentralmosque.co.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -70,40 +70,50 @@ class Extractor(BaseMosqueWebsiteExtractor):
             except ValueError:
                 continue
 
-            # Map jamaat times, with prayer name for am/pm inference
+            # Map jamaat times, with prayer name for am/pm inference.
+            # Prefer explicitly named jamaat fields; for Maghrib fall back to
+            # "maghrib" if no separate "maghribJamaat" field exists in the data
+            # (some mosque JS data omits it because Maghrib is prayed at adhan time).
             time_mappings = {
-                Prayer.FAJR: ("fajarJamaat", "fajr"),
-                Prayer.DHUHR: ("zuhurJamaat", "dhuhr"),
-                Prayer.ASR: ("asrJamaat", "asr"),
-                Prayer.MAGHRIB: ("maghrib", "maghrib"),
-                Prayer.ISHA: ("ishaJamaat", "isha"),
+                Prayer.FAJR: (["fajarJamaat"], "fajr"),
+                Prayer.DHUHR: (["zuhurJamaat"], "dhuhr"),
+                Prayer.ASR: (["asrJamaat"], "asr"),
+                Prayer.MAGHRIB: (["maghribJamaat", "maghrib"], "maghrib"),
+                Prayer.ISHA: (["ishaJamaat"], "isha"),
             }
 
-            for prayer, (field_name, prayer_name) in time_mappings.items():
-                if field_name in prayer_data:
-                    time_str = prayer_data[field_name]
-                    try:
-                        prayer_time = coerce_time(time_str, prayer=prayer_name)
-                        if prayer_time:
-                            evidence = ExtractorEvidence(
-                                target_label=self.targets[0].label,
-                                target_url=self.targets[0].url,
-                                extractor_key=self.key,
-                                extractor_version=self.version,
-                                derivation={
-                                    "field": field_name,
-                                    "source": "embedded_javascript_data",
-                                },
-                            )
-                            row = ExtractorRow(
-                                date=row_date,
-                                prayer=prayer,
-                                jamaat_time=prayer_time,
-                                evidence=evidence,
-                            )
-                            rows.append(row)
-                    except Exception:
-                        pass
+            for prayer, (field_names, prayer_name) in time_mappings.items():
+                time_str = None
+                field_used = None
+                for fn in field_names:
+                    if fn in prayer_data:
+                        time_str = prayer_data[fn]
+                        field_used = fn
+                        break
+                if time_str is None:
+                    continue
+                try:
+                    prayer_time = coerce_time(time_str, prayer=prayer_name)
+                    if prayer_time:
+                        evidence = ExtractorEvidence(
+                            target_label=self.targets[0].label,
+                            target_url=self.targets[0].url,
+                            extractor_key=self.key,
+                            extractor_version=self.version,
+                            derivation={
+                                "field": field_used,
+                                "source": "embedded_javascript_data",
+                            },
+                        )
+                        row = ExtractorRow(
+                            date=row_date,
+                            prayer=prayer,
+                            jamaat_time=prayer_time,
+                            evidence=evidence,
+                        )
+                        rows.append(row)
+                except Exception:
+                    pass
 
         if not rows:
             return ExtractorResult(

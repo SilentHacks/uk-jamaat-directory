@@ -13,7 +13,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "muslim_welfare_house_3cc5cdd0"
-    version = "2026.06.13.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("mwht.org.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -40,9 +40,13 @@ class Extractor(TableTimetableExtractor):
         Prayer.ISHA: 11,
     }
 
+    _MONTH_NAMES = frozenset(
+        "january february march april may june july august september october november december".split()
+    )
+
     def accept_row(self, row: list[str], row_date) -> bool:
         date_val = row[self.date_column].strip() if self.date_column < len(row) else ""
-        if not date_val or date_val in ("June",):
+        if not date_val or date_val.lower() in self._MONTH_NAMES:
             return False
         try:
             int(date_val)

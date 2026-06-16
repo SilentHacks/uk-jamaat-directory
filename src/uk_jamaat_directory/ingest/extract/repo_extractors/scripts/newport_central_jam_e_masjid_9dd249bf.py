@@ -18,7 +18,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "newport_central_jam_e_masjid_9dd249bf"
-    version = "2026.06.13.1"
+    version = "2026.06.16.1"
     source_match = SourceMatch(domains=("ncjm.co.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
 
@@ -50,7 +50,6 @@ class Extractor(BaseMosqueWebsiteExtractor):
         rows: list[ExtractorRow] = []
 
         # Look for prayer time tables in various common formats
-        # Pattern 1: Table with date, fajr, dhuhr, asr, maghrib, isha headers
         table_pattern = r"<table[^>]*>(.*?)</table>"
         tables = re.findall(table_pattern, html, re.DOTALL | re.IGNORECASE)
 
@@ -72,23 +71,43 @@ class Extractor(BaseMosqueWebsiteExtractor):
             if not any("fajr" in h or "zuhr" in h or "asr" in h for h in headers_lower):
                 continue
 
-            # Find column indices
+            # Find column indices - prefer iqamah/jamaat columns over adhan/begins columns
             date_idx = None
-            prayer_indices = {}
+            prayer_indices: dict[Prayer, int] = {}
+
+            # Two-pass: first look for explicit jamaat/iqamah columns, then fall back
+            PRAYER_NAME_MAP = [
+                (Prayer.FAJR, ("fajr",)),
+                (Prayer.DHUHR, ("zuhr", "dhuhr")),
+                (Prayer.ASR, ("asr",)),
+                (Prayer.MAGHRIB, ("maghrib",)),
+                (Prayer.ISHA, ("isha",)),
+            ]
+            JAMAAT_KEYWORDS = ("jamaat", "iqamah", "iqama", "jama", "congregation")
+            ADHAN_KEYWORDS = ("adhan", "begins", "begin", "azan", "start")
 
             for idx, h in enumerate(headers_lower):
                 if "date" in h or "day" in h:
                     date_idx = idx
-                if "fajr" in h:
-                    prayer_indices[Prayer.FAJR] = idx
-                elif "zuhr" in h or "dhuhr" in h:
-                    prayer_indices[Prayer.DHUHR] = idx
-                elif "asr" in h:
-                    prayer_indices[Prayer.ASR] = idx
-                elif "maghrib" in h:
-                    prayer_indices[Prayer.MAGHRIB] = idx
-                elif "isha" in h:
-                    prayer_indices[Prayer.ISHA] = idx
+
+            for prayer, name_parts in PRAYER_NAME_MAP:
+                best_idx = None
+                best_score = -1
+                for idx, h in enumerate(headers_lower):
+                    if not any(n in h for n in name_parts):
+                        continue
+                    # Score: jamaat columns > generic > adhan columns
+                    if any(kw in h for kw in JAMAAT_KEYWORDS):
+                        score = 2
+                    elif any(kw in h for kw in ADHAN_KEYWORDS):
+                        score = 0
+                    else:
+                        score = 1
+                    if score > best_score:
+                        best_score = score
+                        best_idx = idx
+                if best_idx is not None:
+                    prayer_indices[prayer] = best_idx
 
             if date_idx is None or len(prayer_indices) < 5:
                 continue
