@@ -2,7 +2,7 @@
 
 Canonical public directory for UK mosques and jamaat timetable data.
 
-**Status:** Early implementation. Phases 0–12 are in place, plus repo-owned deterministic extractor scripts and an overnight AI authoring orchestrator (ADR 0016/0017). Admin web UI remains planned. The long-term product plan is in [PLAN.md](PLAN.md).
+**Status:** Early implementation. Phases 0–12 are in place, plus repo-owned deterministic extractor scripts and an overnight AI authoring orchestrator (ADR 0016/0017) and a server-rendered public dashboard + key-gated admin UI (ADR 0020). The long-term product plan is in [PLAN.md](PLAN.md).
 
 **Repository:** [github.com/SilentHacks/uk-jamaat-directory](https://github.com/SilentHacks/uk-jamaat-directory)
 
@@ -60,6 +60,37 @@ Apply migrations from the host or inside the API container:
 ```bash
 make migrate
 ```
+
+## Web dashboard and admin UI
+
+The public site at `/` is a server-rendered dashboard (Jinja2 + HTMX, no build step)
+to search/filter mosques and view per-mosque **weekly jamaat timetables** with
+freshness badges and calculated-vs-jamaat labelling. The former landing/marketing
+content (API and bulk-data links) now lives at `/about`; the Scalar API reference
+stays at `/docs`.
+
+A key-gated admin area lives at `/admin`:
+
+- **Dashboard** — coverage stats (mosques, % active with published times, stale
+  sources, pending candidates/reviews).
+- **Mosques** — create/edit/merge, attach sources, set publication policy.
+- **Schedules** — approve/reject candidates; trigger publish, validate, and
+  freshness recompute.
+- **Pipeline** — source-health, authoring-task status, and per-source crawl trigger.
+
+Admin login uses the existing `ADMIN_API_KEY` over a signed session cookie and
+requires `SESSION_SECRET_KEY` to be set:
+
+```bash
+# .env
+ADMIN_API_KEY=<long-random-secret>
+SESSION_SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
+```
+
+Routing: Caddy serves `/assets`, `/docs`, `/data`, and `/exports` statically; `/v1`
+is the JSON API; all other paths are proxied to the app, which renders HTML. The
+`/v1` JSON contract is unchanged and the admin UI is excluded from the OpenAPI spec.
+See [docs/adr/0020](docs/adr/0020-server-rendered-dashboard-admin-ui.md).
 
 ## Public API (`/v1`)
 
@@ -358,7 +389,8 @@ AGENTS.md                  Agent/developer conventions
 | 11 | Docker VPS deployment, backups, restore drills | Done |
 | 12 | GitHub publishing workflow (CI, Dependabot, license docs) | Done |
 | 13 | Public-facing layer: static site, API reference, serve/deploy hardening, GHCR CD | Done |
-| 14+ | Interactive directory frontend, admin web UI, OCR crawlers | Planned |
+| 14 | Server-rendered dashboard (search/timetables) + key-gated admin UI (ADR 0020) | Done |
+| 15+ | OCR crawlers, richer analytics | Planned |
 
 ## Data Publication Rules
 

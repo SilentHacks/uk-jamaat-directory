@@ -1,0 +1,41 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Mosques — Admin{% endblock %}
+
+{% block admin %}
+<div class="admin-head">
+  <h1>Mosques <span class="muted">({{ total }})</span></h1>
+  <a class="btn primary" href="/admin/mosques/new">+ New mosque</a>
+</div>
+
+<form method="get" action="/admin/mosques" class="filter-form">
+  <input type="search" name="q" value="{{ q }}" placeholder="Name, town, postcode…" />
+  <select name="status">
+    <option value="">All statuses</option>
+    {% for s in statuses %}
+    <option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn">Filter</button>
+</form>
+
+<table class="data">
+  <thead><tr><th>Name</th><th>Town</th><th>Postcode</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for m in mosques %}
+    <tr>
+      <td><a href="/admin/mosques/{{ m.id }}">{{ m.name }}</a></td>
+      <td>{{ m.city or '—' }}</td>
+      <td>{{ m.postcode or '—' }}</td>
+      <td><span class="badge status-{{ m.status.value }}">{{ m.status.value }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="muted">No mosques match.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% if prev_offset is not none %}<a class="btn" href="/admin/mosques?offset={{ prev_offset }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">← Prev</a>{% endif %}
+  {% if next_offset is not none %}<a class="btn" href="/admin/mosques?offset={{ next_offset }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next →</a>{% endif %}
+</div>
+{% endblock %}

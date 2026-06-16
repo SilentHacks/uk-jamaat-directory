@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -7,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from uk_jamaat_directory.api.errors import install_exception_handlers
@@ -17,6 +20,8 @@ from uk_jamaat_directory.config import Settings, get_settings
 from uk_jamaat_directory.logging import configure_logging
 from uk_jamaat_directory.middleware import request_context_middleware
 from uk_jamaat_directory.observability import init_sentry
+from uk_jamaat_directory.ui.admin import router as admin_ui_router
+from uk_jamaat_directory.ui.router import router as ui_router
 
 
 def _register_docs(app: FastAPI, settings: Settings) -> None:
@@ -68,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = resolved_settings
     install_exception_handlers(app)
+    _install_admin_redirect(app)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=resolved_settings.allowed_hosts)
     app.add_middleware(
         CORSMiddleware,
@@ -80,10 +86,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # so even 429 responses get an X-Request-ID and a log line.
     app.middleware("http")(public_rate_limit_middleware)
     app.middleware("http")(request_context_middleware)
+    # Signed session cookie for the admin UI login. When no secret is configured
+    # the admin UI login simply rejects every attempt (see ui.auth), but the
+    # middleware still needs *a* key to run; use an ephemeral one in that case.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=resolved_settings.session_secret_key or "ujd-insecure-dev-session-key",
+        session_cookie=resolved_settings.session_cookie_name,
+        max_age=resolved_settings.session_max_age_seconds,
+        same_site="lax",
+        https_only=resolved_settings.session_https_only,
+    )
     app.include_router(api_router, prefix=resolved_settings.api_prefix)
+    app.include_router(ui_router)
+    app.include_router(admin_ui_router)
     _register_docs(app, resolved_settings)
+    _mount_dev_static(app)
     app.dependency_overrides[get_settings] = lambda: resolved_settings
     return app
+
+
+def _install_admin_redirect(app: FastAPI) -> None:
+    """Turn the admin-session redirect signal into an HTTP redirect response."""
+    from starlette.responses import RedirectResponse
+
+    from uk_jamaat_directory.ui.auth import RedirectToLogin
+
+    async def _redirect_handler(request: Any, exc: RedirectToLogin):  # noqa: ARG001
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    app.add_exception_handler(RedirectToLogin, _redirect_handler)
+
+
+def _mount_dev_static(app: FastAPI) -> None:
+    """Serve /assets locally when running uvicorn without Caddy.
+
+    In production Caddy serves /assets from ``web/public`` before requests reach
+    the app, so this mount is only exercised by ``make dev``. It is skipped when
+    the directory is absent (e.g. inside the API container image).
+    """
+    assets_dir = Path(__file__).resolve().parents[2] / "web" / "public" / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
 
 app = create_app()

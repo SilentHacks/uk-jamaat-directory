@@ -39,10 +39,9 @@ Phase 6 scope excludes charity register import and public Google-derived facts. 
 - Phase 10 exports: `generate-exports` CLI, Celery `exports.generate_latest`, NDJSON/CSV/changes/metadata files in S3 with manifest checksums (ADR 0008).
 - Phase 11 deploy: `docker-compose.production.yml`, bundled Caddy TLS, `scripts/deploy/*` (migrate, backup, deploy, smoke), `docs/deploy/` (ADR 0009).
 - Phase 12 GitHub: CI on `master`, Dependabot, dependency review workflow, `LICENSE.md` / `DATA_LICENSE.md` / `ATTRIBUTION.md` / `SECURITY.md`, `docs/github/` (ADR 0010).
+- Phase 14 web UI (ADR 0020): server-rendered dashboard + admin in `uk_jamaat_directory.ui` (Jinja2 + self-hosted HTMX, no bundler). Public `/` search/browse + `/mosques/{id}` weekly timetable; `/about` holds the old API/data landing; Scalar stays at `/docs`. Admin at `/admin` logs in with `ADMIN_API_KEY` over a signed session cookie (requires `SESSION_SECRET_KEY`), CSRF-guards every POST, and covers mosque CRUD/merge, source policy, candidate approve/reject, publish/validate/recompute (Celery), and pipeline/source-health/authoring views with per-source crawl triggers. UI routes are `include_in_schema=False`; `/v1` JSON is unchanged. Caddy proxies non-`/v1`, non-static paths to the app.
 
-Not implemented yet: HTML/PDF crawlers, frontend.
-
-## Architecture Rules
+Not implemented yet: PDF/OCR crawlers.## Architecture Rules
 
 - Keep Directory concerns in this repo: mosque identity, source provenance, schedule candidates, published occurrences, freshness, exports, and contribution/admin workflows.
 - Do not add Sirat journey-planning, routing, user behavior, or private planner logic here.

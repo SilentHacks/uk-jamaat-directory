@@ -1,0 +1,68 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Schedules — Admin{% endblock %}
+
+{% block admin %}
+<h1>Schedule moderation <span class="muted">({{ total }})</span></h1>
+
+<div class="action-bar">
+  <form method="post" action="/admin/schedule/validate" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <button type="submit" class="btn">Validate candidates</button>
+  </form>
+  <form method="post" action="/admin/schedule/publish" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <button type="submit" class="btn primary">Publish approved</button>
+  </form>
+  <form method="post" action="/admin/schedule/recompute-freshness" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <button type="submit" class="btn">Recompute freshness</button>
+  </form>
+</div>
+
+<form method="get" action="/admin/candidates" class="filter-form">
+  <select name="status">
+    <option value="">All</option>
+    {% for s in statuses %}<option value="{{ s }}" {% if s == status_filter %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <input type="text" name="mosque_id" value="{{ mosque_id }}" placeholder="Mosque ID (optional)" />
+  <button type="submit" class="btn">Filter</button>
+</form>
+
+<table class="data">
+  <thead><tr><th>Date</th><th>Prayer</th><th>Jamaat</th><th>Conf.</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for c in candidates %}
+    <tr>
+      <td>{{ c.date }}</td>
+      <td>{{ c.prayer | prayer_label }}{% if c.session_label %} <small>{{ c.session_label }}</small>{% endif %}</td>
+      <td>{{ c.jamaat_time | fmt_time }}</td>
+      <td>{{ c.confidence }}</td>
+      <td><span class="badge cand-{{ c.status }}">{{ c.status }}</span></td>
+      <td class="actions">
+        {% if c.status in ['pending', 'rejected'] %}
+        <form method="post" action="/admin/candidates/{{ c.candidate_id }}/approve" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="redirect_to" value="{{ request.url.path }}?status={{ status_filter }}" />
+          <button type="submit" class="btn small">Approve</button>
+        </form>
+        {% endif %}
+        {% if c.status in ['pending', 'approved'] %}
+        <form method="post" action="/admin/candidates/{{ c.candidate_id }}/reject" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="redirect_to" value="{{ request.url.path }}?status={{ status_filter }}" />
+          <button type="submit" class="btn small danger">Reject</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="muted">No candidates match.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% if prev_offset is not none %}<a class="btn" href="/admin/candidates?offset={{ prev_offset }}{% if status_filter %}&status={{ status_filter }}{% endif %}">← Prev</a>{% endif %}
+  {% if next_offset is not none %}<a class="btn" href="/admin/candidates?offset={{ next_offset }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next →</a>{% endif %}
+</div>
+{% endblock %}

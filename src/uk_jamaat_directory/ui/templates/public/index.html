@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Search UK mosques — UK Jamaat Directory{% endblock %}
+
+{% block main %}
+<section class="wrap search-page">
+  <h1>Find a mosque</h1>
+  <p class="lede">Search UK mosques by name, town, or postcode and view their jamaat timetables.</p>
+
+  <form
+    class="search-form"
+    role="search"
+    hx-get="/partials/mosques"
+    hx-target="#results"
+    hx-trigger="input changed delay:300ms, search, submit"
+    hx-push-url="true"
+    hx-indicator="#search-indicator"
+  >
+    <input
+      type="search"
+      name="q"
+      value="{{ q }}"
+      placeholder="Mosque name…"
+      aria-label="Mosque name"
+      autocomplete="off"
+    />
+    <input
+      type="text"
+      name="city"
+      value="{{ city }}"
+      placeholder="Town / city"
+      aria-label="Town or city"
+      autocomplete="off"
+    />
+    <input
+      type="text"
+      name="postcode"
+      value="{{ postcode }}"
+      placeholder="Postcode"
+      aria-label="Postcode"
+      autocomplete="off"
+    />
+    <button type="submit" class="btn primary">Search</button>
+    <span id="search-indicator" class="htmx-indicator">Searching…</span>
+  </form>
+
+  <div id="results">
+    {% include "public/_results.html" %}
+  </div>
+</section>
+{% endblock %}

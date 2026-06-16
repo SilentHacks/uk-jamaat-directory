@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, time
+from datetime import date, time, timedelta
 
 import pytest
 from fixtures import seed_public_mosque_bundle
@@ -15,6 +15,11 @@ from uk_jamaat_directory.domain import (
 from uk_jamaat_directory.models.core import ScheduleCandidate
 
 ADMIN_HEADERS = {"X-Admin-Key": "test-admin-key"}
+
+# Use a date relative to "today" so candidates stay inside the schedule
+# validation window (today - schedule_date_past_days .. today + future). A
+# hardcoded calendar date silently ages out of the window and breaks approval.
+_IN_WINDOW_DATE = date.today() + timedelta(days=1)
 
 
 @pytest.mark.asyncio
@@ -30,7 +35,7 @@ async def test_admin_list_and_approve_candidate(
         id=uuid.uuid4(),
         mosque_id=mosque.id,
         source_id=source.id,
-        date=date(2026, 6, 7),
+        date=_IN_WINDOW_DATE,
         prayer=Prayer.DHUHR,
         start_time=time(13, 0),
         jamaat_time=time(13, 15),
@@ -68,7 +73,7 @@ async def test_admin_reject_candidate(
         id=uuid.uuid4(),
         mosque_id=bundle["mosque"].id,
         source_id=bundle["public_source"].id,
-        date=date(2026, 6, 7),
+        date=_IN_WINDOW_DATE,
         prayer=Prayer.ASR,
         jamaat_time=time(16, 30),
         timezone="Europe/London",
@@ -96,7 +101,7 @@ async def test_admin_approve_rejects_unknown_policy_source(
         id=uuid.uuid4(),
         mosque_id=bundle["mosque"].id,
         source_id=bundle["private_source"].id,
-        date=date(2026, 6, 7),
+        date=_IN_WINDOW_DATE,
         prayer=Prayer.MAGHRIB,
         jamaat_time=time(21, 0),
         timezone="Europe/London",

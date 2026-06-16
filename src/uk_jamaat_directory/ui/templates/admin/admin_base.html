@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block main %}
+<div class="admin-shell wrap">
+  <nav class="admin-nav">
+    <a href="/admin">Dashboard</a>
+    <a href="/admin/mosques">Mosques</a>
+    <a href="/admin/candidates">Schedules</a>
+    <a href="/admin/pipeline">Pipeline</a>
+    <form class="logout" method="post" action="/admin/logout">
+      <button type="submit" class="btn small">Log out</button>
+    </form>
+  </nav>
+
+  {% set flash_msg = request.query_params.get('msg') %}
+  {% set flash_err = request.query_params.get('err') %}
+  {% if flash_msg %}<div class="flash ok">{{ flash_msg }}</div>{% endif %}
+  {% if flash_err %}<div class="flash err">{{ flash_err }}</div>{% endif %}
+
+  {% block admin %}{% endblock %}
+</div>
+{% endblock %}

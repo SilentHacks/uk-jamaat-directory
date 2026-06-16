@@ -1,0 +1,43 @@
+<div class="week-nav">
+  <button class="btn" type="button"
+    hx-get="/partials/mosques/{{ mosque_id }}/timetable?week={{ prev_week.isoformat() }}"
+    hx-target="#timetable" hx-swap="innerHTML">← Prev</button>
+  <span class="week-label">Week of {{ week_start | fmt_date }}</span>
+  <button class="btn" type="button"
+    hx-get="/partials/mosques/{{ mosque_id }}/timetable?week={{ next_week.isoformat() }}"
+    hx-target="#timetable" hx-swap="innerHTML">Next →</button>
+</div>
+
+{% if not has_any %}
+<p class="empty">No published times for this week.</p>
+{% else %}
+<div class="table-scroll">
+<table class="timetable">
+  <thead>
+    <tr>
+      <th>Prayer</th>
+      {% for d in days %}<th>{{ d | fmt_date }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for prayer in prayer_order %}
+    <tr>
+      <th class="prayer">{{ prayer | prayer_label }}</th>
+      {% for d in days %}
+      {% set cell = grid[prayer][d.isoformat()] %}
+      <td>
+        {% for occ in cell %}
+        <span class="time{% if occ.confidence in calculated_confidences %} calculated{% endif %}"
+              {% if occ.confidence in calculated_confidences %}title="Calculated time, not a published jamaat"{% endif %}>
+          {{ occ.jamaat_time | fmt_time }}{% if occ.session_label %} <small>{{ occ.session_label }}</small>{% endif %}
+        </span>
+        {% else %}<span class="muted">—</span>{% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="legend"><span class="time calculated">00:00</span> = calculated time, not a confirmed jamaat.</p>
+{% endif %}

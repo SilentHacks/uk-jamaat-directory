@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ mosque.name }} — UK Jamaat Directory{% endblock %}
+{% block description %}Jamaat prayer timetable and details for {{ mosque.name }}{% if mosque.city %}, {{ mosque.city }}{% endif %}.{% endblock %}
+
+{% block main %}
+<section class="wrap mosque-detail">
+  <p class="back"><a href="/">← Back to search</a></p>
+  <h1>{{ mosque.name }}</h1>
+
+  <div class="detail-grid">
+    <div class="detail-meta">
+      <h2>Details</h2>
+      <dl>
+        {% set addr = [mosque.address_line1, mosque.address_line2, mosque.city, mosque.county, mosque.postcode] | select | join(', ') %}
+        {% if addr %}<dt>Address</dt><dd>{{ addr }}</dd>{% endif %}
+        {% if mosque.website_url %}<dt>Website</dt><dd><a href="{{ mosque.website_url }}" rel="noopener nofollow" target="_blank">{{ mosque.website_url }}</a></dd>{% endif %}
+        {% if mosque.aliases %}<dt>Also known as</dt><dd>{{ mosque.aliases | join('; ') }}</dd>{% endif %}
+      </dl>
+
+      {% if mosque.facilities %}
+      <h3>Facilities</h3>
+      <ul class="facilities">
+        {% for key, value in mosque.facilities.items() if value %}
+        <li>{{ key | replace('_', ' ') | title }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if mosque.sources %}
+      <h3>Sources</h3>
+      <ul class="sources">
+        {% for s in mosque.sources %}
+        <li>
+          <span class="src-type">{{ s.source_type | replace('_', ' ') }}</span>
+          <span class="badge confidence-{{ s.confidence }}">{{ s.confidence | replace('_', ' ') }}</span>
+          {% if s.source_url %}<a href="{{ s.source_url }}" rel="noopener nofollow" target="_blank">link</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+
+    <div class="detail-timetable">
+      <h2>Weekly timetable</h2>
+      <div id="timetable">
+        {% include "public/_timetable.html" %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

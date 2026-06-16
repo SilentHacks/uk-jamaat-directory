@@ -1,0 +1,26 @@
+{% if not append %}
+<p class="count">{{ total }} mosque{{ '' if total == 1 else 's' }}{% if q or city or postcode %} matched{% endif %}</p>
+<ul id="mosque-list" class="mosque-list">
+{% endif %}
+  {% for m in items %}
+  <li class="mosque-item">
+    <a class="mosque-name" href="/mosques/{{ m.directory_mosque_id }}">{{ m.name }}</a>
+    {% set place = [m.city, m.postcode] | select | join(', ') %}
+    {% if place %}<span class="muted">{{ place }}</span>{% endif %}
+  </li>
+  {% endfor %}
+  {% if not items and not append %}
+  <li class="empty">No mosques found. Try a different name, town, or postcode.</li>
+  {% endif %}
+  {% if next_offset is not none %}
+  <li class="load-more"
+      hx-get="/partials/mosques?offset={{ next_offset }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if city %}&city={{ city | urlencode }}{% endif %}{% if postcode %}&postcode={{ postcode | urlencode }}{% endif %}"
+      hx-target="this"
+      hx-swap="outerHTML"
+      hx-trigger="click">
+    <button type="button" class="btn">Load more</button>
+  </li>
+  {% endif %}
+{% if not append %}
+</ul>
+{% endif %}

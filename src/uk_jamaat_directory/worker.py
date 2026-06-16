@@ -21,6 +21,7 @@ celery_app.conf.update(
         "uk_jamaat_directory.tasks.crawl",
         "uk_jamaat_directory.tasks.exports",
         "uk_jamaat_directory.tasks.authoring",
+        "uk_jamaat_directory.tasks.schedules",
     ],
     beat_schedule={
         "crawl-register-sources": {

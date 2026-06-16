@@ -40,10 +40,19 @@
 		file_server
 	}
 
-	handle {
+	@static path /assets/* /favicon.svg /robots.txt /sitemap.xml /404.html /data /data/*
+	handle @static {
 		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		root * /srv/www
 		file_server
+	}
+
+	handle {
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+		reverse_proxy api:8000 {
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+		}
 	}
 
 	handle_errors {

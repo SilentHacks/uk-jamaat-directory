@@ -23,7 +23,7 @@ from uk_jamaat_directory.schemas.public import (
 from uk_jamaat_directory.services.public_policy import is_public_source_policy
 
 
-def _coordinates_from_location(location: object | None) -> tuple[float | None, float | None]:
+def coordinates_from_location(location: object | None) -> tuple[float | None, float | None]:
     if location is None:
         return None, None
     # GeoAlchemy2 returns WKBElement; tests may pass through ORM-loaded values.
@@ -45,7 +45,7 @@ def mosque_summary(
 ) -> MosqueSummaryPublic:
     lat, lng = latitude, longitude
     if lat is None and lng is None:
-        lat, lng = _coordinates_from_location(mosque.location)
+        lat, lng = coordinates_from_location(mosque.location)
 
     return MosqueSummaryPublic(
         directory_mosque_id=mosque.id,
@@ -66,7 +66,7 @@ def mosque_detail(
     sources: list[MosqueSource] | None = None,
     attributes: MosqueAttribute | None = None,
 ) -> MosqueDetailPublic:
-    lat, lng = _coordinates_from_location(mosque.location)
+    lat, lng = coordinates_from_location(mosque.location)
     public_sources = [
         public_source_provenance(source)
         for source in (sources or [])
