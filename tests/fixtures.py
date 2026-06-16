@@ -127,3 +127,62 @@ async def seed_public_mosque_bundle(session: AsyncSession) -> dict[str, object]:
         "private_occurrence": private_occurrence,
         "change_event": change_event,
     }
+
+
+async def seed_crawled_mosque(
+    session: AsyncSession,
+    *,
+    dataset_version: DatasetVersion,
+    name: str = "Crawled Masjid",
+    city: str = "Leeds",
+    postcode: str = "LS1 1AA",
+) -> dict[str, object]:
+    """Seed an active mosque whose published timetable came from a public
+    ``mosque_website`` (crawl pipeline) source in ``dataset_version``."""
+    mosque = Mosque(
+        id=uuid.uuid4(),
+        name=name,
+        normalized_name=name.lower(),
+        city=city,
+        postcode=postcode,
+        status=MosqueStatus.ACTIVE,
+    )
+    website_source = MosqueSource(
+        id=uuid.uuid4(),
+        mosque_id=mosque.id,
+        source_type=SourceType.MOSQUE_WEBSITE,
+        external_id=f"web-{uuid.uuid4().hex[:8]}",
+        source_url="https://crawled.example.org/timetable",
+        publication_policy=SourcePublicationPolicy.PUBLIC_REDISTRIBUTION_ALLOWED,
+        confidence=Confidence.COMMUNITY,
+        attribution="crawled.example.org",
+        last_seen_at=datetime.now(UTC),
+    )
+    occurrence = ScheduleOccurrence(
+        id=uuid.uuid4(),
+        mosque_id=mosque.id,
+        source_id=website_source.id,
+        dataset_version_id=dataset_version.id,
+        date=date(2026, 6, 5),
+        prayer=Prayer.FAJR,
+        start_time=time(2, 50),
+        jamaat_time=time(3, 50),
+        timezone="Europe/London",
+        confidence=Confidence.COMMUNITY,
+        freshness_status=FreshnessStatus.FRESH,
+        source_url=website_source.source_url,
+        last_verified_at=datetime.now(UTC),
+    )
+
+    session.add(mosque)
+    await session.flush()
+    session.add(website_source)
+    await session.flush()
+    session.add(occurrence)
+    await session.commit()
+
+    return {
+        "mosque": mosque,
+        "website_source": website_source,
+        "occurrence": occurrence,
+    }

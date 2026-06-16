@@ -3,10 +3,10 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from uk_jamaat_directory.domain import MosqueStatus
+from uk_jamaat_directory.domain import MosqueStatus, SourceType
 from uk_jamaat_directory.geo.search import find_active_mosques_nearby, get_active_mosque_by_id
 from uk_jamaat_directory.models.core import (
     ChangeEvent,
@@ -45,11 +45,32 @@ def _latest_dataset_filter(session: AsyncSession):
     return latest_published_version_id(session)
 
 
+def _crawled_timetable_exists(latest_version_id):
+    """Correlated EXISTS: the mosque has at least one published occurrence in the
+    latest dataset version that came from a public ``mosque_website`` source.
+
+    This mirrors what the public timetable actually shows (latest published
+    dataset + public source policy), restricted to the website-crawl pipeline so
+    the filter means "has a successfully crawled, publicly viewable timetable".
+    """
+    return (
+        select(ScheduleOccurrence.id)
+        .join(MosqueSource, ScheduleOccurrence.source_id == MosqueSource.id)
+        .where(ScheduleOccurrence.mosque_id == Mosque.id)
+        .where(ScheduleOccurrence.dataset_version_id == latest_version_id)
+        .where(MosqueSource.source_type == SourceType.MOSQUE_WEBSITE)
+        .where(public_source_filter())
+        .exists()
+    )
+
+
 def _active_mosque_filters(
     *,
     city: str | None = None,
     postcode: str | None = None,
     query: str | None = None,
+    crawled_version_id=None,
+    crawled_only: bool = False,
 ):
     filters = [Mosque.status == MosqueStatus.ACTIVE]
     if city:
@@ -64,6 +85,12 @@ def _active_mosque_filters(
                 Mosque.normalized_name.ilike(pattern),
             )
         )
+    if crawled_only:
+        # No published dataset yet means nothing can have a crawled timetable.
+        if crawled_version_id is None:
+            filters.append(false())
+        else:
+            filters.append(_crawled_timetable_exists(crawled_version_id))
     return filters
 
 
@@ -74,8 +101,15 @@ async def list_mosques(
     offset: int,
     city: str | None = None,
     postcode: str | None = None,
+    crawled_only: bool = False,
 ) -> MosqueListResponse:
-    filters = _active_mosque_filters(city=city, postcode=postcode)
+    crawled_version_id = await _latest_dataset_filter(session) if crawled_only else None
+    filters = _active_mosque_filters(
+        city=city,
+        postcode=postcode,
+        crawled_only=crawled_only,
+        crawled_version_id=crawled_version_id,
+    )
 
     count_stmt = select(func.count()).select_from(Mosque).where(*filters)
     total = int((await session.execute(count_stmt)).scalar_one())
@@ -98,8 +132,16 @@ async def search_mosques(
     postcode: str | None,
     city: str | None,
     limit: int,
+    crawled_only: bool = False,
 ) -> MosqueListResponse:
-    filters = _active_mosque_filters(query=query, postcode=postcode, city=city)
+    crawled_version_id = await _latest_dataset_filter(session) if crawled_only else None
+    filters = _active_mosque_filters(
+        query=query,
+        postcode=postcode,
+        city=city,
+        crawled_only=crawled_only,
+        crawled_version_id=crawled_version_id,
+    )
     stmt = select(Mosque).where(*filters).order_by(Mosque.name.asc()).limit(limit)
     mosques = (await session.execute(stmt)).scalars().all()
 
