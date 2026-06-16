@@ -64,3 +64,18 @@ async def test_about_page_renders_without_db(client_with_db: AsyncClient) -> Non
     resp = await client_with_db.get("/about")
     assert resp.status_code == 200
     assert "API reference" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_public_pages_support_head(
+    client_with_db: AsyncClient, db_session: AsyncSession
+) -> None:
+    # Public pages are served by the SSR app (not a static file server), so the
+    # GET routes must also answer HEAD. Monitoring/CDN health checks (and the
+    # deploy smoke test's `curl -I /`) rely on this; a bare @router.get would
+    # 405 on HEAD.
+    bundle = await seed_public_mosque_bundle(db_session)
+    for path in ("/", "/about", f"/mosques/{bundle['mosque'].id}"):
+        resp = await client_with_db.head(path)
+        assert resp.status_code == 200, f"HEAD {path} returned {resp.status_code}"
+
