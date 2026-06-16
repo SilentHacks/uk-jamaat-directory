@@ -11,7 +11,7 @@
     role="search"
     hx-get="/partials/mosques"
     hx-target="#results"
-    hx-trigger="input changed delay:300ms, search, submit"
+    hx-trigger="input changed delay:300ms, change, search, submit"
     hx-push-url="true"
     hx-indicator="#search-indicator"
   >
@@ -39,6 +39,15 @@
       aria-label="Postcode"
       autocomplete="off"
     />
+    <label class="filter-toggle">
+      <input
+        type="checkbox"
+        name="crawled"
+        value="true"
+        {% if crawled %}checked{% endif %}
+      />
+      Only mosques with a crawled timetable
+    </label>
     <button type="submit" class="btn primary">Search</button>
     <span id="search-indicator" class="htmx-indicator">Searching…</span>
   </form>

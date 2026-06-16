@@ -30,6 +30,7 @@ async def _search_results(
     q: str | None,
     city: str | None,
     postcode: str | None,
+    crawled: bool,
     offset: int,
 ):
     """Run a list/search query and return (response, has_more, next_offset)."""
@@ -41,6 +42,7 @@ async def _search_results(
             postcode=postcode,
             city=city,
             limit=PAGE_SIZE + 1,
+            crawled_only=crawled,
         )
     else:
         result = await public_reads.list_mosques(
@@ -49,6 +51,7 @@ async def _search_results(
             offset=offset,
             city=city,
             postcode=postcode,
+            crawled_only=crawled,
         )
     items = list(result.items)
     has_more = len(items) > PAGE_SIZE
@@ -64,10 +67,11 @@ async def index(
     q: str | None = Query(default=None),
     city: str | None = Query(default=None),
     postcode: str | None = Query(default=None),
+    crawled: bool = Query(default=False),
     session: AsyncSession = Depends(get_db_session),
 ) -> HTMLResponse:
     items, total, next_offset = await _search_results(
-        session, q=q, city=city, postcode=postcode, offset=0
+        session, q=q, city=city, postcode=postcode, crawled=crawled, offset=0
     )
     resp = render(
         request,
@@ -78,6 +82,7 @@ async def index(
             "q": q or "",
             "city": city or "",
             "postcode": postcode or "",
+            "crawled": crawled,
             "next_offset": next_offset,
         },
     )
@@ -91,11 +96,12 @@ async def mosque_results(
     q: str | None = Query(default=None),
     city: str | None = Query(default=None),
     postcode: str | None = Query(default=None),
+    crawled: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> HTMLResponse:
     items, total, next_offset = await _search_results(
-        session, q=q, city=city, postcode=postcode, offset=offset
+        session, q=q, city=city, postcode=postcode, crawled=crawled, offset=offset
     )
     return render(
         request,
@@ -106,6 +112,7 @@ async def mosque_results(
             "q": q or "",
             "city": city or "",
             "postcode": postcode or "",
+            "crawled": crawled,
             "next_offset": next_offset,
             "append": offset > 0,
         },
