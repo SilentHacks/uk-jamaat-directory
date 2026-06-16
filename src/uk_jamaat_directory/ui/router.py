@@ -58,7 +58,7 @@ async def _search_results(
     return items, result.count, next_offset
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def index(
     request: Request,
     q: str | None = Query(default=None),
@@ -112,7 +112,9 @@ async def mosque_results(
     )
 
 
-@router.get("/mosques/{mosque_id}", response_class=HTMLResponse)
+@router.api_route(
+    "/mosques/{mosque_id}", methods=["GET", "HEAD"], response_class=HTMLResponse
+)
 async def mosque_detail(
     request: Request,
     mosque_id: uuid.UUID,
@@ -180,7 +182,7 @@ async def _timetable_grid(
     }
 
 
-@router.get("/about", response_class=HTMLResponse)
+@router.api_route("/about", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def about(request: Request) -> HTMLResponse:
     resp = render(request, "public/about.html", {})
     resp.headers["Cache-Control"] = PAGE_CACHE
