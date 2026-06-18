@@ -27,6 +27,8 @@ A typical authored script becomes ~30 lines:
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import date, datetime
 
 from uk_jamaat_directory.domain import Prayer
@@ -266,6 +268,136 @@ class PdfTableTimetableExtractor(_TabularTimetableMixin, BaseMosqueWebsiteExtrac
             ],
             no_schedule_reason="timetable table not found in PDF",
         )
+
+
+class MasjidboxReduxExtractor(BaseMosqueWebsiteExtractor):
+    """Declarative extractor for masjidbox.com prayer-times pages.
+
+    masjidbox SSR pages embed the schedule as a percent-encoded JSON blob in
+    ``window.REDUX_STATE``. The ``iqamah`` object holds the congregation
+    (jamaat) times as ISO 8601 strings with the local UTC offset, so
+    ``datetime.fromisoformat(...).time()`` yields the correct local time. The
+    sibling ``adhan`` values are prayer start times and are deliberately not
+    used as jamaat times.
+
+    Subclasses only supply ``key``, ``version``, ``source_match``,
+    ``refresh_policy`` and ``targets`` (a single masjidbox
+    ``prayer-times/<slug>`` URL with ``kind=TargetKind.HTML``).
+    """
+
+    target_label: str = "timetable"
+    _PRAYERS: dict[Prayer, str] = {
+        Prayer.FAJR: "fajr",
+        Prayer.DHUHR: "dhuhr",
+        Prayer.ASR: "asr",
+        Prayer.MAGHRIB: "maghrib",
+        Prayer.ISHA: "isha",
+    }
+
+    def extract(self, ctx: ExtractContext) -> ExtractorResult:
+        artifact = ctx.artifact(self.target_label)
+        if not artifact.body:
+            return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
+        html = artifact.text()
+
+        match = re.search(r"window\.REDUX_STATE\s*=\s*'([^']+)'", html)
+        if not match:
+            return ExtractorResult(rows=[], no_schedule_reason="REDUX_STATE not found")
+        try:
+            decoded = re.sub(
+                r"%([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), match.group(1)
+            )
+            data = json.loads(decoded)
+        except Exception:
+            return ExtractorResult(rows=[], no_schedule_reason="REDUX_STATE parse failed")
+
+        timetable = (
+            data.get("masjidbox", {}).get("masjidboxAthany", {}).get("timetable", [])
+        )
+        if not timetable:
+            return ExtractorResult(
+                rows=[], no_schedule_reason="timetable not found in REDUX_STATE"
+            )
+
+        rows: list[ExtractorRow] = []
+        warnings: list[ExtractorWarning] = []
+        for day in timetable:
+            iqamah = day.get("iqamah") or {}
+            jumuah = iqamah.get("jumuah")
+            if isinstance(jumuah, list):
+                for session, value in enumerate(jumuah, start=1):
+                    if not value:
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                    except Exception:
+                        continue
+                    rows.append(
+                        ExtractorRow(
+                            date=dt.date(),
+                            prayer=Prayer.JUMUAH,
+                            jamaat_time=dt.time(),
+                            session_number=session,
+                            session_label=f"session {session}",
+                            timezone=ctx.timezone,
+                            evidence=ctx.evidence(
+                                target_label=self.target_label,
+                                extractor_key=self.key,
+                                extractor_version=self.version,
+                                raw_text=str(value),
+                                selector=f"REDUX_STATE iqamah.jumuah[{session - 1}]",
+                            ),
+                        )
+                    )
+            for prayer, key in self._PRAYERS.items():
+                value = iqamah.get(key)
+                if not value:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except Exception:
+                    warnings.append(
+                        ExtractorWarning(
+                            code="bad_jamaat",
+                            message=f"{prayer.value}: {value!r}",
+                            target_label=self.target_label,
+                        )
+                    )
+                    continue
+                window = PLAUSIBLE_WINDOWS.get(prayer.value)
+                if window and not (window[0] <= dt.time() <= window[1]):
+                    warnings.append(
+                        ExtractorWarning(
+                            code="implausible_time",
+                            message=(
+                                f"{dt.date()} {prayer.value}: {value!r} "
+                                "outside plausible window"
+                            ),
+                            target_label=self.target_label,
+                        )
+                    )
+                    continue
+                rows.append(
+                    ExtractorRow(
+                        date=dt.date(),
+                        prayer=prayer,
+                        jamaat_time=dt.time(),
+                        timezone=ctx.timezone,
+                        evidence=ctx.evidence(
+                            target_label=self.target_label,
+                            extractor_key=self.key,
+                            extractor_version=self.version,
+                            raw_text=value,
+                            selector=f"REDUX_STATE iqamah.{key}",
+                        ),
+                    )
+                )
+
+        if not rows:
+            return ExtractorResult(
+                rows=[], warnings=warnings, no_schedule_reason="no iqamah times found"
+            )
+        return ExtractorResult(rows=rows, warnings=warnings)
 
 
 class StubbedOcrExtractor(BaseMosqueWebsiteExtractor):
