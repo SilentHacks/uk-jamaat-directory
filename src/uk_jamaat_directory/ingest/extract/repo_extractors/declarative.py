@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from uk_jamaat_directory.domain import Prayer
 from uk_jamaat_directory.ingest.extract.helpers import html as html_helpers
@@ -426,7 +426,7 @@ class MawaqitConfDataExtractor(BaseMosqueWebsiteExtractor):
 
     def _resolve_time(
         self, raw: str, adhan: str | None, prayer: str
-    ) -> "datetime.time | None":
+    ) -> time | None:
         from uk_jamaat_directory.ingest.extract.helpers.relative import (
             add_minutes,
             parse_offset_minutes,
