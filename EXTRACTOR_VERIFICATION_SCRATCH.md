@@ -222,12 +222,12 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] aylesbury_vale_islamic_centre_5870fad7.py  (aylesburyislamiccentre.com)
 - [x] baitul_aman_mosque_3c1b6b58.py  (baitulaman.org)
 - [ ] bait_ul_aziz_islamic_cultural_centre_96959238.py  (baitulazizmosque.org.uk)
-- [ ] jamiyat_ahl_e_hadith_a759e7f5.py  (bd5masjid.com)
+- [x] jamiyat_ahl_e_hadith_a759e7f5.py  (bd5masjid.com)
 - [ ] beckton_islamic_association_24355713.py  (becktonislamicassociation.org.uk)
 - [ ] jumu_ah_salaah_4c925720.py  (becktonislamicassociation.org.uk)
 - [ ] bismillah_cultural_centre_9288c3bf.py  (bismillahcentre.com)
 - [ ] manor_road_masjid_81330c23.py  (bismillahcentre.com)
-- [ ] brixton_mosque_bbcdafa3.py  (brixtonmasjid.co.uk)
+- [x] brixton_mosque_bbcdafa3.py  (brixtonmasjid.co.uk)
 - [ ] jumu_ah_salaah_f34baeab.py  (cambournecrescent.org)
 - [ ] birmingham_central_mosque_493ae443.py  (centralmosque.org.uk)
 - [ ] shahparan_chadderton_central_mosque_72a67300.py  (chaddertonshahporan.co.uk)
@@ -262,8 +262,8 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] north_finchley_mosque_ea4bee7c.py  (ianl.org.uk)
 - [ ] st_albans_islamic_centre_381c96bd.py  (icsta.org.uk)
 - [ ] islamic_integration_community_centre_20b933d0.py  (iiccuk.org)
-- [ ] leicester_central_mosque_a0c96d64.py  (islamiccentre.org)
-- [ ] leicester_mosque_6a438c29.py  (islamiccentre.org)
+- [x] leicester_central_mosque_a0c96d64.py  (islamiccentre.org)
+- [x] leicester_mosque_6a438c29.py  (islamiccentre.org)
 - [ ] islamic_centre_of_edgware_646d71b0.py  (islamiccentreedgware.org)
 - [x] jalalia_jame_masjid_57918418.py  (jalaliajaamemosque.org.uk)
 - [ ] jamia_masjid_noor_25636eb5.py  (jamiamasjidnoor.co.uk)
@@ -501,3 +501,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - Verified CORRECT (Jama'at sub-column / embedded "Iqm" jamaat / single jamaat set): islamic_centre_upton_park, al_sunnah, aylesbury_vale, tawheed_maidenhead (cells embed "Iqm <jamaat>" - coerce_time takes the iqamah), as_salam (cell "<jamaat>Begins <begin>"), masjid_abu_bakr_af0cd60a, goldington, jalalia_jame_masjid, baitul_aman.
 - Row-oriented (prayers in rows, Iqamah/Jamat col) verified: abubakr_siddiq, baytul_ihsaan, ross_street, ely, shrewsbury.
 - STILL TODO: dawatul_islam (Adhan/Jamat paired widget - needs custom to pick Jamat row), portsmouth_muslim_academy (0 rows - jumuah only?), al_markaz_ul_islami (SSL fetch error, retry).
+
+## Notes (TBL pass 3: fetch-blocked re-checked)
+- brixton, jamiyat_ahl_e_hadith_a759e7f5, leicester_central, leicester_mosque [x]: returned 406 to my urllib default UA but fetch fine with a browser UA (production crawler uses proper UA). All target Jama'ah/Jamaat columns correctly; full 5 jamaat times verified. leicester '4.15' dotted times parse OK.
+- Still NO-TABLE/JS (TODO): jumu_ah_salaah_95a36d75, newbury_jamme_masjid_88ce3a6a. upper_soothill_72f46809: URL 404 (TODO).
