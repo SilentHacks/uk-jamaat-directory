@@ -19,7 +19,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "riverside_muslim_association_0b681e59"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("riversidemuslimassociation.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
 
@@ -44,9 +44,9 @@ class Extractor(TableTimetableExtractor):
     prayer_columns = {
         Prayer.FAJR: 3,
         Prayer.DHUHR: 6,
-        Prayer.ASR: 8,
-        Prayer.MAGHRIB: 10,
-        Prayer.ISHA: 12,
+        Prayer.ASR: 9,
+        Prayer.MAGHRIB: 11,
+        Prayer.ISHA: 13,
     }
 
     def clean_cell(self, value: str) -> str:

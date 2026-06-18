@@ -22,7 +22,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "muslim_cultural_and_welfare_association_d3fe8fb8"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("mcwas.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -71,7 +71,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             def g(col: int) -> str:
                 return (row[col] or "").strip() if col < len(row) else ""
 
-            fj = g(2)
+            fj = g(3)
             if fj:
                 jt = coerce_time(fj, prayer="fajr")
                 if jt:
@@ -98,7 +98,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             target_label=target_label,
                         )
                     )
-            dj = g(5)
+            dj = g(6)
             if dj:
                 if "/" in dj:
                     parts = [p.strip() for p in dj.split("/") if p.strip()]
@@ -155,7 +155,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                                 target_label=target_label,
                             )
                         )
-            aj = g(8)
+            aj = g(9)
             if aj:
                 jt = coerce_time(aj, prayer="asr")
                 if jt:
@@ -182,7 +182,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             target_label=target_label,
                         )
                     )
-            mgj = g(10)
+            mgj = g(11)
             if mgj:
                 jt = coerce_time(mgj, prayer="maghrib")
                 if jt:
@@ -209,7 +209,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
                             target_label=target_label,
                         )
                     )
-            ij = g(12)
+            ij = g(13)
             if ij:
                 jt = coerce_time(ij, prayer="isha")
                 if jt:

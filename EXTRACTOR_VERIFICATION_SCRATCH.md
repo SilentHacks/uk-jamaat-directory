@@ -130,7 +130,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] newport_diyanet_education_community_centre_9b7d44ff.py  (mawaqit.net)
 - [x] mayfair_islamic_centre_0a9cdc4e.py  (mayfairislamiccentre.org.uk)
 - [x] masjid_bilal_6c40d256.py  (mbilal.org)
-- [ ] muslim_cultural_and_welfare_association_d3fe8fb8.py  (mcwas.org)
+- [F] muslim_cultural_and_welfare_association_d3fe8fb8.py  (mcwas.org)
 - [x] muslim_education_centre_bf364c38.py  (mecawt.co.uk)
 - [x] medina_mosque_4ea05a3a.py  (medinaicwindsor.co.uk)
 - [x] medina_mosque_126ff42d.py  (medinamosque.org.uk)
@@ -310,7 +310,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [F] raza_mosque_d1b8b603.py  (razamasjidaston.co.uk)
 - [x] central_jamme_masjid__reading__ac7d9189.py  (readingmosque.com)
 - [x] central_jamme_mosque_0e8d09ba.py  (readingmosque.com)
-- [ ] riverside_muslim_association_0b681e59.py  (riversidemuslimassociation.org)
+- [F] riverside_muslim_association_0b681e59.py  (riversidemuslimassociation.org)
 - [x] ross_street_masjid_23762c68.py  (rossstreetmasjid.org)
 - [x] rugby_mosque_b1bc45a9.py  (rugby-mosque.org)
 - [x] mevlana_rumi_4365091a.py  (rumimosque.uk)
@@ -527,3 +527,10 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - whitley_bay [F]: "jama" didn't match "Jamāʿah" (ā/ʿ unicode) so it fell back to body[1] = the START row; changed match to "jam" -> now reads Jamāʿah jamaat.
 - Verified correct (pick iqamah/jama'ah/jamat from static HTML despite RENDERED label): balham, hazrath_shahjahal(IQAMAH col), hockwell_ring(IQAMAH), mab_centre, masjid_quba_66d4fd86(Jamat), masjid_imambargah_shuhdae_karbala(Shia iqamah, early), medina_4ea05a3a(iqamah), nottingham_islamic_centre(Iqamah row), pakistani_muslim_community(iqamah), romford, the_eden, tooting, masjid_tawhid(OK_JAMAAT 17 matches).
 - makki_masjid_trust: implausible data (maghrib 19:39 for UK June) -> TODO investigate.
+
+## Notes (rendered agent-browser verification, 82 zero-static scripts)
+- Built /tmp/render_verify.py: renders each target via agent-browser, runs the extractor on rendered HTML, cross-checks jamaat vs begins columns. Ran all 82.
+- FIXED muslim_cultural_and_welfare_association_d3fe8fb8 [F]: custom extract read begins cols g(2/5/8/10/12); shifted to Jamā‘ah cols g(3/6/9/11/13). fajr now 04:00 (was 02:52 begins).
+- FIXED riverside_muslim_association_0b681e59 [F]: Asr/Maghrib/Isha pointed at begins (8/10/12); fixed to Iqamah (9/11/13). (Fajr/Dhuhr were already iqamah.)
+- ~45 rendered scripts verified jamaat-correct via render (OK_JAMAAT / jamaat-plausible values), marked [x].
+- TODO rendered ROWS0 (no data even when rendered - JS board not captured / no timetable published / OCR): aberdeen_0477ea2b, abu_bakar_mosque(mosquepay no data), al_hayat, al_hidaayah, al_huda_welfare, asha, bangladeshi, central_mosque_wembley, daarul_huda, galler_turkish, hazrat_bilal, madina_madrassa, madina_masjid_islamic_centre_c5414996, markaz_us_sunnah_2ac7039c, markazi_jamia_masjid_a210e3af, masjid_ahl_al_sunnah(OCR), masjid_ar_raheem, masjid_as_sunnah_8fffb9da, masjid_e_quwwatul_islam, masjid_isa_ibn_maryam, masjid_stratford, masjid_ul_hidayah, morden, muslim_cultural_heritage, newcasyle_central, newport_central_jam_e_masjid, north_devon(OCR), quba_masjid, shahjalal_5e94c940(OCR), shahparan_chadderton, watford_jamia, galler. RENDER_FAIL: husseini_islamic_mission, prayer_room (need retry). the_hub/faizan_e_islam/huda_community: broken values (investigate).
