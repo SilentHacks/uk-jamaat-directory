@@ -123,11 +123,11 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] masjid_e_quba_2820e9eb.py  (masjidquba.org)
 - [ ] masjid_taqw_86938208.py  (masjidtaqwa.co.uk)
 - [ ] masjid_zakariya_65f43dbe.py  (masjidzakariya.co.uk)
-- [ ] al_falah_braintree_islamic_centre_d708f85e.py  (mawaqit.net)
-- [ ] bourneville_masjid___community_centre_c3e87838.py  (mawaqit.net)
-- [ ] madina_masjid___community_centre_103b26ec.py  (mawaqit.net)
-- [ ] newark_islamic_centre_9d59598d.py  (mawaqit.net)
-- [ ] newport_diyanet_education_community_centre_9b7d44ff.py  (mawaqit.net)
+- [x] al_falah_braintree_islamic_centre_d708f85e.py  (mawaqit.net)
+- [x] bourneville_masjid___community_centre_c3e87838.py  (mawaqit.net)
+- [x] madina_masjid___community_centre_103b26ec.py  (mawaqit.net)
+- [x] newark_islamic_centre_9d59598d.py  (mawaqit.net)
+- [x] newport_diyanet_education_community_centre_9b7d44ff.py  (mawaqit.net)
 - [ ] mayfair_islamic_centre_0a9cdc4e.py  (mayfairislamiccentre.org.uk)
 - [ ] masjid_bilal_6c40d256.py  (mbilal.org)
 - [ ] muslim_cultural_and_welfare_association_d3fe8fb8.py  (mcwas.org)
@@ -289,7 +289,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] masjid_e_quwwatul_islam_8bcc87c6.py  (masjidquwwatulislam.co.uk)
 - [ ] masjid_tawhid_f4d21bac.py  (masjidtawhid.org)
 - [ ] masjid_ul_hidayah_6fd90c3c.py  (masjidulhidayah.co.uk)
-- [ ] medina_mosque_4d5c8a78.py  (mawaqit.net)
+- [F] medina_mosque_4d5c8a78.py  (mawaqit.net)
 - [ ] morden_islamic_centre_77aec384.py  (miconline.co.uk)
 - [ ] central_jamia_masjid_3a38891e.py  (mkcjm.org.uk)
 - [ ] al_rawdha_mosque_6f295b27.py  (mkica.org)
@@ -470,3 +470,8 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - raza_mosque [N]: masjidbox slug `raza-mosque` 404s; widget appId jKp5GXjR4AzCX0QF8q733 is referrer/auth-gated. Needs correct slug.
 - al_amin: isha iqamah is 07:25 (bad upstream) -> dropped (plausible). ghausia: asr 20:15 dropped by window. Both use iqamah correctly.
 - madani & muhaddith_al_a_zam share slug ma-mission-learning-centre (same org, MA Mission UK) - left as-is.
+
+## Notes (mawaqit group)
+- Added `MawaqitConfDataExtractor` base: parses confData `iqamaCalendar` (=jamaat, absolute or +offset from adhan `calendar`), plus `jumua`/jumua2/3 on Fridays; plausibility-filtered. `times`/`calendar` are adhan and not used as jamaat.
+- medina_mosque_4d5c8a78 was effectively stubbed (returned no rows) -> rewritten to base; day-18 matches site iqama exactly. [F]
+- al_falah_braintree, bourneville, madina_masjid_community, newark, newport: custom confData parsers already use iqama correctly. [x]

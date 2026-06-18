@@ -400,6 +400,151 @@ class MasjidboxReduxExtractor(BaseMosqueWebsiteExtractor):
         return ExtractorResult(rows=rows, warnings=warnings)
 
 
+class MawaqitConfDataExtractor(BaseMosqueWebsiteExtractor):
+    """Declarative extractor for mawaqit.net widget/page targets.
+
+    mawaqit embeds the whole year in a ``confData`` JSON object in the page.
+    ``iqamaCalendar`` holds the congregation (iqama/jamaat) times — a list of
+    12 month dicts keyed by day-of-month, each value ``[fajr, dhuhr, asr,
+    maghrib, isha]``. Values are absolute ``HH:MM`` or a relative offset
+    (e.g. ``"+20"``) from the matching ``calendar`` (adhan) time. ``jumua``
+    /``jumua2``/``jumua3`` give the Friday congregation times. ``calendar``
+    (adhan/start times) is deliberately not used as jamaat.
+
+    Subclasses only supply ``key``, ``version``, ``source_match``,
+    ``refresh_policy`` and ``targets``.
+    """
+
+    target_label: str = "timetable"
+    # iqamaCalendar index -> calendar (adhan) index for relative offsets.
+    # calendar is [fajr, shuruq, dhuhr, asr, maghrib, isha]; iqama skips shuruq.
+    _IQAMA_PRAYERS = (Prayer.FAJR, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
+    _ADHAN_INDEX = (0, 2, 3, 4, 5)
+
+    def _resolve_time(
+        self, raw: str, adhan: str | None, prayer: str
+    ) -> "datetime.time | None":
+        from uk_jamaat_directory.ingest.extract.helpers.relative import (
+            add_minutes,
+            parse_offset_minutes,
+        )
+        from uk_jamaat_directory.ingest.extract.helpers.times import coerce_time
+
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        if ":" in raw:
+            return coerce_time(raw, prayer=prayer)
+        offset = parse_offset_minutes(raw)
+        if offset is None or not adhan:
+            return None
+        base = coerce_time(adhan, prayer=prayer)
+        if base is None:
+            return None
+        return add_minutes(base, offset)
+
+    def extract(self, ctx: ExtractContext) -> ExtractorResult:
+        artifact = ctx.artifact(self.target_label)
+        if not artifact.body:
+            return ExtractorResult(rows=[], no_schedule_reason="artifact was empty")
+        html = artifact.text()
+        match = re.search(r"confData\s*=\s*(\{.*?\})\s*[;<]", html, re.S)
+        if not match:
+            return ExtractorResult(rows=[], no_schedule_reason="confData not found")
+        try:
+            data = json.loads(match.group(1))
+        except Exception:
+            return ExtractorResult(rows=[], no_schedule_reason="confData parse failed")
+
+        iqama_cal = data.get("iqamaCalendar")
+        adhan_cal = data.get("calendar")
+        if not isinstance(iqama_cal, list) or not iqama_cal:
+            return ExtractorResult(rows=[], no_schedule_reason="iqamaCalendar not found")
+
+        year = datetime.now().year
+        rows: list[ExtractorRow] = []
+        warnings: list[ExtractorWarning] = []
+        jumua_times = [data.get("jumua"), data.get("jumua2"), data.get("jumua3")]
+        jumua_times = [t for t in jumua_times if t]
+
+        for month_index, month in enumerate(iqama_cal, start=1):
+            if not isinstance(month, dict):
+                continue
+            adhan_month = (
+                adhan_cal[month_index - 1]
+                if isinstance(adhan_cal, list) and len(adhan_cal) >= month_index
+                else {}
+            )
+            for day_str, values in month.items():
+                try:
+                    day = int(day_str)
+                    row_date = date(year, month_index, day)
+                except (ValueError, TypeError):
+                    continue
+                if not isinstance(values, list):
+                    continue
+                adhan_values = adhan_month.get(day_str) if isinstance(adhan_month, dict) else None
+                for i, prayer in enumerate(self._IQAMA_PRAYERS):
+                    if i >= len(values):
+                        continue
+                    adhan = None
+                    if isinstance(adhan_values, list) and self._ADHAN_INDEX[i] < len(adhan_values):
+                        adhan = adhan_values[self._ADHAN_INDEX[i]]
+                    jamaat = self._resolve_time(values[i], adhan, prayer.value)
+                    if jamaat is None:
+                        continue
+                    window = PLAUSIBLE_WINDOWS.get(prayer.value)
+                    if window and not (window[0] <= jamaat <= window[1]):
+                        continue
+                    rows.append(
+                        ExtractorRow(
+                            date=row_date,
+                            prayer=prayer,
+                            jamaat_time=jamaat,
+                            timezone=ctx.timezone,
+                            evidence=ctx.evidence(
+                                target_label=self.target_label,
+                                extractor_key=self.key,
+                                extractor_version=self.version,
+                                raw_text=str(values[i]),
+                                selector=(
+                                    f"confData.iqamaCalendar"
+                                    f"[{month_index - 1}][{day_str}][{i}]"
+                                ),
+                            ),
+                        )
+                    )
+                # Friday jumua congregations
+                if row_date.weekday() == 4 and jumua_times:
+                    for session, value in enumerate(jumua_times, start=1):
+                        jt = self._resolve_time(str(value), None, "jumuah")
+                        if jt is None:
+                            continue
+                        rows.append(
+                            ExtractorRow(
+                                date=row_date,
+                                prayer=Prayer.JUMUAH,
+                                jamaat_time=jt,
+                                session_number=session,
+                                session_label=f"session {session}",
+                                timezone=ctx.timezone,
+                                evidence=ctx.evidence(
+                                    target_label=self.target_label,
+                                    extractor_key=self.key,
+                                    extractor_version=self.version,
+                                    raw_text=str(value),
+                                    selector=f"confData.jumua[{session}]",
+                                ),
+                            )
+                        )
+
+        if not rows:
+            return ExtractorResult(
+                rows=[], warnings=warnings, no_schedule_reason="no iqama times found"
+            )
+        return ExtractorResult(rows=rows, warnings=warnings)
+
+
 class StubbedOcrExtractor(BaseMosqueWebsiteExtractor):
     """Extractor for image timetables, stubbed until OCR is implemented.
 

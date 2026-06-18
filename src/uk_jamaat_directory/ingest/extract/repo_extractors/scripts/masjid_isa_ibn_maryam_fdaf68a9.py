@@ -1,4 +1,3 @@
-import re
 from datetime import date
 
 from uk_jamaat_directory.domain import Prayer
