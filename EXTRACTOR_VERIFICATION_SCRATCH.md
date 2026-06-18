@@ -58,7 +58,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] harrow_central_mosque_3bf64ecc.py  (harrowmosque.org.uk)
 - [ ] hastings_mosque_f398eec1.py  (hastingsmosque.org)
 - [x] islamic_education___cultural_society_975d603e.py  (hayesmuslimcentre.org.uk)
-- [ ] hitchin_mosque_a6685012.py  (hitchinmosque.org)
+- [F] hitchin_mosque_a6685012.py  (hitchinmosque.org)
 - [ ] hockwell_ring_masjid_827d63a3.py  (hockwellringmasjid.org.uk)
 - [x] madina_mosque_e5ac2b61.py  (horsham-masjid.co.uk)
 - [ ] jumu_ah_salaah_organised_by_isle_of_man_muslim_association_12281505.py  (iaiom.com)
