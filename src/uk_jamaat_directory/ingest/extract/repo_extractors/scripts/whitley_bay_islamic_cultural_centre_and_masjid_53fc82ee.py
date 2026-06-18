@@ -19,7 +19,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.contract import (
 
 class Extractor(BaseMosqueWebsiteExtractor):
     key = "whitley_bay_islamic_cultural_centre_and_masjid_53fc82ee"
-    version = "2026.06.11.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("wbicc.org.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -107,7 +107,7 @@ class Extractor(BaseMosqueWebsiteExtractor):
             if not row or len(row) == 0:
                 continue
             first_cell_lower = row[0].lower()
-            if any(keyword in first_cell_lower for keyword in ["jamaa", "jama"]):
+            if "jam" in first_cell_lower:
                 jamaat_row = row
                 break
 
