@@ -13,7 +13,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "jamiat_ahle_e_hadith_masjid_c9d0ea1b"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("web.archive.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -26,9 +26,9 @@ class Extractor(TableTimetableExtractor):
     table_keywords = ("fajr", "jamat")
     date_column = 1
     prayer_columns = {
-        Prayer.FAJR: 3,
-        Prayer.DHUHR: 6,
-        Prayer.ASR: 8,
-        Prayer.MAGHRIB: 9,
-        Prayer.ISHA: 11,
+        Prayer.FAJR: 4,
+        Prayer.DHUHR: 7,
+        Prayer.ASR: 9,
+        Prayer.MAGHRIB: 10,
+        Prayer.ISHA: 12,
     }

@@ -21,7 +21,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "portsmouth_central_masjid_0cc03202"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("portsmouthcentralmasjid.com",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -34,12 +34,12 @@ class Extractor(TableTimetableExtractor):
     table_keywords = ("date", "fajr")
     date_column = "date"
     prayer_columns = {
-        Prayer.FAJR: "fajr",
-        Prayer.DHUHR: "zuhr",
+        Prayer.FAJR: "fajr jama",
+        Prayer.DHUHR: "zuhr jama",
         Prayer.JUMUAH: "jumu",
-        Prayer.ASR: "asr",
-        Prayer.MAGHRIB: "maghrib",
-        Prayer.ISHA: "isha",
+        Prayer.ASR: "asr jama",
+        Prayer.MAGHRIB: "maghrib jama",
+        Prayer.ISHA: "isha jama",
     }
 
     def extract(self, ctx: ExtractContext) -> ExtractorResult:
