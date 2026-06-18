@@ -26,7 +26,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] balham_mosque_204a7555.py  (balhammosque.org)
 - [x] tooting_islamic_centre_47c153c5.py  (balhammosque.org)
 - [ ] north_devon_islamic_culture_centre_69898210.py  (barnstapleislamiccentre.co.uk)
-- [ ] baytul__ilm_69aaaad1.py  (baytulilm.com)
+- [x] baytul__ilm_69aaaad1.py  (baytulilm.com)
 - [x] beca_east_street_islamic_centre_60743321.py  (becamasjid.org)
 - [ ] beeston_muslim_centre_4b497147.py  (beestonmuslimcentre.co.uk)
 - [x] belfast_islamic_centre_434ac67e.py  (belfastislamiccentre.org.uk)
@@ -140,7 +140,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] chesterfield_jamia_mosque_education___welfare_trust_62c76f97.py  (muslimwelfarechesterfield.com)
 - [x] chesterfield_muslim_association_42c6244a.py  (muslimwelfarechesterfield.com)
 - [x] abu_bakr_as_saddique_mosque_2d278ab8.py  (mwht.org.uk)
-- [ ] muslim_welfare_house_62d0cd32.py  (mwht.org.uk)
+- [x] muslim_welfare_house_62d0cd32.py  (mwht.org.uk)
 - [x] muslim_world_league_31aa892d.py  (mwllo.org.uk)
 - [x] muslim_world_league___london_office_d253f224.py  (mwllo.org.uk)
 - [x] muslim_youth_foundation__myf__f82d22e6.py  (myf.org.uk)
@@ -172,7 +172,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] southcourt_islamic_centre_5e5a1980.py  (southcourtislamiccentre.co.uk)
 - [x] stepney_shahjalal_mosque___cultural_centre_c11f557d.py  (stepneyshahjalalmosque.org.uk)
 - [x] swindon_masjid_5426174c.py  (swindonmasjid.com)
-- [ ] synthetic_html_table.py  (synthetic.example)
+- [S] synthetic_html_table.py  (synthetic.example)
 - [x] the_eden_centre_4fbb465e.py  (theedenfoundation.org.uk)
 - [x] medina_mosque___islamic_centre_e456fe79.py  (themadinamosque.com)
 - [x] the_olton_project_c180c518.py  (theoltonproject.com)
@@ -185,8 +185,8 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] tunbridge_wells_islamic_cultural_centre_2ecb9500.py  (tunbridgewellsmosque.com)
 - [x] masjid_umar_8adadf97.py  (umarmasjid.co.uk)
 - [F] whitley_bay_islamic_cultural_centre_and_masjid_53fc82ee.py  (wbicc.org.uk)
-- [ ] jamia_masjid_ahl_e_hadith_2c012faf.py  (web.archive.org)
-- [ ] jamiat_ahl_e_hadith_fe8c209c.py  (web.archive.org)
+- [x] jamia_masjid_ahl_e_hadith_2c012faf.py  (web.archive.org)
+- [x] jamiat_ahl_e_hadith_fe8c209c.py  (web.archive.org)
 - [S] werneth_jamia_mosque_46f815aa.py  (wernethjamiamasjid.org.uk)
 - [ ] windsor_muslim_association_88bc6962.py  (windsormuslimassociation.com)
 - [x] wycombe_islamic_society_3438d5e0.py  (wise-web.org)
@@ -237,7 +237,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] daarul_huda_50fef335.py  (daarulhuda.org)
 - [ ] madina_madrassa___spiritual_centre_37734c2b.py  (darassalaam.org.uk)
 - [ ] darul_ihsaan_barking_f1d2fd62.py  (darulihsaanbarking.org.uk)
-- [ ] dawatul_islam_mosque_48f02c85.py  (dawatulig.org.uk)
+- [N] dawatul_islam_mosque_48f02c85.py  (dawatulig.org.uk)
 - [ ] the_hub_f5feafcd.py  (deencentral.org)
 - [x] baytul_ihsaan_8e261dd7.py  (dfhtrust.org)
 - [F] manchester_islamic_centre___didsbury_mosque_70eec6a8.py  (didsburymosque.org)
@@ -269,7 +269,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] jamia_masjid_noor_25636eb5.py  (jamiamasjidnoor.co.uk)
 - [ ] bangladeshi_islamic_association_centre_316752c3.py  (jms.org.uk)
 - [ ] masjid_al_falaah__kokni_muslim_association_cd15d012.py  (kmab.org.uk)
-- [ ] kentish_town_baitul_aman_masjid_9dfa0030.py  (ktbam.co.uk)
+- [x] kentish_town_baitul_aman_masjid_9dfa0030.py  (ktbam.co.uk)
 - [x] madina_masjid_b9c32bc3.py  (madina-masjid.org.uk)
 - [x] madina_foundation_dagenham_east_islamic_centre_6301b29c.py  (madinafoundationdagenham.org)
 - [x] temporary_musallah_for_maidstone_community_and_islamic_centre_3f3a9116.py  (maidstonemosque.com)
@@ -295,7 +295,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] al_rawdha_mosque_6f295b27.py  (mkica.org)
 - [ ] abu_bakar_mosque_b02953ba.py  (mosquepay.co.uk)
 - [N] al_amanah_mosque_79d4c155.py  (muathtrust.com)
-- [ ] muslim_welfare_house_3cc5cdd0.py  (mwht.org.uk)
+- [x] muslim_welfare_house_3cc5cdd0.py  (mwht.org.uk)
 - [x] newbury_jamme_masjid_88ce3a6a.py  (newburyjammemasjid.org.uk)
 - [ ] newcasyle_central_mosque_f8c09615.py  (newcastlecentralmosque.com)
 - [x] masjid_al_humera_7add1105.py  (newhammosques.com)
@@ -534,3 +534,10 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - FIXED riverside_muslim_association_0b681e59 [F]: Asr/Maghrib/Isha pointed at begins (8/10/12); fixed to Iqamah (9/11/13). (Fajr/Dhuhr were already iqamah.)
 - ~45 rendered scripts verified jamaat-correct via render (OK_JAMAAT / jamaat-plausible values), marked [x].
 - TODO rendered ROWS0 (no data even when rendered - JS board not captured / no timetable published / OCR): aberdeen_0477ea2b, abu_bakar_mosque(mosquepay no data), al_hayat, al_hidaayah, al_huda_welfare, asha, bangladeshi, central_mosque_wembley, daarul_huda, galler_turkish, hazrat_bilal, madina_madrassa, madina_masjid_islamic_centre_c5414996, markaz_us_sunnah_2ac7039c, markazi_jamia_masjid_a210e3af, masjid_ahl_al_sunnah(OCR), masjid_ar_raheem, masjid_as_sunnah_8fffb9da, masjid_e_quwwatul_islam, masjid_isa_ibn_maryam, masjid_stratford, masjid_ul_hidayah, morden, muslim_cultural_heritage, newcasyle_central, newport_central_jam_e_masjid, north_devon(OCR), quba_masjid, shahjalal_5e94c940(OCR), shahparan_chadderton, watford_jamia, galler. RENDER_FAIL: husseini_islamic_mission, prayer_room (need retry). the_hub/faizan_e_islam/huda_community: broken values (investigate).
+
+## Notes (remaining HTML batch)
+- CORRECT [x]: baytul__ilm (2nd/jamaat time), jamia_masjid_ahl_e_hadith_2c012faf & jamiat_ahl_e_hadith_fe8c209c (jamiat-family jamaat cols, winter/stale-month dates), kentish_town (reads Jama'ah but pulls Jan monthly = stale month), muslim_welfare_house x2 (reads Jama'ah row: fajr 03:00 not begins 02:39).
+- dawatul_islam [N]: site's own widget data is broken/placeholder (fajr Adhan 1:33, Jamat 1:40 - implausible); script reads a stale winter monthly table. Source data unusable.
+- synthetic_html_table [S]: test fixture (synthetic.example), not a real mosque.
+- TODO 403-to-fetch (need agent-browser/browser-UA): al_markaz_ul_islami, ayrshire_central, brixton_hill, greenwich_islamic, islamic_tarbiyah, jumu_ah_f34baeab, sleaford, windsor.
+- TODO div/JS 0-row: al_emaan, jumu_ah_95a36d75, portsmouth_muslim_academy, quwwatul_islam, tunbridge_wells.
