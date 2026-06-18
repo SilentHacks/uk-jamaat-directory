@@ -11,7 +11,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] masjid_as_sunnah_8fffb9da.py  (albaseerah.com)
 - [x] al_bhokari_education_centre_107f9b66.py  (albokhari.org)
 - [x] al_falah_islamic_education_centre_b510ec37.py  (alfalahcentre.org)
-- [ ] al_furqan_mosque_b51be45b.py  (alfurqanllm.org)
+- [x] al_furqan_mosque_b51be45b.py  (alfurqanllm.org)
 - [ ] al_furqan_mosque_125c0f6c.py  (alfurqanmosque.com)
 - [ ] masjid_quba_66d4fd86.py  (alhassan.org.uk)
 - [x] al_hidaya_foundation_925dc5ec.py  (alhidayahfoundation.co.uk)
@@ -56,7 +56,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] the_muslim_cultural_centre_c4075e29.py  (gravesendcentralmosque.com)
 - [ ] islamic_centre_63d75651.py  (hamiltonislamiccentre.co.uk)
 - [x] harrow_central_mosque_3bf64ecc.py  (harrowmosque.org.uk)
-- [ ] hastings_mosque_f398eec1.py  (hastingsmosque.org)
+- [x] hastings_mosque_f398eec1.py  (hastingsmosque.org)
 - [x] islamic_education___cultural_society_975d603e.py  (hayesmuslimcentre.org.uk)
 - [F] hitchin_mosque_a6685012.py  (hitchinmosque.org)
 - [ ] hockwell_ring_masjid_827d63a3.py  (hockwellringmasjid.org.uk)
@@ -231,7 +231,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] jumu_ah_salaah_f34baeab.py  (cambournecrescent.org)
 - [ ] birmingham_central_mosque_493ae443.py  (centralmosque.org.uk)
 - [ ] shahparan_chadderton_central_mosque_72a67300.py  (chaddertonshahporan.co.uk)
-- [ ] chadwell_heath_muslim_centre_8e1dfec0.py  (chadwellheathmuslimcentre.co.uk)
+- [N] chadwell_heath_muslim_centre_8e1dfec0.py  (chadwellheathmuslimcentre.co.uk)
 - [x] abubakr_siddiq_islamic_centre_670544a8.py  (cma.cambridgemosque.com)
 - [x] mosque___islamic_centre_3b43b2a3.py  (cradleyheathcentralmosque.co.uk)
 - [ ] daarul_huda_50fef335.py  (daarulhuda.org)
@@ -514,3 +514,11 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - TODO genuine 0-row div/JS pages (no <table>): al_emaan (div grid), tunbridge_wells (div), quwwatul_islam (div, triage saw empty), jumu_ah_salaah_95a36d75, newbury (iqamah JS). portsmouth_muslim_academy (jumuah-only widget, 0 rows).
 - TODO 403/406/500 to my fetch (likely production-OK, recheck): al_ansar(403 but verified earlier [x]), al_jalal(403, verified [x]), al_markaz, ayrshire_central, brixton_hill, glasgow_central, greenwich_islamic, islamic_tarbiyah, masjid_e_taqwa, mosque___islamic_centre_3b43b2a3(500), sleaford, windsor, jumu_ah_f34baeab.
 - NOTE: remaining ~190 row-producing scripts still need per-site jamaat-vs-adhan confirmation (triage shows values but not labels). CUSTOM bucket (~150) largely unexamined.
+
+## Notes (suspicious deep-dive via per-page begins/jamaat comparison)
+- Method: fetched each page, compared script's extracted value to the row's Begins vs Jama'ah/Iqamah times. UK-June jamaat is naturally early so value-plausibility alone over-flagged; per-page comparison is definitive.
+- CONFIRMED CORRECT (pick iqamah/jama'ah): abu_bakr_as_saddique, al_quds, al_tawheed, canterbury, darul_ummah_goresbrook, eritrean, harlow, islamic_cultural_centre_7f1d439d, masjid_us_sunnah, sri_lankan, stepney_shahjalal, glasgow_mena, wycombe, finsbury_park, jamia_masjid_ibrahim(US Austin TX - wrong location but iqamah-correct), al_furqan_b51be45b(reads Iqamah cols; site returns stale/placeholder 2024 data), hastings(iqamah/congregation labels, JS).
+- FIXED hitchin [F]: was reading the "Namaz|Time" begins-only table; now scans for [prayer,begins,jamaat] rows and takes the last (jamaat) time.
+- chadwell_heath [N]: configured URL (page_id=392) is a stale Ramadan BEGINS table (cols Fajr/Sunrise/Dhuhr/Asr/Iftar/Maghrib/Isha-Taraweeh, no jamaat col). Currently publishes begins -> needs the correct jamaat page.
+- mayfair_islamic_centre [x but RE-REVIEW]: target hardcoded to 042026.csv (April only - freshness bug); CSV has F_q/Z_q/A_q/M_q/I_q (iqamah) columns = jamaat. Reads iqamah type but month hardcoded.
+- TODO PDF-target (need PDF inspection): bournemouth, kings_heath, norbury_muslim_centre, york_mosque, salafi_masjid (+ other PDF-kind scripts).
