@@ -16,7 +16,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] masjid_quba_66d4fd86.py  (alhassan.org.uk)
 - [ ] al_hidaya_foundation_925dc5ec.py  (alhidayahfoundation.co.uk)
 - [ ] masjid_al_huda_ed608509.py  (alhudabolton.com)
-- [ ] al_huda_islamic_centre_e3039d79.py  (alhudamasjid.org.uk)
+- [S] al_huda_islamic_centre_e3039d79.py  (alhudamasjid.org.uk)
 - [ ] masjid_al_jannah_7532ab3a.py  (aljannah.org.uk)
 - [ ] al_karam_trust_mosque_3ede8482.py  (alkaram-mosque.co.uk)
 - [ ] masjid_alnoor_d95ee13f.py  (alnoorcet.co.uk)
@@ -84,7 +84,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] furqan_611620bc.py  (madrasahalfurqan.co.uk)
 - [ ] makki_masjid_trust_058f83f5.py  (makkimasjidburton.org.uk)
 - [ ] masjid_ahl_al_sunnah_b88ec05e.py  (mamissionuk.com)
-- [ ] masjid_e_aqsa_15d77255.py  (masjid-e-aqsa.net)
+- [S] masjid_e_aqsa_15d77255.py  (masjid-e-aqsa.net)
 - [ ] masjid_us_sunnah_f883b7b0.py  (masjid-us-sunnah.com)
 - [ ] masjid_abu_bakr_56d63068.py  (masjidabubakr.co.uk)
 - [ ] masjid_e_aisha_53fc614f.py  (masjidaisha.co.uk)
@@ -115,7 +115,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] norwich_and_norfolk_community_centre_2a8ca4e7.py  (masjidbox.com)
 - [x] south_essex_islamic_community_centre_4b3178aa.py  (masjidbox.com)
 - [ ] masjid_hamza_ad4f2c4f.py  (masjidehamza.co.uk)
-- [ ] jame_masjid_e_noor_95e16e98.py  (masjidenoor.com)
+- [S] jame_masjid_e_noor_95e16e98.py  (masjidenoor.com)
 - [ ] masjid_e_taqwa_education___welfare_trust_e55b67db.py  (masjidetaqwa.co.uk)
 - [ ] masjid_ghousia_176f6475.py  (masjidghousia.org)
 - [ ] jamia_masjid_ibrahim_4a6516ac.py  (masjidibrahim.org)
@@ -187,7 +187,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] whitley_bay_islamic_cultural_centre_and_masjid_53fc82ee.py  (wbicc.org.uk)
 - [ ] jamia_masjid_ahl_e_hadith_2c012faf.py  (web.archive.org)
 - [ ] jamiat_ahl_e_hadith_fe8c209c.py  (web.archive.org)
-- [ ] werneth_jamia_mosque_46f815aa.py  (wernethjamiamasjid.org.uk)
+- [S] werneth_jamia_mosque_46f815aa.py  (wernethjamiamasjid.org.uk)
 - [ ] windsor_muslim_association_88bc6962.py  (windsormuslimassociation.com)
 - [ ] wycombe_islamic_society_3438d5e0.py  (wise-web.org)
 - [ ] jamia_masjid_ukim_ed0de84e.py  (wliconline.org)
@@ -294,7 +294,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] central_jamia_masjid_3a38891e.py  (mkcjm.org.uk)
 - [ ] al_rawdha_mosque_6f295b27.py  (mkica.org)
 - [ ] abu_bakar_mosque_b02953ba.py  (mosquepay.co.uk)
-- [ ] al_amanah_mosque_79d4c155.py  (muathtrust.com)
+- [N] al_amanah_mosque_79d4c155.py  (muathtrust.com)
 - [ ] muslim_welfare_house_3cc5cdd0.py  (mwht.org.uk)
 - [ ] newbury_jamme_masjid_88ce3a6a.py  (newburyjammemasjid.org.uk)
 - [ ] newcasyle_central_mosque_f8c09615.py  (newcastlecentralmosque.com)
@@ -328,8 +328,8 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] swansea_city_mosque___islamic_community_centre_632517a8.py  (swanseamosque.org)
 - [x] swansea_city_mosque___islamic_community_centre_b6c6832e.py  (swanseamosque.org)
 - [x] tawheed_islamic_education_centre_of_maidenhead_11b8ff30.py  (tiecm.org)
-- [ ] turners_road_masjid_59894530.py  (turnersroadmasjid.org)
-- [ ] upper_soothill_islamic_centre_72f46809.py  (usic.org.uk)
+- [F] turners_road_masjid_59894530.py  (turnersroadmasjid.org)
+- [N] upper_soothill_islamic_centre_72f46809.py  (usic.org.uk)
 - [ ] watford_jamia_masjid_037999c2.py  (watfordmosque.org.uk)
 - [x] jamiat_ahl_e_hadith_0992caf9.py  (web.archive.org)
 - [F] jamiat_ahle_e_hadith_masjid_c9d0ea1b.py  (web.archive.org)
@@ -505,3 +505,12 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 ## Notes (TBL pass 3: fetch-blocked re-checked)
 - brixton, jamiyat_ahl_e_hadith_a759e7f5, leicester_central, leicester_mosque [x]: returned 406 to my urllib default UA but fetch fine with a browser UA (production crawler uses proper UA). All target Jama'ah/Jamaat columns correctly; full 5 jamaat times verified. leicester '4.15' dotted times parse OK.
 - Still NO-TABLE/JS (TODO): jumu_ah_salaah_95a36d75, newbury_jamme_masjid_88ce3a6a. upper_soothill_72f46809: URL 404 (TODO).
+
+## Notes (TBL pass 4: triage of 215 HTML scripts)
+- Built /tmp/triage.py (threaded, browser UA) - ran all non-stub non-rendered single-HTML extractors. ~190/215 produce rows.
+- turners_road [F]: required 'jumuah' in table_keywords but daily widget header has no jumuah col; dropped keyword, mapped Dhuhr->'zuhr'. Now 5 jamaat times (Begins/Jama'ah widget like shahjalal).
+- Stubs not caught by initial filter (return OCR/aggregator no_schedule) -> [S]: jame_masjid_e_noor, masjid_e_aqsa, werneth_jamia_mosque (OCR), al_huda_islamic_centre (aggregator detection no-op).
+- Dead targets [N]: al_amanah (muathtrust.com parked, 341 bytes), upper_soothill (URL 404).
+- TODO genuine 0-row div/JS pages (no <table>): al_emaan (div grid), tunbridge_wells (div), quwwatul_islam (div, triage saw empty), jumu_ah_salaah_95a36d75, newbury (iqamah JS). portsmouth_muslim_academy (jumuah-only widget, 0 rows).
+- TODO 403/406/500 to my fetch (likely production-OK, recheck): al_ansar(403 but verified earlier [x]), al_jalal(403, verified [x]), al_markaz, ayrshire_central, brixton_hill, glasgow_central, greenwich_islamic, islamic_tarbiyah, masjid_e_taqwa, mosque___islamic_centre_3b43b2a3(500), sleaford, windsor, jumu_ah_f34baeab.
+- NOTE: remaining ~190 row-producing scripts still need per-site jamaat-vs-adhan confirmation (triage shows values but not labels). CUSTOM bucket (~150) largely unexamined.

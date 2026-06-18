@@ -22,7 +22,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "turners_road_masjid_59894530"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("turnersroadmasjid.org",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -32,12 +32,11 @@ class Extractor(TableTimetableExtractor):
             kind=TargetKind.HTML,
         ),
     )
-    table_keywords = ("prayer", "fajr", "jumuah")
+    table_keywords = ("prayer", "fajr")
     date_column = 0
     prayer_columns = {
         Prayer.FAJR: "fajr",
-        Prayer.DHUHR: "jumuah",
-        Prayer.JUMUAH: "jumuah",
+        Prayer.DHUHR: "zuhr",
         Prayer.ASR: "asr",
         Prayer.MAGHRIB: "maghrib",
         Prayer.ISHA: "isha",
