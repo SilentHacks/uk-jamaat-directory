@@ -51,7 +51,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] dunfermline_islamic_centre_c874c7d9.py  (dunfermlinecentralmosque.org.uk)
 - [x] edgware_central_mosque_06b151c0.py  (edgwarecentralmosque.org)
 - [x] edgware_islamic_cultural_trust_4d48643b.py  (edgwareict.org.uk)
-- [ ] faizan_e_islam_centre_c7d7d4ad.py  (faizaneislam.com)
+- [F] faizan_e_islam_centre_c7d7d4ad.py  (faizaneislam.com)
 - [x] falkirk_islamic_centre_a9339654.py  (falkirkcentralmosque.com)
 - [x] the_muslim_cultural_centre_c4075e29.py  (gravesendcentralmosque.com)
 - [x] islamic_centre_63d75651.py  (hamiltonislamiccentre.co.uk)
@@ -82,7 +82,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] leeds_islamic_centre_415fc02e.py  (leedsic.com)
 - [x] lewisham_islamic_centre_40e85cb8.py  (lewishamislamiccentre.com)
 - [x] furqan_611620bc.py  (madrasahalfurqan.co.uk)
-- [ ] makki_masjid_trust_058f83f5.py  (makkimasjidburton.org.uk)
+- [N] makki_masjid_trust_058f83f5.py  (makkimasjidburton.org.uk)
 - [N] masjid_ahl_al_sunnah_b88ec05e.py  (mamissionuk.com)
 - [S] masjid_e_aqsa_15d77255.py  (masjid-e-aqsa.net)
 - [x] masjid_us_sunnah_f883b7b0.py  (masjid-us-sunnah.com)
@@ -238,7 +238,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [N] madina_madrassa___spiritual_centre_37734c2b.py  (darassalaam.org.uk)
 - [x] darul_ihsaan_barking_f1d2fd62.py  (darulihsaanbarking.org.uk)
 - [N] dawatul_islam_mosque_48f02c85.py  (dawatulig.org.uk)
-- [ ] the_hub_f5feafcd.py  (deencentral.org)
+- [F] the_hub_f5feafcd.py  (deencentral.org)
 - [x] baytul_ihsaan_8e261dd7.py  (dfhtrust.org)
 - [F] manchester_islamic_centre___didsbury_mosque_70eec6a8.py  (didsburymosque.org)
 - [x] dunstable_masjid_b0ee86ec.py  (dunstablemasjid.org.uk)
@@ -256,7 +256,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] hayes_welfare_association___abdulla_masjid_b93d5b8e.py  (hayeswelfareassociation.co.uk)
 - [N] hazrat_bilal_centre_8c31d97c.py  (hazratbilal.org.uk)
 - [x] hounslow_jamia_masjid___islamic_centre_838f851d.py  (hounslowmasjid.co.uk)
-- [ ] huda_community_centre_990edbe3.py  (hudacentre.com)
+- [N] huda_community_centre_990edbe3.py  (hudacentre.com)
 - [x] hull_mosque_63dcbfb3.py  (hullmosque.com)
 - [N] husseini_islamic_mission_62214179.py  (hussainimission.com)
 - [x] north_finchley_mosque_ea4bee7c.py  (ianl.org.uk)
@@ -549,3 +549,9 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 ## Notes (PDF group)
 - Built /tmp/pdf_check.py. Most PDF extractors read jamaat/iqama cols (dhuhr 13:30+): aston, furqan_611620bc, masjid_e_taqwa, masjid_taqw, norbury_muslim_centre, salafi_masjid, york_mosque, shahjalal_masjid_6cd0dba8 (Iqama col), kings_heath (dhuhr 13:30/asr 19:45 jamaat). [x]
 - bournemouth [N]: the linked PDF is a RAMADAN 2026 (Feb-Mar) begins timetable - stale + begins, no current jamaat.
+
+## Notes (final 5 JS/div scripts)
+- faizan_e_islam [F] & the_hub [F]: dpt-style two-row header; prayer-name row (6 cells) misaligned with 13-cell data rows. Rewrote to declarative with fixed Jamaat columns 3/6/8/10/12. Now full 5 jamaat times.
+- salaam_centre [F]: same dpt plugin; was reading Begins cols -> fixed to Iqamah 3/6/9/11/13 (site publishes only placeholder 12:00am iqamah, so real jamaat unavailable, but no longer mis-publishes begins/adhan).
+- huda_community [N]: site table is all 12:00am placeholders dated 2024 (no real data).
+- makki_masjid_trust [N]: no table on rendered page; values implausible (no usable timetable).
