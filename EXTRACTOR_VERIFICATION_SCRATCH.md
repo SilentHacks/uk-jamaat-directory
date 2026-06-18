@@ -20,7 +20,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] masjid_al_jannah_7532ab3a.py  (aljannah.org.uk)
 - [x] al_karam_trust_mosque_3ede8482.py  (alkaram-mosque.co.uk)
 - [x] masjid_alnoor_d95ee13f.py  (alnoorcet.co.uk)
-- [ ] ayrshire_central_masjid_5ddc2394.py  (ayrshirecentralmosque.org.uk)
+- [x] ayrshire_central_masjid_5ddc2394.py  (ayrshirecentralmosque.org.uk)
 - [x] azhar_academy_e857294e.py  (azharacademybolton.org)
 - [x] former_baitul_aman_mosque_and_cultural_centre_b8e10753.py  (baitulaman.org)
 - [x] balham_mosque_204a7555.py  (balhammosque.org)
@@ -31,7 +31,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] beeston_muslim_centre_4b497147.py  (beestonmuslimcentre.co.uk)
 - [x] belfast_islamic_centre_434ac67e.py  (belfastislamiccentre.org.uk)
 - [x] belfast_islamic_centre_6d7e6c26.py  (belfastislamiccentre.org.uk)
-- [ ] brixton_hill_islamic_centre_dbed119c.py  (bhic.org.uk)
+- [x] brixton_hill_islamic_centre_dbed119c.py  (bhic.org.uk)
 - [ ] bournemouth_islamic_centre___central_mosque_8c8ac212.py  (biccm.org.uk)
 - [x] jamia_mosque_blackheath_5dfca4b9.py  (blackheathjamiamosque.co.uk)
 - [x] blackpool_central_mosque_601edaf8.py  (blackpool-mosque.co.uk)
@@ -69,7 +69,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] masjid_isa_ibn_maryam_fdaf68a9.py  (isaibnmaryam.co.uk)
 - [x] the_islambradford_centre_9adfbf58.py  (islambradford.com)
 - [x] nottingham_islamic_centre_33a5826d.py  (islamiccentrenottingham.com)
-- [ ] islamic_tarbiyah_academy_6c9244ba.py  (islamictarbiyah.com)
+- [x] islamic_tarbiyah_academy_6c9244ba.py  (islamictarbiyah.com)
 - [x] jamiatul_ilm_wal_huda_uk_3bc09b7b.py  (jamiah.co.uk)
 - [x] tantallon_road_mosque_50f4b0b3.py  (jamiaislamiaglasgow.org.uk)
 - [x] kettering_muslim_association_bad6943b.py  (ketteringmosque.co.uk)
@@ -163,7 +163,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] shahjalal_mosque___islamic_centre_5e94c940.py  (shahjalalmasjid.org)
 - [x] shah_jalal_islamic_centre_and_masjid_d7f9ee0e.py  (shahjalalmasjidipswich.co.uk)
 - [x] masjid___imambargah_shuhdae_karbala_3b82dfee.py  (shuhdaekarbala.org.uk)
-- [ ] sleaford_islamic_centre_a6a785a2.py  (sleafordislamiccentre.org)
+- [x] sleaford_islamic_centre_a6a785a2.py  (sleafordislamiccentre.org)
 - [x] sri_lankan_muslim_cultural_centre_uk_29a095a3.py  (slmcc.co.uk)
 - [x] jamia_masjid_anwar_ul_uloom_6db7c9d1.py  (smethwickjamiamosque.co.uk)
 - [x] pakistani_muslim_community_centre_0d6fc891.py  (smethwickjamiamosque.co.uk)
@@ -188,7 +188,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] jamia_masjid_ahl_e_hadith_2c012faf.py  (web.archive.org)
 - [x] jamiat_ahl_e_hadith_fe8c209c.py  (web.archive.org)
 - [S] werneth_jamia_mosque_46f815aa.py  (wernethjamiamasjid.org.uk)
-- [ ] windsor_muslim_association_88bc6962.py  (windsormuslimassociation.com)
+- [x] windsor_muslim_association_88bc6962.py  (windsormuslimassociation.com)
 - [x] wycombe_islamic_society_3438d5e0.py  (wise-web.org)
 - [x] jamia_masjid_ukim_ed0de84e.py  (wliconline.org)
 - [x] woodfarm_education_centre_994189a2.py  (woodfarmeducationcentre.org.uk)
@@ -212,7 +212,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] al_madinah_masjid_d9c8e11d.py  (almadinahmasjid.co.uk)
 - [ ] al_maktoum_mosque_7203ee87.py  (almaktoummosque.org)
 - [ ] muslim_cultural_heritage_centre_2f37036c.py  (almanaar.org.uk)
-- [ ] al_markaz_ul_islami_7c181174.py  (almarkazulislami.org.uk)
+- [x] al_markaz_ul_islami_7c181174.py  (almarkazulislami.org.uk)
 - [x] al_sunnah_mosque_e02540b7.py  (alsunnahmcr.org)
 - [x] al_tawheed_mosque_218ab07f.py  (altawheedmasjid.org)
 - [x] as_salam_centre_5ebfff08.py  (as-salaam.org)
@@ -228,7 +228,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] bismillah_cultural_centre_9288c3bf.py  (bismillahcentre.com)
 - [x] manor_road_masjid_81330c23.py  (bismillahcentre.com)
 - [x] brixton_mosque_bbcdafa3.py  (brixtonmasjid.co.uk)
-- [ ] jumu_ah_salaah_f34baeab.py  (cambournecrescent.org)
+- [x] jumu_ah_salaah_f34baeab.py  (cambournecrescent.org)
 - [ ] birmingham_central_mosque_493ae443.py  (centralmosque.org.uk)
 - [ ] shahparan_chadderton_central_mosque_72a67300.py  (chaddertonshahporan.co.uk)
 - [N] chadwell_heath_muslim_centre_8e1dfec0.py  (chadwellheathmuslimcentre.co.uk)
@@ -541,3 +541,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - synthetic_html_table [S]: test fixture (synthetic.example), not a real mosque.
 - TODO 403-to-fetch (need agent-browser/browser-UA): al_markaz_ul_islami, ayrshire_central, brixton_hill, greenwich_islamic, islamic_tarbiyah, jumu_ah_f34baeab, sleaford, windsor.
 - TODO div/JS 0-row: al_emaan, jumu_ah_95a36d75, portsmouth_muslim_academy, quwwatul_islam, tunbridge_wells.
+
+## Notes (403-fetch HTML re-checked via agent-browser)
+- All read iqamah/jamaat correctly: al_markaz, ayrshire, brixton_hill, islamic_tarbiyah (dhuhr 13:30+), jumu_ah_f34baeab (Prayer|Start|Jamaat, fajr=04:00 jamaat), sleaford (Iqamah col; 13:08 IS their iqamah per header), windsor (Iqamah col; 14:07 their iqamah). [x]
+- greenwich_islamic_centre: ROWS0 even rendered (TODO - needs deeper/longer render or no data).
