@@ -13,7 +13,7 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "manchester_islamic_centre___didsbury_mosque_70eec6a8"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("didsburymosque.com", "didsburymosque.org"))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     targets = (
@@ -29,6 +29,6 @@ class Extractor(TableTimetableExtractor):
         Prayer.FAJR: 4,
         Prayer.DHUHR: 7,
         Prayer.ASR: 9,
-        Prayer.MAGHRIB: 10,
+        Prayer.MAGHRIB: 11,
         Prayer.ISHA: 12,
     }

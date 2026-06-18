@@ -96,7 +96,10 @@ class _TabularTimetableMixin:
     # --- implementation ---
     def _column_index(self, header: list[str], spec: str | int) -> int | None:
         if isinstance(spec, int):
-            return spec if 0 <= spec < len(header) else None
+            # Body rows may be wider than the header row (e.g. two-row headers
+            # where the sub-header has fewer cells than data rows), so only
+            # reject negative indices here; per-row bounds are checked later.
+            return spec if spec >= 0 else None
         needle = spec.lower()
         for idx, cell in enumerate(header):
             if needle in cell.lower():
