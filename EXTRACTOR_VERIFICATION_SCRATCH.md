@@ -40,7 +40,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] bristol_central_mosque_01e0c34b.py  (bristolcentralmosque.co.uk)
 - [x] cambridge_central_mosque_165d4c74.py  (cambridgecentralmosque.org)
 - [x] canterbury_islamic_centre_fee86598.py  (canterburymosque.co.uk)
-- [ ] glasgow_central_mosque_72e65ee9.py  (centralmosque.co.uk)
+- [x] glasgow_central_mosque_72e65ee9.py  (centralmosque.co.uk)
 - [ ] markazi_jamia_masjid_a210e3af.py  (centralmosquerochdale.com)
 - [x] central_park_community_centre_856f023d.py  (centralparkcommunitycentre.com)
 - [x] chatham_mosque_0fcccf04.py  (chathamhillmosque.co.uk)
