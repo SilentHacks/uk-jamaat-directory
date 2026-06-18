@@ -5,7 +5,7 @@ Legend: [ ] unchecked  [x] verified-correct  [F] fixed  [N] no-data/unverifiable
 Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 
 ## CUSTOM (188)
-- [ ] madni_jamia_masjid_bd29b476.py  ()
+- [S] madni_jamia_masjid_bd29b476.py  ()
 - [ ] afghan_islamic_cultural_centre_5f1f8e18.py  (afghanicc.com)
 - [ ] al_emaan_centre_fa0f95b4.py  (al-emaan.org.uk)
 - [ ] masjid_as_sunnah_8fffb9da.py  (albaseerah.com)
@@ -178,10 +178,10 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [ ] the_olton_project_c180c518.py  (theoltonproject.com)
 - [ ] thornton_heath_islamic_centre_d557d412.py  (thislamiccentre.org)
 - [ ] tilbury_mosque_f8757053.py  (tilburymosque.co.uk)
-- [ ] al_falah_community_centre_0bbbeab7.py  (timing.athanplus.com)
-- [ ] edgware_road_mosque_79e0eae2.py  (timing.athanplus.com)
-- [ ] london_central_mosque_e5258d60.py  (timing.athanplus.com)
-- [ ] maidenhead_central_mosque_ef8b9620.py  (timing.athanplus.com)
+- [F] al_falah_community_centre_0bbbeab7.py  (timing.athanplus.com)
+- [x] edgware_road_mosque_79e0eae2.py  (timing.athanplus.com)
+- [x] london_central_mosque_e5258d60.py  (timing.athanplus.com)
+- [x] maidenhead_central_mosque_ef8b9620.py  (timing.athanplus.com)
 - [ ] tunbridge_wells_islamic_cultural_centre_2ecb9500.py  (tunbridgewellsmosque.com)
 - [ ] masjid_umar_8adadf97.py  (umarmasjid.co.uk)
 - [ ] whitley_bay_islamic_cultural_centre_and_masjid_53fc82ee.py  (wbicc.org.uk)
@@ -475,3 +475,9 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - Added `MawaqitConfDataExtractor` base: parses confData `iqamaCalendar` (=jamaat, absolute or +offset from adhan `calendar`), plus `jumua`/jumua2/3 on Fridays; plausibility-filtered. `times`/`calendar` are adhan and not used as jamaat.
 - medina_mosque_4d5c8a78 was effectively stubbed (returned no rows) -> rewritten to base; day-18 matches site iqama exactly. [F]
 - al_falah_braintree, bourneville, madina_masjid_community, newark, newport: custom confData parsers already use iqama correctly. [x]
+
+## Notes (athanplus group)
+- athanplus monthly widget: IQAMAH row/cols = jamaat; ADHAN/begins cols not used. Maghrib iqamah is often "Sunset" (pray at maghrib begins).
+- al_falah_community_centre [F]: was hardcoding "June 2026" (broke other months) and skipping Maghrib; now derives month/year from page and includes Maghrib (theme=2 col 10). day-18 all 5 prayers correct.
+- edgware_road, maidenhead [x]: robust iqamah parsers (theme=1); deliberately skip Maghrib "Sunset" (minor gap, not adhan misuse). london_central [x]: embed widget, all 5 correct.
+- madni_jamia_masjid_bd29b476 [S]: module is a SKIPPED_REVIEW docstring with no Extractor class (Google Sheets iframe, out of scope per ADR 0017).
