@@ -22,16 +22,20 @@ from uk_jamaat_directory.ingest.extract.repo_extractors.declarative import (
 
 class Extractor(TableTimetableExtractor):
     key = "salaam_centre_30e21138"
-    version = "2026.06.12.1"
+    version = "2026.06.18.1"
     source_match = SourceMatch(domains=("sicm.org.uk",))
     refresh_policy = RefreshPolicy(frequency=RunFrequency.DAILY)
     table_keywords = ("date", "iqamah")
     date_column = 0
+    # daily-prayer-time-for-mosques dpt plugin layout (two-row header):
+    # 0=Date,1=Day,2=FajrBegins,3=FajrIqamah,4=Sunrise,5=ZuhrBegins,6=ZuhrIqamah,
+    # 7=AsrEarly,8=AsrLate,9=AsrIqamah,10=MaghBegins,11=MaghIqamah,12=IshaBegins,13=IshaIqamah
     prayer_columns = {
-        Prayer.FAJR: 2,
-        Prayer.DHUHR: 5,
-        Prayer.ASR: 7,
-        Prayer.MAGHRIB: 8,
+        Prayer.FAJR: 3,
+        Prayer.DHUHR: 6,
+        Prayer.ASR: 9,
+        Prayer.MAGHRIB: 11,
+        Prayer.ISHA: 13,
     }
 
     def __init__(self) -> None:

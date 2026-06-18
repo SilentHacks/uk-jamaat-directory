@@ -318,7 +318,7 @@ Totals: {'TBL': 146, 'CUSTOM': 188, 'STUB': 113, 'PDFTBL': 5}  grand=452
 - [x] masjid_e_saliheen_e21e7e8e.py  (saliheen.co.uk)
 - [F] shahjalal_mosque_and_islamic_centre_eaa39c15.py  (shahjalalmosque.org)
 - [x] shrewsbury_muslim_centre_5f5a28be.py  (shrewsburymuslimcentre.org)
-- [ ] salaam_centre_30e21138.py  (sicm.org.uk)
+- [F] salaam_centre_30e21138.py  (sicm.org.uk)
 - [N] prayer_room_338160ad.py  (smcc.arabblogs.com)
 - [x] s_r_i_c_c_baitul_rahman_masjid_c59f6513.py  (somalirelief.org.uk)
 - [x] somers_town_islamic_cultural_and_education_centre_8b9d1b3d.py  (somerstownmosque.com)
