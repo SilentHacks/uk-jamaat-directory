@@ -136,11 +136,11 @@ async def test_community_schedule_stays_pending_after_validate(
         mosque_id,
         MosqueScheduleSubmission(
             schedules=[
-                ScheduleSubmissionRow(
-                    date=date(2026, 6, 9),
-                    prayer="fajr",
-                    jamaat_time="04:15",
-                )
+                    ScheduleSubmissionRow(
+                        date=date.today(),
+                        prayer="fajr",
+                        jamaat_time="04:15",
+                    )
             ]
         ),
     )
