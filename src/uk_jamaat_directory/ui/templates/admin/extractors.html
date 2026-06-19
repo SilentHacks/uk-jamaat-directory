@@ -1,0 +1,110 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Extractors — Admin{% endblock %}
+
+{% block admin %}
+<h1>Extractor Review Dashboard</h1>
+
+<div class="panel">
+  <form method="get" action="/admin/extractors" class="filter-form">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search mosque or domain..." />
+    <select name="status">
+      <option value="">All Statuses</option>
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+      <option value="needs_attention" {% if status_filter == 'needs_attention' %}selected{% endif %}>Needs Attention</option>
+      <option value="missing_script" {% if status_filter == 'missing_script' %}selected{% endif %}>Missing Script</option>
+    </select>
+    <select name="frequency">
+      <option value="">All Frequencies</option>
+      <option value="daily" {% if freq_filter == 'daily' %}selected{% endif %}>Daily</option>
+      <option value="weekly" {% if freq_filter == 'weekly' %}selected{% endif %}>Weekly</option>
+      <option value="monthly" {% if freq_filter == 'monthly' %}selected{% endif %}>Monthly</option>
+    </select>
+    <button type="submit" class="btn">Filter</button>
+  </form>
+</div>
+
+<table class="data">
+  <thead>
+    <tr>
+      <th>Mosque &amp; Website</th>
+      <th>Extractor Key</th>
+      <th>Frequency</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% set assignment = row.Assignment %}
+    {% set source = row.Source %}
+    {% set mosque = row.Mosque %}
+    {% if assignment %}
+      {% set needs_attention = assignment.metadata_.get('needs_attention', False) %}
+    {% else %}
+      {% set needs_attention = False %}
+    {% endif %}
+    <tr id="row-{{ source.id }}">
+      <td>
+        {% if mosque %}
+        <strong><a href="/admin/mosques/{{ source.mosque_id }}">{{ mosque.name }}</a></strong>
+        {% else %}
+        <strong class="muted">(unlinked source)</strong>
+        {% endif %}
+        <br />
+        <a href="{{ source.source_url }}" target="_blank" class="muted small">{{ source.source_url | truncate(50) }}</a>
+      </td>
+      <td>
+        {% if assignment %}
+        <code>{{ assignment.extractor_key }}</code> <small class="muted">v{{ assignment.extractor_version }}</small>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if assignment %}
+        <span class="badge">{{ assignment.run_frequency }}</span>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if not assignment %}
+          <span class="badge status-duplicate" style="border-color: var(--danger); color: var(--danger)">Missing Script</span>
+        {% elif needs_attention %}
+          <span class="badge status-duplicate" style="border-color: var(--danger); color: var(--danger)">Attention Needed</span>
+        {% else %}
+          <span class="badge status-active">{{ assignment.status }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if assignment %}
+        <button class="btn small"
+                hx-post="/admin/extractors/{{ source.id }}/preview"
+                hx-target="#detail-{{ source.id }}"
+                hx-swap="innerHTML"
+                onclick="document.getElementById('drawer-{{ source.id }}').style.display = 'table-row'">
+          Preview
+        </button>
+        {% endif %}
+      </td>
+    </tr>
+    {% if assignment %}
+    <tr id="drawer-{{ source.id }}" class="detail-drawer" style="display:none; background: var(--panel);">
+      <td colspan="5">
+        <div id="detail-{{ source.id }}" class="detail-container">
+          <div class="muted">Loading preview sandbox...</div>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% else %}
+    <tr><td colspan="5" class="muted">No extractor assignments matched.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% if prev_offset is not none %}<a class="btn" href="/admin/extractors?offset={{ prev_offset }}&q={{ q }}&status={{ status_filter }}&frequency={{ freq_filter }}">← Prev</a>{% endif %}
+  {% if next_offset is not none %}<a class="btn" href="/admin/extractors?offset={{ next_offset }}&q={{ q }}&status={{ status_filter }}&frequency={{ freq_filter }}">Next →</a>{% endif %}
+</div>
+{% endblock %}

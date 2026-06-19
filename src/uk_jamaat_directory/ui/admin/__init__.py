@@ -17,6 +17,7 @@ from fastapi import APIRouter
 from uk_jamaat_directory.ui.admin import (
     auth_routes,
     dashboard,
+    extractors,
     moderation,
     mosques,
     pipeline,
@@ -28,5 +29,6 @@ router.include_router(dashboard.router)
 router.include_router(mosques.router)
 router.include_router(moderation.router)
 router.include_router(pipeline.router)
+router.include_router(extractors.router)
 
 __all__ = ["router"]

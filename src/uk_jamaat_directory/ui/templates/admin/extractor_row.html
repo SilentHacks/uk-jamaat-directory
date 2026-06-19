@@ -1,0 +1,62 @@
+{% set assignment = Assignment %}
+{% set source = Source %}
+{% set mosque = Mosque %}
+{% if assignment %}
+  {% set needs_attention = assignment.metadata_.get('needs_attention', False) %}
+{% else %}
+  {% set needs_attention = False %}
+{% endif %}
+<tr id="row-{{ source.id }}">
+  <td>
+    {% if mosque %}
+    <strong><a href="/admin/mosques/{{ source.mosque_id }}">{{ mosque.name }}</a></strong>
+    {% else %}
+    <strong class="muted">(unlinked source)</strong>
+    {% endif %}
+    <br />
+    <a href="{{ source.source_url }}" target="_blank" class="muted small">{{ source.source_url | truncate(50) }}</a>
+  </td>
+  <td>
+    {% if assignment %}
+    <code>{{ assignment.extractor_key }}</code> <small class="muted">v{{ assignment.extractor_version }}</small>
+    {% else %}
+    <span class="muted">—</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if assignment %}
+    <span class="badge">{{ assignment.run_frequency }}</span>
+    {% else %}
+    <span class="muted">—</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if not assignment %}
+      <span class="badge status-duplicate" style="border-color: var(--danger); color: var(--danger)">Missing Script</span>
+    {% elif needs_attention %}
+      <span class="badge status-duplicate" style="border-color: var(--danger); color: var(--danger)">Attention Needed</span>
+    {% else %}
+      <span class="badge status-active">{{ assignment.status }}</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if assignment %}
+    <button class="btn small"
+            hx-post="/admin/extractors/{{ source.id }}/preview"
+            hx-target="#detail-{{ source.id }}"
+            hx-swap="innerHTML"
+            onclick="document.getElementById('drawer-{{ source.id }}').style.display = 'table-row'">
+      Preview
+    </button>
+    {% endif %}
+  </td>
+</tr>
+{% if assignment %}
+<tr id="drawer-{{ source.id }}" class="detail-drawer" style="display:none; background: var(--panel);">
+  <td colspan="5">
+    <div id="detail-{{ source.id }}" class="detail-container">
+      <div class="muted">Loading preview sandbox...</div>
+    </div>
+  </td>
+</tr>
+{% endif %}
