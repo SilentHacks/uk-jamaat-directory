@@ -61,7 +61,7 @@ async def extractors_list(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> HTMLResponse:
-    if status == "missing_script":
+    if status in (None, "missing_script"):
         stmt = (
             select(MosqueSource, Mosque, SourceExtractorAssignment)
             .join(Mosque, MosqueSource.mosque_id == Mosque.id, isouter=True)
@@ -69,7 +69,6 @@ async def extractors_list(
                 SourceExtractorAssignment,
                 MosqueSource.id == SourceExtractorAssignment.source_id,
             )
-            .where(SourceExtractorAssignment.source_id.is_(None))
         )
         count_stmt = (
             select(func.count())
@@ -78,8 +77,15 @@ async def extractors_list(
                 SourceExtractorAssignment,
                 MosqueSource.id == SourceExtractorAssignment.source_id,
             )
-            .where(SourceExtractorAssignment.source_id.is_(None))
         )
+
+        if status == "missing_script":
+            stmt = stmt.where(SourceExtractorAssignment.source_id.is_(None))
+            count_stmt = count_stmt.where(SourceExtractorAssignment.source_id.is_(None))
+
+        if frequency:
+            stmt = stmt.where(SourceExtractorAssignment.run_frequency == frequency)
+            count_stmt = count_stmt.where(SourceExtractorAssignment.run_frequency == frequency)
     else:
         stmt = (
             select(SourceExtractorAssignment, MosqueSource, Mosque)
@@ -109,34 +115,20 @@ async def extractors_list(
 
     if q and q.strip():
         pattern = f"%{q.strip()}%"
-        if status == "missing_script":
-            stmt = stmt.where(
-                or_(
-                    Mosque.name.ilike(pattern),
-                    MosqueSource.source_url.ilike(pattern),
-                )
+        stmt = stmt.where(
+            or_(
+                Mosque.name.ilike(pattern),
+                MosqueSource.source_url.ilike(pattern),
             )
-            count_stmt = count_stmt.where(
-                or_(
-                    Mosque.name.ilike(pattern),
-                    MosqueSource.source_url.ilike(pattern),
-                )
+        )
+        count_stmt = count_stmt.where(
+            or_(
+                Mosque.name.ilike(pattern),
+                MosqueSource.source_url.ilike(pattern),
             )
-        else:
-            stmt = stmt.where(
-                or_(
-                    Mosque.name.ilike(pattern),
-                    MosqueSource.source_url.ilike(pattern),
-                )
-            )
-            count_stmt = count_stmt.where(
-                or_(
-                    Mosque.name.ilike(pattern),
-                    MosqueSource.source_url.ilike(pattern),
-                )
-            )
+        )
 
-    if status == "missing_script":
+    if status in (None, "missing_script"):
         stmt = stmt.order_by(MosqueSource.source_url.asc())
     else:
         stmt = stmt.order_by(SourceExtractorAssignment.next_run_at.asc().nullsfirst())
@@ -169,9 +161,18 @@ async def extractors_list(
 async def extractor_preview(
     request: Request,
     source_id: uuid.UUID,
+    csrf_token: str = Form(default=""),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> HTMLResponse:
+    if not check_csrf(request, csrf_token):
+        return no_store(
+            HTMLResponse(
+                '<div class="flash err">Session expired. Please refresh the page.</div>',
+                status_code=403,
+            )
+        )
+
     source = await session.get(MosqueSource, source_id)
     if source is None:
         return no_store(
@@ -224,13 +225,13 @@ async def extractor_preview(
     try:
         storage = S3Storage(settings)
         body = await storage.get_bytes(artifact.object_key)
-    except Exception as exc:
+    except Exception:
         return no_store(
             render(
                 request,
                 "admin/extractor_preview.html",
                 {
-                    "error": f"Failed to read artifact from storage: {exc}",
+                    "error": "Failed to read artifact from storage.",
                     "source_id": str(source_id),
                     "csrf_token": auth.issue_csrf_token(request),
                 },
@@ -327,7 +328,7 @@ async def extractor_attention(
         meta.pop("attention_updated_at", None)
 
     assignment.metadata_ = meta
-    await session.flush()
+    await session.commit()
 
     source = await session.get(MosqueSource, source_id)
     mosque = await session.get(Mosque, source.mosque_id) if source and source.mosque_id else None

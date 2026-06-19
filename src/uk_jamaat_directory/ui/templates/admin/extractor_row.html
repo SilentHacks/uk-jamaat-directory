@@ -43,6 +43,7 @@
     {% if assignment %}
     <button class="btn small"
             hx-post="/admin/extractors/{{ source.id }}/preview"
+            hx-vals='{"csrf_token": "{{ csrf_token }}"}'
             hx-target="#detail-{{ source.id }}"
             hx-swap="innerHTML"
             onclick="document.getElementById('drawer-{{ source.id }}').style.display = 'table-row'">
